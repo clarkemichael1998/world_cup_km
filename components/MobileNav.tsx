@@ -16,6 +16,17 @@ const tabs = [
     )
   },
   {
+    href: "/leaderboard",
+    label: "Ranking",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
+        <line x1="18" y1="20" x2="18" y2="10" />
+        <line x1="12" y1="20" x2="12" y2="4" />
+        <line x1="6" y1="20" x2="6" y2="14" />
+      </svg>
+    )
+  },
+  {
     href: "/collection",
     label: "Cards",
     icon: (
@@ -65,7 +76,7 @@ export function MobileNav() {
       className="fixed bottom-0 left-0 right-0 z-50 border-t border-green-900/10 bg-white/95 backdrop-blur md:hidden"
       style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
     >
-      <div className="grid grid-cols-5">
+      <div className="grid grid-cols-6">
         {tabs.map((tab) => {
           const active = pathname === tab.href || pathname.startsWith(tab.href + "/");
           return (

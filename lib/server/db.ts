@@ -285,6 +285,18 @@ export function logKmEntry(userId: number, distanceKm: number, cardsEarned: numb
   getDb().prepare("INSERT INTO km_log (user_id, distance_km, cards_earned) VALUES (?, ?, ?)").run(userId, distanceKm, cardsEarned);
 }
 
+export function getKmLeaderboard() {
+  return getDb()
+    .prepare(
+      `SELECT users.username, COALESCE(SUM(km_log.distance_km), 0) AS total_km, COUNT(km_log.id) AS entry_count
+       FROM users
+       LEFT JOIN km_log ON km_log.user_id = users.id
+       GROUP BY users.id
+       ORDER BY total_km DESC`
+    )
+    .all() as Array<{ username: string; total_km: number; entry_count: number }>;
+}
+
 export function getKmFeed(limit = 30) {
   return getDb()
     .prepare(

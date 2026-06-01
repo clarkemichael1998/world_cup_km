@@ -34,8 +34,10 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
                 <Link className="rounded-md px-3 py-2 hover:bg-green-100" href="/add-km">Add KM</Link>
                 <Link className="rounded-md px-3 py-2 hover:bg-green-100" href="/collection">Collection</Link>
                 <Link className="rounded-md px-3 py-2 hover:bg-green-100" href="/squad">Squad</Link>
+                <Link className="rounded-md px-3 py-2 hover:bg-green-100" href="/leaderboard">Leaderboard</Link>
                 <Link className="rounded-md px-3 py-2 hover:bg-green-100" href="/live">Live</Link>
                 <Link className="rounded-md px-3 py-2 hover:bg-green-100" href="/chat">Chat</Link>
+                <Link className="rounded-md px-3 py-2 hover:bg-green-100" href="/rules">Rules</Link>
                 <Link className="rounded-md px-3 py-2 hover:bg-green-100" href="/login">Login</Link>
                 <NavActions />
               </div>
@@ -46,7 +48,10 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           <header className="nav-blur sticky top-0 z-40 flex items-center justify-between border-b border-green-900/10 bg-white/80 px-4 py-3 md:hidden"
             style={{ paddingTop: "max(0.75rem, env(safe-area-inset-top, 0px))" }}>
             <Link href="/" className="text-lg font-black tracking-tight text-pitch">KMXI</Link>
-            <NavActions />
+            <div className="flex items-center gap-3">
+              <Link href="/rules" className="text-xs font-black uppercase tracking-wide text-green-900/60 hover:text-green-950">Rules</Link>
+              <NavActions />
+            </div>
           </header>
 
           <AuthGuard />
