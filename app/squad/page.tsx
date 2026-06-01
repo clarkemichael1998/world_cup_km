@@ -188,13 +188,13 @@ function SquadToken({ slot, selected, active, onClick }: { slot: SquadSlot; sele
   const position = slotAllowedPositions(slot)[0];
 
   return (
-    <button className={`min-w-0 rounded-lg border p-2 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${active ? "border-gold bg-white" : "border-white/30 bg-white/95"}`} onClick={onClick}>
+    <button className={`min-w-0 rounded-lg border p-1.5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${active ? "border-gold bg-white" : "border-white/30 bg-white/95"}`} onClick={onClick}>
       <div className="flex items-center justify-between gap-1">
-        {selected ? <Flag nation={selected.nation} compact /> : <span className="text-xs font-black text-green-900/50">--</span>}
-        <span className={`rounded px-1.5 py-0.5 text-[11px] font-black text-green-950 bg-gradient-to-br ${ratingTone}`}>{selected?.rating ?? "--"}</span>
+        {selected ? <Flag nation={selected.nation} compact /> : <span className="text-[10px] font-black text-green-900/50">--</span>}
+        <span className={`rounded px-1 py-0.5 text-[10px] font-black text-green-950 bg-gradient-to-br ${ratingTone}`}>{selected?.rating ?? "--"}</span>
       </div>
-      <p className="mt-1 truncate text-sm font-black leading-tight text-green-950">{selected?.name ?? slotLabel(slot)}</p>
-      <p className="mt-0.5 truncate text-[11px] font-bold text-green-900/70">{selected ? selected.club : position}</p>
+      <p className="mt-1 break-words text-[10px] font-black leading-tight text-green-950">{selected?.name ?? slotLabel(slot)}</p>
+      <p className="mt-0.5 truncate text-[9px] font-bold text-green-900/70">{selected ? selected.club : position}</p>
       <div
         className="mt-1 h-1 overflow-hidden rounded-full bg-green-950/10"
         role="progressbar"

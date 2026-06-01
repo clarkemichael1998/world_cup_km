@@ -2,6 +2,7 @@ import type { Player } from "@/lib/types";
 import { flagUrl } from "@/lib/flags";
 
 const rarityStyles: Record<Player["rarity"], string> = {
+  clowns: "border-red-400 bg-red-50 text-red-950",
   common: "border-slate-300 bg-slate-50 text-slate-900",
   rare: "border-sky-300 bg-sky-50 text-sky-950",
   epic: "border-fuchsia-300 bg-fuchsia-50 text-fuchsia-950",

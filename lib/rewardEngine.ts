@@ -4,6 +4,7 @@ import type { Player, Position, Rarity, SquadSlot, UserState } from "./types";
 export const allPlayers = players as Player[];
 
 const odds: Array<{ rarity: Rarity; ceiling: number }> = [
+  { rarity: "clowns", ceiling: 0.01 },
   { rarity: "common", ceiling: 0.65 },
   { rarity: "rare", ceiling: 0.9 },
   { rarity: "epic", ceiling: 0.98 },
@@ -68,7 +69,7 @@ export function generateStarterState(): UserState {
       (player) =>
         item.positions.includes(player.pos) &&
         !picked.has(player.id) &&
-        ["common", "rare"].includes(player.rarity) &&
+        (["common", "rare"] as Rarity[]).includes(player.rarity) &&
         player.rating >= 60 &&
         player.rating <= 74
     );
