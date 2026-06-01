@@ -3,8 +3,8 @@ import Link from "next/link";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "KM Footy",
-  description: "Log kilometres and collect football player cards."
+  title: "KMXI",
+  description: "Log kilometres, collect World Cup players, and compete with your XI."
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
@@ -15,7 +15,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           <header className="border-b border-green-900/10 bg-white/80 backdrop-blur">
             <nav className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
               <Link href="/" className="text-xl font-black tracking-tight text-pitch">
-                KM Footy
+                KMXI
               </Link>
               <div className="flex gap-2 text-sm font-semibold text-green-950">
                 <Link className="rounded-md px-3 py-2 hover:bg-green-100" href="/add-km">
@@ -29,6 +29,9 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
                 </Link>
                 <Link className="rounded-md px-3 py-2 hover:bg-green-100" href="/live">
                   Live
+                </Link>
+                <Link className="rounded-md px-3 py-2 hover:bg-green-100" href="/chat">
+                  Chat
                 </Link>
                 <Link className="rounded-md px-3 py-2 hover:bg-green-100" href="/login">
                   Login

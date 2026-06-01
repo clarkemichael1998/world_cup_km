@@ -9,9 +9,14 @@ import type { UserState } from "@/lib/types";
 
 export default function Home() {
   const [state, setState] = useState<UserState | null>(null);
+  const [communityKm, setCommunityKm] = useState<number | null>(null);
 
   useEffect(() => {
     loadUserStateAsync().then(setState);
+    fetch("/api/community")
+      .then((response) => response.json())
+      .then((payload) => setCommunityKm(payload.community.totalKm))
+      .catch(() => {});
   }, []);
 
   const squadRating = state ? calculateSquadRating(state) : 0;
@@ -19,10 +24,11 @@ export default function Home() {
 
   return (
     <div>
-      <PageTitle title="KM Footy" subtitle="Log real-world distance, earn player cards, and shape your local best XI." />
+      <PageTitle title="KMXI" subtitle="Log real-world distance, earn player cards, and shape your World Cup XI." />
 
-      <section className="grid gap-4 md:grid-cols-3">
+      <section className="grid gap-4 md:grid-cols-4">
         <Stat label="Total KM" value={state ? state.totalKm.toFixed(1) : "..."} />
+        <Stat label="Community KM" value={communityKm === null ? "..." : communityKm.toFixed(1)} />
         <Stat label="Collection" value={state ? String(state.ownedPlayerIds.length) : "..."} />
         <Stat label="Squad Rating" value={state ? String(squadRating) : "..."} />
       </section>
@@ -46,6 +52,7 @@ export default function Home() {
         <HomeLink href="/add-km" title="Add KM" text="Turn whole kilometres into random player rewards." />
         <HomeLink href="/collection" title="Collection" text="Browse cards, filter by role, rarity, and club." />
         <HomeLink href="/squad" title="Squad" text="Pick your XI manually or auto-select your strongest team." />
+        <HomeLink href="/chat" title="Chat" text="Talk tactics, pulls, and live scores with the group." />
       </section>
     </div>
   );

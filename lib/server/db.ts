@@ -124,6 +124,13 @@ export function getDb() {
       FOREIGN KEY (user_id) REFERENCES users(id),
       FOREIGN KEY (locked_squad_id) REFERENCES locked_squads(id)
     );
+    CREATE TABLE IF NOT EXISTS chat_messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      message TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
   `);
   migrateFixtureResults(db);
   seedFixtureResults(db);
@@ -238,6 +245,32 @@ export function saveRevealPlayerIds(userId: number, playerIds: number[]) {
   database.prepare("DELETE FROM reveal_players WHERE user_id = ?").run(userId);
   const insert = database.prepare("INSERT INTO reveal_players (user_id, position, player_id) VALUES (?, ?, ?)");
   playerIds.forEach((playerId, index) => insert.run(userId, index, playerId));
+}
+
+export function getCommunityStats() {
+  const row = getDb().prepare("SELECT COALESCE(SUM(total_km), 0) AS total_km, COUNT(*) AS user_count FROM user_state").get() as { total_km: number; user_count: number };
+  return {
+    totalKm: row.total_km,
+    userCount: row.user_count
+  };
+}
+
+export function getChatMessages() {
+  return getDb()
+    .prepare(
+      `SELECT chat_messages.id, chat_messages.message, chat_messages.created_at, users.username
+       FROM chat_messages
+       JOIN users ON users.id = chat_messages.user_id
+       ORDER BY chat_messages.created_at DESC, chat_messages.id DESC
+       LIMIT 50`
+    )
+    .all() as Array<{ id: number; message: string; created_at: string; username: string }>;
+}
+
+export function saveChatMessage(userId: number, message: string) {
+  const trimmed = message.trim().slice(0, 500);
+  if (!trimmed) return;
+  getDb().prepare("INSERT INTO chat_messages (user_id, message) VALUES (?, ?)").run(userId, trimmed);
 }
 
 function ensureUserState(userId: number) {
