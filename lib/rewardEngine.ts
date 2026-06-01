@@ -5,10 +5,10 @@ export const allPlayers = players as Player[];
 
 const odds: Array<{ rarity: Rarity; ceiling: number }> = [
   { rarity: "clowns", ceiling: 0.01 },
-  { rarity: "common", ceiling: 0.65 },
-  { rarity: "rare", ceiling: 0.9 },
-  { rarity: "epic", ceiling: 0.98 },
-  { rarity: "legend", ceiling: 0.998 },
+  { rarity: "common", ceiling: 0.64 },
+  { rarity: "rare", ceiling: 0.89 },
+  { rarity: "epic", ceiling: 0.97 },
+  { rarity: "legend", ceiling: 0.995 },
   { rarity: "icon", ceiling: 1 }
 ];
 
