@@ -54,6 +54,12 @@ export default function AddKmPage() {
 
     saveUserState(updated);
     saveRevealPlayers(rewardPlayers);
+    fetch("/api/km-log", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ distanceKm: value, cardsEarned: rewardPlayers.length })
+    }).catch(() => {});
     router.push("/reveal");
   }
 

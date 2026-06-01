@@ -131,6 +131,14 @@ export function getDb() {
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id)
     );
+    CREATE TABLE IF NOT EXISTS km_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      distance_km REAL NOT NULL,
+      cards_earned INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
   `);
   migrateFixtureResults(db);
   seedFixtureResults(db);
@@ -271,6 +279,22 @@ export function saveChatMessage(userId: number, message: string) {
   const trimmed = message.trim().slice(0, 500);
   if (!trimmed) return;
   getDb().prepare("INSERT INTO chat_messages (user_id, message) VALUES (?, ?)").run(userId, trimmed);
+}
+
+export function logKmEntry(userId: number, distanceKm: number, cardsEarned: number) {
+  getDb().prepare("INSERT INTO km_log (user_id, distance_km, cards_earned) VALUES (?, ?, ?)").run(userId, distanceKm, cardsEarned);
+}
+
+export function getKmFeed(limit = 30) {
+  return getDb()
+    .prepare(
+      `SELECT km_log.distance_km, km_log.cards_earned, km_log.created_at, users.username
+       FROM km_log
+       JOIN users ON users.id = km_log.user_id
+       ORDER BY km_log.created_at DESC, km_log.id DESC
+       LIMIT ?`
+    )
+    .all(limit) as Array<{ distance_km: number; cards_earned: number; created_at: string; username: string }>;
 }
 
 function ensureUserState(userId: number) {
