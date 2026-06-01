@@ -1,0 +1,296 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { PageTitle } from "@/components/PageTitle";
+import { autoPickBestXI, calculateSquadRating, canPlaySlot, getOwnedPlayers, getPlayer, slotAllowedPositions, squadSlots } from "@/lib/squadUtils";
+import { loadUserStateAsync, saveUserState } from "@/lib/storage";
+import type { Player, Position, SquadSlot, UserState } from "@/lib/types";
+
+const formationRows: Array<{ label: string; slots: SquadSlot[] }> = [
+  { label: "FW", slots: ["FW1", "FW2", "FW3"] },
+  { label: "MF", slots: ["MF1", "MF2", "MF3"] },
+  { label: "DF", slots: ["DF1", "DF2", "DF3", "DF4"] },
+  { label: "GK", slots: ["GK"] }
+];
+
+const positionOrder: Position[] = ["GK", "DF", "MF", "FW"];
+
+const flagCodes: Record<string, string> = {
+  Algeria: "dz",
+  Argentina: "ar",
+  Australia: "au",
+  Austria: "at",
+  Belgium: "be",
+  "Bosnia and Herzegovina": "ba",
+  Brazil: "br",
+  Canada: "ca",
+  "Cape Verde": "cv",
+  Colombia: "co",
+  Croatia: "hr",
+  Curaçao: "cw",
+  "Czech Republic": "cz",
+  "DR Congo": "cd",
+  Ecuador: "ec",
+  Egypt: "eg",
+  England: "gb-eng",
+  France: "fr",
+  Germany: "de",
+  Ghana: "gh",
+  Haiti: "ht",
+  Iran: "ir",
+  Iraq: "iq",
+  "Ivory Coast": "ci",
+  Japan: "jp",
+  Jordan: "jo",
+  Mexico: "mx",
+  Morocco: "ma",
+  Netherlands: "nl",
+  "New Zealand": "nz",
+  Norway: "no",
+  Panama: "pa",
+  Paraguay: "py",
+  Portugal: "pt",
+  Qatar: "qa",
+  "Saudi Arabia": "sa",
+  Scotland: "gb-sct",
+  Senegal: "sn",
+  "South Africa": "za",
+  "South Korea": "kr",
+  Spain: "es",
+  Sweden: "se",
+  Switzerland: "ch",
+  Tunisia: "tn",
+  Turkey: "tr",
+  "United States": "us",
+  Uruguay: "uy",
+  Uzbekistan: "uz"
+};
+
+export default function SquadPage() {
+  const [state, setState] = useState<UserState | null>(null);
+  const [activeSlot, setActiveSlot] = useState<SquadSlot | null>(null);
+  const [query, setQuery] = useState("");
+
+  useEffect(() => {
+    loadUserStateAsync().then((loaded) => {
+      setState(loaded);
+      syncDraftSquad(loaded.squad);
+    });
+  }, []);
+
+  function updateSlot(slot: SquadSlot, playerId?: number) {
+    if (!state) return;
+    const squad = { ...state.squad };
+    if (playerId) {
+      squad[slot] = playerId;
+    } else {
+      delete squad[slot];
+    }
+    const updated = { ...state, squad };
+    setState(updated);
+    saveUserState(updated);
+    syncDraftSquad(squad);
+  }
+
+  function autoPick() {
+    if (!state) return;
+    const updated = autoPickBestXI(state);
+    setState(updated);
+    saveUserState(updated);
+    syncDraftSquad(updated.squad);
+  }
+
+  const owned = state ? getOwnedPlayers(state) : [];
+  const rating = state ? calculateSquadRating(state) : 0;
+  const selectedIds = new Set(Object.values(state?.squad ?? {}));
+  const selectedPlayers = squadSlots.map((slot) => getPlayer(state?.squad[slot])).filter((player): player is Player => Boolean(player));
+  const activePosition = activeSlot ? slotAllowedPositions(activeSlot)[0] : null;
+  const activePlayer = activeSlot ? getPlayer(state?.squad[activeSlot]) : undefined;
+  const positionCounts = positionOrder.map((position) => ({
+    position,
+    selected: selectedPlayers.filter((player) => player.pos === position).length,
+    owned: owned.filter((player) => player.pos === position).length
+  }));
+  const benchPlayers = useMemo(() => {
+    if (!activeSlot) return [];
+    const normalized = query.trim().toLowerCase();
+    return owned
+      .filter((player) => {
+        const isCurrentSelection = player.id === activePlayer?.id;
+        const matchesSlot = canPlaySlot(player, activeSlot) || isCurrentSelection;
+        const isAvailable = !selectedIds.has(player.id) || isCurrentSelection;
+        const matchesQuery = !normalized || `${player.name} ${player.nation} ${player.club}`.toLowerCase().includes(normalized);
+        return matchesSlot && isAvailable && matchesQuery;
+      })
+      .sort((a, b) => b.rating - a.rating || a.name.localeCompare(b.name));
+  }, [activePlayer?.id, activeSlot, owned, query, selectedIds]);
+
+  return (
+    <div>
+      <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
+        <PageTitle title="Squad" subtitle={`${selectedPlayers.length}/11 selected${rating ? ` - Average ${rating}` : ""}`} />
+        <button className="mb-4 self-start rounded-md bg-boot px-4 py-2 text-sm font-black text-white hover:bg-red-700 md:mb-8" onClick={autoPick}>
+          Auto-pick Best XI
+        </button>
+      </div>
+
+      <section className="grid gap-4 md:grid-cols-[minmax(0,1fr)_300px] xl:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="rounded-lg bg-pitch p-3 text-white shadow-sm">
+          <div className="relative overflow-hidden rounded-md border border-white/20 bg-green-950/25 p-3">
+            <div className="pointer-events-none absolute inset-4 rounded-[50%] border border-white/15" />
+            <div className="pointer-events-none absolute left-1/2 top-0 h-full w-px bg-white/10" />
+
+            <div className="relative space-y-2">
+              {formationRows.map((row) => (
+                <div key={row.label} className="grid grid-cols-[28px_1fr] items-center gap-2">
+                  <p className="text-xs font-black uppercase tracking-wide text-green-100/70">{row.label}</p>
+                  <div className={`grid gap-2 ${row.slots.length === 1 ? "mx-auto w-36" : row.slots.length === 4 ? "grid-cols-4" : "grid-cols-3"}`}>
+                    {row.slots.map((slot) => (
+                      <SquadToken key={slot} slot={slot} selected={getPlayer(state?.squad[slot])} active={activeSlot === slot} onClick={() => setActiveSlot(slot)} />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-3 grid grid-cols-4 gap-2">
+            {positionCounts.map((item) => (
+              <div key={item.position} className="rounded-md bg-white/10 px-2 py-1 text-center text-xs font-black">
+                <p>{item.position}</p>
+                <p className="text-green-100/75">
+                  {item.selected}/{item.owned}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <aside className="rounded-lg border border-green-900/10 bg-white p-4 shadow-sm">
+          {activeSlot && activePosition ? (
+            <>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-wide text-green-900/60">Swap {slotLabel(activeSlot)}</p>
+                  <p className="mt-1 text-2xl font-black text-green-950">{activePosition}</p>
+                </div>
+                {activePlayer ? <RatingBadge player={activePlayer} /> : null}
+              </div>
+
+              {activePlayer ? (
+                <div className="mt-3 rounded-md bg-green-950/5 p-3">
+                  <div className="flex items-center gap-2">
+                    <Flag nation={activePlayer.nation} />
+                    <div className="min-w-0">
+                      <p className="truncate text-lg font-black text-green-950">{activePlayer.name}</p>
+                      <p className="truncate text-sm font-bold text-green-900/70">{activePlayer.nation}</p>
+                    </div>
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-xs font-bold text-green-950">
+                    <Detail label="Club" value={activePlayer.club} />
+                    <Detail label="DOB" value={activePlayer.dob} />
+                    <Detail label="Caps" value={activePlayer.caps ?? "Unknown"} />
+                    <Detail label="Goals" value={activePlayer.goals ?? "Unknown"} />
+                  </div>
+                  <button className="mt-3 rounded-md bg-green-950/10 px-3 py-2 text-xs font-black text-green-950 hover:bg-green-950/15" onClick={() => updateSlot(activeSlot)}>
+                    Clear slot
+                  </button>
+                </div>
+              ) : (
+                <p className="mt-3 rounded-md bg-green-950/5 p-3 text-sm font-bold text-green-900/70">Choose a player for this slot.</p>
+              )}
+
+              <input className="mt-4 w-full rounded-md border border-green-900/20 px-3 py-2 text-sm font-semibold" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={`Search ${activePosition} players`} />
+
+              <div className="mt-3 max-h-[360px] space-y-2 overflow-y-auto pr-1">
+                {benchPlayers.map((player) => (
+                  <button key={player.id} className={`w-full rounded-md border px-3 py-2 text-left hover:border-green-800 ${player.id === activePlayer?.id ? "border-green-900 bg-green-950 text-white" : "border-green-900/10 bg-white text-green-950"}`} onClick={() => updateSlot(activeSlot, player.id)}>
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <Flag nation={player.nation} />
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-black">{player.name}</p>
+                          <p className="truncate text-xs font-semibold opacity-75">
+                            {player.nation} - {player.club}
+                          </p>
+                        </div>
+                      </div>
+                      <span className="rounded-md bg-gold px-2 py-1 text-xs font-black text-green-950">{player.rating}</span>
+                    </div>
+                  </button>
+                ))}
+                {benchPlayers.length === 0 ? <p className="rounded-md bg-green-950/5 p-3 text-sm font-bold text-green-900/70">No available {activePosition} players match that search.</p> : null}
+              </div>
+            </>
+          ) : (
+            <div className="flex h-full min-h-40 items-center justify-center rounded-md bg-green-950/5 p-4 text-center text-sm font-bold text-green-900/70">Click a squad slot to see player details and swap options.</div>
+          )}
+        </aside>
+      </section>
+    </div>
+  );
+}
+
+function SquadToken({ slot, selected, active, onClick }: { slot: SquadSlot; selected?: Player; active: boolean; onClick: () => void }) {
+  const rating = selected?.rating ?? 0;
+  const ratingTone = rating >= 90 ? "from-amber-200 to-yellow-500" : rating >= 82 ? "from-fuchsia-200 to-fuchsia-500" : rating >= 74 ? "from-sky-200 to-sky-500" : "from-slate-100 to-slate-300";
+  const position = slotAllowedPositions(slot)[0];
+
+  return (
+    <button className={`min-w-0 rounded-lg border p-2 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${active ? "border-gold bg-white" : "border-white/30 bg-white/95"}`} onClick={onClick}>
+      <div className="flex items-center justify-between gap-1">
+        {selected ? <Flag nation={selected.nation} compact /> : <span className="text-xs font-black text-green-900/50">--</span>}
+        <span className={`rounded px-1.5 py-0.5 text-[11px] font-black text-green-950 bg-gradient-to-br ${ratingTone}`}>{selected?.rating ?? "--"}</span>
+      </div>
+      <p className="mt-1 truncate text-sm font-black leading-tight text-green-950">{selected?.name ?? slotLabel(slot)}</p>
+      <p className="mt-0.5 truncate text-[11px] font-bold text-green-900/70">{selected ? selected.club : position}</p>
+      <div className="mt-1 h-1 overflow-hidden rounded-full bg-green-950/10">
+        <div className={`h-full rounded-full bg-gradient-to-r ${ratingTone}`} style={{ width: `${selected ? Math.max(8, selected.rating) : 0}%` }} />
+      </div>
+    </button>
+  );
+}
+
+function RatingBadge({ player }: { player: Player }) {
+  return (
+    <div className="rounded-md bg-gold px-3 py-2 text-center text-green-950">
+      <p className="text-2xl font-black leading-none">{player.rating}</p>
+      <p className="text-[11px] font-black uppercase">{player.rarity}</p>
+    </div>
+  );
+}
+
+function Detail({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div className="rounded-md bg-white px-2 py-1">
+      <p className="text-[10px] font-black uppercase tracking-wide text-green-900/55">{label}</p>
+      <p className="mt-0.5 truncate">{value}</p>
+    </div>
+  );
+}
+
+function Flag({ nation, compact = false }: { nation: string; compact?: boolean }) {
+  const code = flagCodes[nation];
+  const className = compact ? "h-3.5 w-5" : "h-5 w-7";
+
+  if (!code) {
+    return <span className={`inline-flex ${className} items-center justify-center rounded-sm bg-green-950/10 text-[9px] font-black`}>{nation.slice(0, 2).toUpperCase()}</span>;
+  }
+
+  return <img className={`${className} shrink-0 rounded-sm object-cover shadow-sm`} src={`https://flagcdn.com/w40/${code}.png`} alt={`${nation} flag`} />;
+}
+
+function slotLabel(slot: SquadSlot) {
+  if (slot === "GK") return "Goalkeeper";
+  return `${slot.slice(0, 2)} ${slot.slice(2)}`;
+}
+
+function syncDraftSquad(squad: Partial<Record<SquadSlot, number>>) {
+  fetch("/api/live/sync-squad", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ squad })
+  }).catch(() => {
+    // Login is optional while browsing locally; the Live page will prompt for it.
+  });
+}
