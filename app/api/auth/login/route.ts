@@ -6,13 +6,13 @@ export async function POST(request: Request) {
   const username = body?.username?.trim();
   const password = body?.password ?? "";
 
-  if (!username || password.length < 4) {
-    return NextResponse.json({ error: "Enter a username and password of at least 4 characters." }, { status: 400 });
+  if (!username || password.length < 8) {
+    return NextResponse.json({ error: "Enter a username and password of at least 8 characters." }, { status: 400 });
   }
 
   const user = createOrGetUser(username, password);
   if (!user) {
-    return NextResponse.json({ error: "That username exists with a different password." }, { status: 401 });
+    return NextResponse.json({ error: "Invalid username or password." }, { status: 401 });
   }
 
   await createSession(user.id);

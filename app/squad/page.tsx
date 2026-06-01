@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { PageTitle } from "@/components/PageTitle";
 import { autoPickBestXI, calculateSquadRating, canPlaySlot, getOwnedPlayers, getPlayer, slotAllowedPositions, squadSlots } from "@/lib/squadUtils";
 import { loadUserStateAsync, saveUserState } from "@/lib/storage";
+import { flagUrl } from "@/lib/flags";
 import type { Player, Position, SquadSlot, UserState } from "@/lib/types";
 
 const formationRows: Array<{ label: string; slots: SquadSlot[] }> = [
@@ -15,56 +16,6 @@ const formationRows: Array<{ label: string; slots: SquadSlot[] }> = [
 
 const positionOrder: Position[] = ["GK", "DF", "MF", "FW"];
 
-const flagCodes: Record<string, string> = {
-  Algeria: "dz",
-  Argentina: "ar",
-  Australia: "au",
-  Austria: "at",
-  Belgium: "be",
-  "Bosnia and Herzegovina": "ba",
-  Brazil: "br",
-  Canada: "ca",
-  "Cape Verde": "cv",
-  Colombia: "co",
-  Croatia: "hr",
-  Curaçao: "cw",
-  "Czech Republic": "cz",
-  "DR Congo": "cd",
-  Ecuador: "ec",
-  Egypt: "eg",
-  England: "gb-eng",
-  France: "fr",
-  Germany: "de",
-  Ghana: "gh",
-  Haiti: "ht",
-  Iran: "ir",
-  Iraq: "iq",
-  "Ivory Coast": "ci",
-  Japan: "jp",
-  Jordan: "jo",
-  Mexico: "mx",
-  Morocco: "ma",
-  Netherlands: "nl",
-  "New Zealand": "nz",
-  Norway: "no",
-  Panama: "pa",
-  Paraguay: "py",
-  Portugal: "pt",
-  Qatar: "qa",
-  "Saudi Arabia": "sa",
-  Scotland: "gb-sct",
-  Senegal: "sn",
-  "South Africa": "za",
-  "South Korea": "kr",
-  Spain: "es",
-  Sweden: "se",
-  Switzerland: "ch",
-  Tunisia: "tn",
-  Turkey: "tr",
-  "United States": "us",
-  Uruguay: "uy",
-  Uzbekistan: "uz"
-};
 
 export default function SquadPage() {
   const [state, setState] = useState<UserState | null>(null);
@@ -244,7 +195,14 @@ function SquadToken({ slot, selected, active, onClick }: { slot: SquadSlot; sele
       </div>
       <p className="mt-1 truncate text-sm font-black leading-tight text-green-950">{selected?.name ?? slotLabel(slot)}</p>
       <p className="mt-0.5 truncate text-[11px] font-bold text-green-900/70">{selected ? selected.club : position}</p>
-      <div className="mt-1 h-1 overflow-hidden rounded-full bg-green-950/10">
+      <div
+        className="mt-1 h-1 overflow-hidden rounded-full bg-green-950/10"
+        role="progressbar"
+        aria-valuenow={selected?.rating ?? 0}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label={selected ? `${selected.name} rating` : "No player"}
+      >
         <div className={`h-full rounded-full bg-gradient-to-r ${ratingTone}`} style={{ width: `${selected ? Math.max(8, selected.rating) : 0}%` }} />
       </div>
     </button>
@@ -270,14 +228,14 @@ function Detail({ label, value }: { label: string; value: string | number }) {
 }
 
 function Flag({ nation, compact = false }: { nation: string; compact?: boolean }) {
-  const code = flagCodes[nation];
+  const url = flagUrl(nation);
   const className = compact ? "h-3.5 w-5" : "h-5 w-7";
 
-  if (!code) {
+  if (!url) {
     return <span className={`inline-flex ${className} items-center justify-center rounded-sm bg-green-950/10 text-[9px] font-black`}>{nation.slice(0, 2).toUpperCase()}</span>;
   }
 
-  return <img className={`${className} shrink-0 rounded-sm object-cover shadow-sm`} src={`https://flagcdn.com/w40/${code}.png`} alt={`${nation} flag`} />;
+  return <img className={`${className} shrink-0 rounded-sm object-cover shadow-sm`} src={url} alt={`${nation} flag`} />;
 }
 
 function slotLabel(slot: SquadSlot) {

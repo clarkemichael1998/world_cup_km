@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { PageTitle } from "@/components/PageTitle";
+import { formatDate } from "@/lib/formatDate";
 
 type LivePayload = {
   user: { username: string; rewardCredits: number };
@@ -174,10 +175,3 @@ function Panel({ title, children }: { title: string; children: React.ReactNode }
   );
 }
 
-function formatDate(value: string) {
-  return new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Europe/London",
-    dateStyle: "medium",
-    timeStyle: "short"
-  }).format(new Date(value));
-}

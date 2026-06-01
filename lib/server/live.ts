@@ -8,6 +8,7 @@ const tournamentEnd = "2026-07-19";
 const creditValue = 3;
 
 const allPlayers = players as Player[];
+const playerMap = new Map<number, Player>(allPlayers.map((p) => [p.id, p]));
 
 export type LiveStatus = {
   tournamentActive: boolean;
@@ -38,7 +39,7 @@ export function getLiveStatus(userId: number, now = new Date()): LiveStatus {
     ? (database.prepare("SELECT slot, player_id FROM locked_squad_players WHERE locked_squad_id = ? ORDER BY slot").all(locked.id) as Array<{ slot: SquadSlot; player_id: number }>)
     : [];
   const lockedSquad = lockedRows
-    .map((row) => ({ slot: row.slot, player: allPlayers.find((player) => player.id === row.player_id) }))
+    .map((row) => ({ slot: row.slot, player: playerMap.get(row.player_id) }))
     .filter((row): row is { slot: SquadSlot; player: Player } => Boolean(row.player));
 
   const matches = database
@@ -68,7 +69,7 @@ export function getLiveStatus(userId: number, now = new Date()): LiveStatus {
       verified: match.verified === 1
     })),
     rewardEvents: rewardEvents.map((event) => {
-      const player = allPlayers.find((item) => item.id === event.player_id);
+      const player = playerMap.get(event.player_id);
       return {
         matchId: event.match_id,
         playerId: event.player_id,
@@ -113,7 +114,7 @@ function getBestOwnedSquadLeaderboard() {
 
 function pickBestFormation(playerIds: number[]) {
   const owned = playerIds
-    .map((id) => allPlayers.find((player) => player.id === id))
+    .map((id) => playerMap.get(id))
     .filter((player): player is Player => Boolean(player));
   const used = new Set<number>();
   const requiredPositions = ["GK", "DF", "DF", "DF", "DF", "MF", "MF", "MF", "FW", "FW", "FW"];
@@ -144,7 +145,7 @@ function ensureLockedSquad(userId: number, window: ReturnType<typeof londonLockW
   const insertPlayer = database.prepare("INSERT INTO locked_squad_players (locked_squad_id, slot, player_id, nation) VALUES (?, ?, ?, ?)");
 
   for (const [slot, playerId] of Object.entries(draftSquad)) {
-    const player = allPlayers.find((item) => item.id === playerId);
+    const player = playerMap.get(playerId);
     if (player) insertPlayer.run(lockedSquadId, slot, player.id, player.nation);
   }
 }

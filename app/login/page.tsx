@@ -33,7 +33,7 @@ export default function LoginPage() {
 
   return (
     <div>
-      <PageTitle title="Login" subtitle="Create or reopen your KMXI account." />
+      <PageTitle title="Login" subtitle="Create or reopen your KMXI account. Password must be at least 8 characters." />
       <form onSubmit={submit} className="max-w-md rounded-lg border border-green-900/10 bg-white p-6 shadow-sm">
         <label className="block text-sm font-bold uppercase tracking-wide text-green-900/70" htmlFor="username">
           Username

@@ -5,6 +5,7 @@ import { upsertManualFixture } from "@/lib/server/fixtures";
 export async function POST(request: Request) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Login required" }, { status: 401 });
+  if (!process.env.ADMIN_USERNAME || user.username !== process.env.ADMIN_USERNAME) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const body = (await request.json().catch(() => null)) as {
     matchId?: string;

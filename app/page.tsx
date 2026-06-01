@@ -43,7 +43,14 @@ export default function Home() {
           </div>
           <p className="text-2xl font-black text-pitch">{nextRewardProgress}%</p>
         </div>
-        <div className="mt-4 h-3 overflow-hidden rounded-full bg-green-100">
+        <div
+          className="mt-4 h-3 overflow-hidden rounded-full bg-green-100"
+          role="progressbar"
+          aria-valuenow={nextRewardProgress}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-label="Progress to next reward"
+        >
           <div className="h-full rounded-full bg-boot transition-all" style={{ width: `${nextRewardProgress}%` }} />
         </div>
       </section>

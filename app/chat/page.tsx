@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { PageTitle } from "@/components/PageTitle";
+import { formatDate } from "@/lib/formatDate";
 
 type ChatMessage = {
   id: number;
@@ -19,7 +20,9 @@ export default function ChatPage() {
 
   useEffect(() => {
     loadMessages();
-    const timer = window.setInterval(loadMessages, 8000);
+    const timer = window.setInterval(() => {
+      if (!document.hidden) loadMessages();
+    }, 8000);
     return () => window.clearInterval(timer);
   }, []);
 
@@ -61,7 +64,7 @@ export default function ChatPage() {
                 <article key={item.id} className="rounded-md bg-green-950/5 p-3">
                   <div className="flex items-center justify-between gap-3">
                     <p className="font-black text-green-950">{item.username}</p>
-                    <time className="text-xs font-bold text-green-900/50">{formatTime(item.created_at)}</time>
+                    <time className="text-xs font-bold text-green-900/50">{formatDate(item.created_at)}</time>
                   </div>
                   <p className="mt-1 whitespace-pre-wrap break-words text-sm font-semibold text-green-950">{item.message}</p>
                 </article>
@@ -103,9 +106,3 @@ export default function ChatPage() {
   );
 }
 
-function formatTime(value: string) {
-  return new Intl.DateTimeFormat("en-GB", {
-    dateStyle: "short",
-    timeStyle: "short"
-  }).format(new Date(value));
-}

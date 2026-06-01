@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { NavActions } from "@/components/NavActions";
+import { AuthGuard } from "@/components/AuthGuard";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -36,9 +38,11 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
                 <Link className="rounded-md px-3 py-2 hover:bg-green-100" href="/login">
                   Login
                 </Link>
+                <NavActions />
               </div>
             </nav>
           </header>
+          <AuthGuard />
           <main className="mx-auto max-w-6xl px-4 py-8">{children}</main>
         </div>
       </body>

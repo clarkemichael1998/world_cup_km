@@ -10,7 +10,7 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: "Login required" }, { status: 401 });
 
   const ids = getRevealPlayerIds(user.id);
-  return NextResponse.json({ players: ids.map((id) => allPlayers.find((player) => player.id === id)).filter(Boolean) });
+  return NextResponse.json({ players: ids.map((id) => allPlayers.find((player) => player.id === id)).filter((p): p is Player => p !== undefined) });
 }
 
 export async function PUT(request: Request) {
