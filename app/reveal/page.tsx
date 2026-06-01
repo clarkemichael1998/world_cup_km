@@ -10,6 +10,7 @@ import type { Player } from "@/lib/types";
 type Stage = 0 | 1 | 2 | 3;
 
 const rarityGlow: Record<Player["rarity"], string> = {
+  clowns:  "rgba(248,113,113,0.6)",
   common:  "rgba(148,163,184,0.5)",
   rare:    "rgba(56,189,248,0.55)",
   epic:    "rgba(192,132,252,0.6)",
@@ -18,6 +19,7 @@ const rarityGlow: Record<Player["rarity"], string> = {
 };
 
 const rarityGrad: Record<Player["rarity"], string> = {
+  clowns:  "from-red-700 via-red-900 to-slate-900",
   common:  "from-slate-700 via-slate-800 to-slate-900",
   rare:    "from-sky-700 via-sky-900 to-slate-900",
   epic:    "from-fuchsia-700 via-purple-900 to-slate-900",
@@ -26,6 +28,7 @@ const rarityGrad: Record<Player["rarity"], string> = {
 };
 
 const rarityLabel: Record<Player["rarity"], string> = {
+  clowns: "Clowns",
   common: "Common",
   rare:   "Rare",
   epic:   "Epic",

@@ -8,7 +8,7 @@ import { getOwnedPlayers } from "@/lib/squadUtils";
 import { loadUserStateAsync } from "@/lib/storage";
 import type { Position, Rarity, UserState } from "@/lib/types";
 
-const rarities: Array<Rarity | "all"> = ["all", "common", "rare", "epic", "legend", "icon"];
+const rarities: Array<Rarity | "all"> = ["all", "clowns", "common", "rare", "epic", "legend", "icon"];
 const positions: Array<Position | "all"> = ["all", "GK", "DF", "MF", "FW"];
 
 export default function CollectionPage() {
