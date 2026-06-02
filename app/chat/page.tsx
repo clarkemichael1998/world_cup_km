@@ -74,23 +74,53 @@ export default function ChatPage() {
     <div>
       <PageTitle title="⚽ Chat" subtitle="Share pulls, squads, and World Cup live chaos with the group." />
 
-      <section className="grid gap-5 lg:grid-cols-[1fr_340px]">
-        <div className="rounded-lg border border-green-900/10 bg-white p-4 shadow-sm">
-          <div className="space-y-3">
+      <section className="space-y-4">
+        <div className="sticky top-[4.25rem] z-30 rounded-lg border border-green-900/10 bg-white/95 p-4 shadow-sm backdrop-blur">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm font-black uppercase tracking-wide text-green-900/60">Send Message</p>
+            <p className="text-xs font-bold text-green-900/45">Newest messages first</p>
+          </div>
+          <form onSubmit={submit} className="mt-3">
+            <textarea
+              className="min-h-20 w-full resize-none rounded-md border border-green-900/20 px-3 py-2 text-sm font-semibold"
+              maxLength={500}
+              placeholder="Brag responsibly."
+              value={message}
+              onChange={(event) => setMessage(event.target.value)}
+            />
+            <div className="mt-2 flex items-center justify-between gap-3">
+              <p className="text-xs font-bold text-green-900/55">{message.length}/500</p>
+              <button className="rounded-md bg-pitch px-4 py-2 text-sm font-black text-white hover:bg-green-800" disabled={busy}>
+                {busy ? "Sending..." : "Send"}
+              </button>
+            </div>
+          </form>
+          {error ? (
+            <div className="mt-3 rounded-md bg-amber-50 p-3 text-sm font-bold text-amber-950">
+              <p>{error}</p>
+              <Link className="mt-2 inline-flex underline" href="/login">
+                Login
+              </Link>
+            </div>
+          ) : null}
+        </div>
+
+        <div className="rounded-lg border border-green-900/10 bg-white p-3 shadow-sm">
+          <div className="space-y-2">
             {messages.length > 0 ? (
               messages.map((item) => {
                 const tone = getMessageTone(item);
                 return (
-                <article key={item.id} className={`rounded-md border p-3 ${tone.container}`}>
+                <article key={item.id} className={`rounded-md border px-3 py-2 ${tone.container}`}>
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex min-w-0 items-center gap-2">
-                      <p className={`truncate font-black ${tone.name}`}>{item.username}</p>
+                      <p className={`truncate text-sm font-black ${tone.name}`}>{item.username}</p>
                       {tone.badge ? <span className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wide ${tone.badgeClass}`}>{tone.badge}</span> : null}
                     </div>
                     <time className="text-xs font-bold text-green-900/50">{formatDate(item.created_at)}</time>
                   </div>
-                  <p className={`mt-1 whitespace-pre-wrap break-words text-sm font-semibold ${tone.text}`}>{item.message}</p>
-                  <div className="mt-2 flex flex-wrap items-center gap-1">
+                  <p className={`mt-1 whitespace-pre-wrap break-words text-[13px] font-semibold leading-snug ${tone.text}`}>{item.message}</p>
+                  <div className="mt-1.5 flex flex-wrap items-center gap-1">
                     {REACTIONS.map((emoji) => {
                       const r = item.reactions.find((x) => x.reaction === emoji);
                       const count = r?.count ?? 0;
@@ -99,7 +129,7 @@ export default function ChatPage() {
                         <button
                           key={emoji}
                           onClick={() => react(item.id, emoji)}
-                          className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-bold transition-colors ${
+                          className={`flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[11px] font-bold transition-colors ${
                             active
                               ? "border-green-700 bg-green-100 text-green-900"
                               : "border-green-900/15 bg-white text-green-900/70 hover:border-green-700/40 hover:bg-green-50"
@@ -119,33 +149,6 @@ export default function ChatPage() {
             )}
           </div>
         </div>
-
-        <aside className="rounded-lg border border-green-900/10 bg-white p-5 shadow-sm">
-          <p className="text-sm font-black uppercase tracking-wide text-green-900/60">Send Message</p>
-          <form onSubmit={submit} className="mt-3">
-            <textarea
-              className="min-h-32 w-full resize-none rounded-md border border-green-900/20 px-3 py-2 text-sm font-semibold"
-              maxLength={500}
-              placeholder="Brag responsibly."
-              value={message}
-              onChange={(event) => setMessage(event.target.value)}
-            />
-            <div className="mt-2 flex items-center justify-between gap-3">
-              <p className="text-xs font-bold text-green-900/55">{message.length}/500</p>
-              <button className="rounded-md bg-pitch px-4 py-2 text-sm font-black text-white hover:bg-green-800" disabled={busy}>
-                {busy ? "Sending..." : "Send"}
-              </button>
-            </div>
-          </form>
-          {error ? (
-            <div className="mt-4 rounded-md bg-amber-50 p-3 text-sm font-bold text-amber-950">
-              <p>{error}</p>
-              <Link className="mt-2 inline-flex underline" href="/login">
-                Login
-              </Link>
-            </div>
-          ) : null}
-        </aside>
       </section>
     </div>
   );
