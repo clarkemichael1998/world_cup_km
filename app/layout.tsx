@@ -50,6 +50,12 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
             <Link href="/" className="text-lg font-black tracking-tight text-pitch">KMXI</Link>
             <div className="flex items-center gap-3">
               <Link href="/rules" className="text-xs font-black uppercase tracking-wide text-green-900/60 hover:text-green-950">Rules</Link>
+              <Link href="/chat" className="flex items-center gap-1.5 rounded-md bg-pitch px-3 py-1.5 text-xs font-black text-white hover:bg-green-800">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                </svg>
+                Chat
+              </Link>
               <NavActions />
             </div>
           </header>

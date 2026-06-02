@@ -5,6 +5,17 @@ import { usePathname } from "next/navigation";
 
 const tabs = [
   {
+    href: "/",
+    label: "Home",
+    exact: true,
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
+        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+        <polyline points="9,22 9,12 15,12 15,22" />
+      </svg>
+    )
+  },
+  {
     href: "/add-km",
     label: "Add KM",
     icon: (
@@ -12,17 +23,6 @@ const tabs = [
         <circle cx="12" cy="12" r="10" />
         <line x1="12" y1="8" x2="12" y2="16" />
         <line x1="8" y1="12" x2="16" y2="12" />
-      </svg>
-    )
-  },
-  {
-    href: "/leaderboard",
-    label: "Ranking",
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
-        <line x1="18" y1="20" x2="18" y2="10" />
-        <line x1="12" y1="20" x2="12" y2="4" />
-        <line x1="6" y1="20" x2="6" y2="14" />
       </svg>
     )
   },
@@ -49,20 +49,22 @@ const tabs = [
     )
   },
   {
+    href: "/leaderboard",
+    label: "Ranking",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
+        <line x1="18" y1="20" x2="18" y2="10" />
+        <line x1="12" y1="20" x2="12" y2="4" />
+        <line x1="6" y1="20" x2="6" y2="14" />
+      </svg>
+    )
+  },
+  {
     href: "/live",
     label: "Live",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
         <polygon points="5,3 19,12 5,21" />
-      </svg>
-    )
-  },
-  {
-    href: "/chat",
-    label: "Chat",
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
-        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
       </svg>
     )
   }
@@ -78,12 +80,12 @@ export function MobileNav() {
     >
       <div className="grid grid-cols-6">
         {tabs.map((tab) => {
-          const active = pathname === tab.href || pathname.startsWith(tab.href + "/");
+          const active = tab.exact ? pathname === tab.href : pathname === tab.href || pathname.startsWith(tab.href + "/");
           return (
             <Link
               key={tab.href}
               href={tab.href}
-              className={`flex flex-col items-center gap-0.5 px-2 py-2.5 text-[10px] font-black uppercase tracking-wide transition-colors ${
+              className={`flex flex-col items-center gap-0.5 px-1 py-2.5 text-[9px] font-black uppercase tracking-wide transition-colors ${
                 active ? "text-pitch" : "text-green-900/50"
               }`}
             >

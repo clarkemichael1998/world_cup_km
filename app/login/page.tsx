@@ -43,6 +43,9 @@ export default function LoginPage() {
           Password
           <input id="password" className="mt-2 w-full rounded-md border border-green-900/20 px-4 py-3 text-base font-bold" type="password" value={password} onChange={(event) => setPassword(event.target.value)} />
         </label>
+        <p className="mt-4 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800">
+          ⚠️ There is no password recovery. If you forget your password, your account cannot be accessed. Write it down somewhere safe.
+        </p>
         {error ? <p className="mt-3 text-sm font-bold text-red-700">{error}</p> : null}
         <button className="mt-5 rounded-md bg-pitch px-5 py-3 font-black text-white hover:bg-green-800" disabled={busy}>
           {busy ? "Working..." : "Continue"}

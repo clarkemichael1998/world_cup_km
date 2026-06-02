@@ -79,7 +79,7 @@ export default function SquadPage() {
   return (
     <div>
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
-        <PageTitle title="Squad" subtitle={`${selectedPlayers.length}/11 selected${rating ? ` - Average ${rating}` : ""}`} />
+        <PageTitle title="Squad" subtitle={`${selectedPlayers.length}/11 selected${rating ? ` - Average ${rating.toFixed(1)}` : ""}`} />
         <button className="mb-4 self-start rounded-md bg-boot px-4 py-2 text-sm font-black text-white hover:bg-red-700 md:mb-8" onClick={autoPick}>
           Auto-pick Best XI
         </button>

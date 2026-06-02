@@ -281,20 +281,76 @@ export function saveChatMessage(userId: number, message: string) {
   getDb().prepare("INSERT INTO chat_messages (user_id, message) VALUES (?, ?)").run(userId, trimmed);
 }
 
+export function getKmLogsToday(userId: number): number {
+  const row = getDb()
+    .prepare(
+      `SELECT COUNT(*) AS count FROM km_log
+       WHERE user_id = ? AND date(created_at) = date('now')`
+    )
+    .get(userId) as { count: number };
+  return row.count;
+}
+
 export function logKmEntry(userId: number, distanceKm: number, cardsEarned: number) {
   getDb().prepare("INSERT INTO km_log (user_id, distance_km, cards_earned) VALUES (?, ?, ?)").run(userId, distanceKm, cardsEarned);
 }
 
 export function getKmLeaderboard() {
-  return getDb()
+  const db = getDb();
+
+  const rows = db
     .prepare(
-      `SELECT users.username, COALESCE(SUM(km_log.distance_km), 0) AS total_km, COUNT(km_log.id) AS entry_count
+      `SELECT users.id, users.username,
+              COALESCE(SUM(km_log.distance_km), 0) AS total_km,
+              COALESCE(games_won.count, 0) AS games_won
        FROM users
        LEFT JOIN km_log ON km_log.user_id = users.id
+       LEFT JOIN (
+         SELECT user_id, COUNT(DISTINCT match_id) AS count
+         FROM reward_events
+         GROUP BY user_id
+       ) games_won ON games_won.user_id = users.id
        GROUP BY users.id
        ORDER BY total_km DESC`
     )
-    .all() as Array<{ username: string; total_km: number; entry_count: number }>;
+    .all() as Array<{ id: number; username: string; total_km: number; games_won: number }>;
+
+  const ownedRows = db
+    .prepare(`SELECT user_id, player_id FROM user_players`)
+    .all() as Array<{ user_id: number; player_id: number }>;
+
+  const byUser = new Map<number, number[]>();
+  for (const row of ownedRows) {
+    const list = byUser.get(row.user_id) ?? [];
+    list.push(row.player_id);
+    byUser.set(row.user_id, list);
+  }
+
+  return rows.map((row) => ({
+    username: row.username,
+    total_km: row.total_km,
+    games_won: row.games_won,
+    best_squad_rating: computeBestSquadRating(byUser.get(row.id) ?? [])
+  }));
+}
+
+import playerData from "@/data/players.json";
+const _allPlayersForRating = playerData as Array<{ id: number; rating: number; pos: string }>;
+
+function computeBestSquadRating(playerIds: number[]): number {
+  if (playerIds.length === 0) return 0;
+  const owned = playerIds.map((id) => _allPlayersForRating.find((p) => p.id === id)).filter(Boolean) as Array<{ id: number; rating: number; pos: string }>;
+  const used = new Set<number>();
+  const positions = ["GK", "DF", "DF", "DF", "DF", "MF", "MF", "MF", "FW", "FW", "FW"];
+  const picked: number[] = [];
+
+  for (const pos of positions) {
+    const best = owned.filter((p) => p.pos === pos && !used.has(p.id)).sort((a, b) => b.rating - a.rating)[0];
+    if (best) { used.add(best.id); picked.push(best.rating); }
+  }
+
+  if (picked.length === 0) return 0;
+  return Math.round((picked.reduce((s, r) => s + r, 0) / picked.length) * 10) / 10;
 }
 
 export function getKmFeed(limit = 30) {

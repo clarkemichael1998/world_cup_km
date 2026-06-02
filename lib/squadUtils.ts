@@ -25,7 +25,7 @@ export function canPlaySlot(player: Player, slot: SquadSlot): boolean {
 export function calculateSquadRating(state: UserState): number {
   const selected = squadSlots.map((slot) => getPlayer(state.squad[slot])).filter((player): player is Player => Boolean(player));
   if (selected.length === 0) return 0;
-  return Math.round(selected.reduce((sum, player) => sum + player.rating, 0) / selected.length);
+  return Math.round((selected.reduce((sum, player) => sum + player.rating, 0) / selected.length) * 10) / 10;
 }
 
 export function autoPickBestXI(state: UserState): UserState {

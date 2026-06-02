@@ -8,12 +8,30 @@ import { calculateSquadRating } from "@/lib/squadUtils";
 import { loadUserStateAsync } from "@/lib/storage";
 import type { UserState } from "@/lib/types";
 
+const WC_FINAL = new Date("2026-07-19T18:00:00Z");
+
+function useCountdown() {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  const diff = WC_FINAL.getTime() - now.getTime();
+  if (diff <= 0) return null;
+  const days = Math.floor(diff / 86400000);
+  const hours = Math.floor((diff % 86400000) / 3600000);
+  const mins = Math.floor((diff % 3600000) / 60000);
+  const secs = Math.floor((diff % 60000) / 1000);
+  return { days, hours, mins, secs };
+}
+
 type FeedEntry = { username: string; distance_km: number; cards_earned: number; created_at: string };
 
 export default function Home() {
   const [state, setState] = useState<UserState | null>(null);
   const [communityKm, setCommunityKm] = useState<number | null>(null);
   const [feed, setFeed] = useState<FeedEntry[]>([]);
+  const countdown = useCountdown();
 
   useEffect(() => {
     loadUserStateAsync().then(setState);
@@ -33,6 +51,23 @@ export default function Home() {
   return (
     <div>
       <PageTitle title="KMXI" subtitle="Log real-world distance, earn player cards, and shape your World Cup XI." />
+
+      {countdown ? (
+        <section className="mb-4 rounded-lg border border-green-900/20 bg-pitch p-4 text-white shadow-sm">
+          <p className="text-xs font-black uppercase tracking-wide text-green-200/80">World Cup Final Countdown</p>
+          <div className="mt-2 flex items-end gap-4">
+            <CountUnit value={countdown.days} label="days" />
+            <CountUnit value={countdown.hours} label="hrs" />
+            <CountUnit value={countdown.mins} label="min" />
+            <CountUnit value={countdown.secs} label="sec" />
+          </div>
+          <p className="mt-2 text-xs font-semibold text-green-200/70">KM logging locks at kick-off · July 19, 2026</p>
+        </section>
+      ) : (
+        <section className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-4 shadow-sm">
+          <p className="text-sm font-black text-amber-900">The World Cup Final has kicked off — KM logging is now locked. Thanks for playing!</p>
+        </section>
+      )}
 
       <section className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
         <Stat label="My KM" value={state ? state.totalKm.toFixed(1) : "..."} />
@@ -104,6 +139,15 @@ function Stat({ label, value }: { label: string; value: string }) {
     <div className="rounded-lg border border-green-900/10 bg-white p-4 shadow-sm md:p-5">
       <p className="text-xs font-bold uppercase tracking-wide text-green-800/70 md:text-sm">{label}</p>
       <p className="mt-2 text-3xl font-black text-green-950 md:text-4xl">{value}</p>
+    </div>
+  );
+}
+
+function CountUnit({ value, label }: { value: number; label: string }) {
+  return (
+    <div className="text-center">
+      <p className="text-3xl font-black leading-none tabular-nums">{String(value).padStart(2, "0")}</p>
+      <p className="text-[10px] font-black uppercase tracking-wide text-green-200/70">{label}</p>
     </div>
   );
 }

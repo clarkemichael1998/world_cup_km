@@ -19,7 +19,7 @@ export function PlayerCard({ player, duplicateCount = 0, large = false }: { play
   const flag = flagUrl(player.nation);
 
   return (
-    <article className={`card-sheen rounded-lg border-2 p-4 shadow-sm ${rarityStyles[player.rarity]} ${large ? "min-h-72" : ""}`}>
+    <article className={`card-sheen rounded-lg border-2 p-4 shadow-sm ${rarityStyles[player.rarity]} ${player.rarity === "icon" ? "card-icon" : player.rarity === "legend" ? "card-legend" : ""} ${large ? "min-h-72" : ""}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-xs font-black uppercase tracking-wide opacity-70">{player.rarity}</p>

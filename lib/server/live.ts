@@ -105,7 +105,7 @@ function getBestOwnedSquadLeaderboard() {
       return {
         username,
         selectedCount: bestXi.length,
-        averageRating: ratings.length > 0 ? Math.round(ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length) : 0
+        averageRating: ratings.length > 0 ? Math.round((ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length) * 10) / 10 : 0
       };
     })
     .sort((a, b) => b.averageRating - a.averageRating || b.selectedCount - a.selectedCount || a.username.localeCompare(b.username))

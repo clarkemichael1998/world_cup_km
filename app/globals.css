@@ -87,6 +87,63 @@ button {
 .animate-reveal-pop       { animation: reveal-pop 0.5s cubic-bezier(0.34,1.56,0.64,1) both; }
 .animate-fade-in          { animation: fade-in 0.35s ease both; }
 
+/* Icon card — animated rainbow shimmer */
+@keyframes icon-shimmer {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes icon-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(250,204,21,0), 0 0 18px 4px rgba(250,204,21,0.35); }
+  50%       { box-shadow: 0 0 0 6px rgba(250,204,21,0), 0 0 32px 10px rgba(250,204,21,0.6); }
+}
+
+@keyframes legend-shimmer {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.card-icon {
+  background: linear-gradient(135deg, #0f0f0f, #1a1a2e, #0f0f0f) !important;
+  border-color: transparent !important;
+  position: relative;
+  animation: icon-pulse 2.5s ease-in-out infinite;
+  color: #fef9c3 !important;
+}
+
+.card-icon::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  background: linear-gradient(135deg, #fbbf24, #f59e0b, #ef4444, #a855f7, #3b82f6, #10b981, #fbbf24);
+  background-size: 300% 300%;
+  animation: icon-shimmer 3s ease infinite;
+  z-index: -1;
+  border-radius: 10px;
+}
+
+.card-legend {
+  background: linear-gradient(135deg, #1c0a00, #2d1200, #1c0a00) !important;
+  border-color: transparent !important;
+  position: relative;
+  color: #fef3c7 !important;
+}
+
+.card-legend::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  background: linear-gradient(135deg, #f59e0b, #fbbf24, #d97706, #fbbf24, #f59e0b);
+  background-size: 300% 300%;
+  animation: legend-shimmer 4s ease infinite;
+  z-index: -1;
+  border-radius: 10px;
+}
+
 /* Hide scrollbar but keep scrollable (for mobile nav) */
 .scrollbar-none {
   -ms-overflow-style: none;
