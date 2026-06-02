@@ -5,11 +5,16 @@ import { FormEvent, useEffect, useState } from "react";
 import { PageTitle } from "@/components/PageTitle";
 import { formatDate } from "@/lib/formatDate";
 
+const REACTIONS = ["👍", "👎", "🔥", "❤️", "😂", "🤡", "💩"];
+
+type ReactionCount = { reaction: string; count: number; user_reacted: boolean };
+
 type ChatMessage = {
   id: number;
   username: string;
   message: string;
   created_at: string;
+  reactions: ReactionCount[];
 };
 
 export default function ChatPage() {
@@ -52,9 +57,22 @@ export default function ChatPage() {
     setMessages(payload.messages ?? []);
   }
 
+  async function react(messageId: number, reaction: string) {
+    const response = await fetch("/api/chat/react", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ messageId, reaction })
+    });
+    if (response.ok) {
+      // Optimistic: reload messages
+      loadMessages();
+    }
+  }
+
   return (
     <div>
-      <PageTitle title="Chat" subtitle="Share pulls, squads, and World Cup live chaos with the group." />
+      <PageTitle title="⚽ Chat" subtitle="Share pulls, squads, and World Cup live chaos with the group." />
 
       <section className="grid gap-5 lg:grid-cols-[1fr_340px]">
         <div className="rounded-lg border border-green-900/10 bg-white p-4 shadow-sm">
@@ -67,6 +85,27 @@ export default function ChatPage() {
                     <time className="text-xs font-bold text-green-900/50">{formatDate(item.created_at)}</time>
                   </div>
                   <p className="mt-1 whitespace-pre-wrap break-words text-sm font-semibold text-green-950">{item.message}</p>
+                  <div className="mt-2 flex flex-wrap items-center gap-1">
+                    {REACTIONS.map((emoji) => {
+                      const r = item.reactions.find((x) => x.reaction === emoji);
+                      const count = r?.count ?? 0;
+                      const active = r?.user_reacted ?? false;
+                      return (
+                        <button
+                          key={emoji}
+                          onClick={() => react(item.id, emoji)}
+                          className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-bold transition-colors ${
+                            active
+                              ? "border-green-700 bg-green-100 text-green-900"
+                              : "border-green-900/15 bg-white text-green-900/70 hover:border-green-700/40 hover:bg-green-50"
+                          }`}
+                        >
+                          <span>{emoji}</span>
+                          {count > 0 && <span className="tabular-nums">{count}</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </article>
               ))
             ) : (
@@ -105,4 +144,3 @@ export default function ChatPage() {
     </div>
   );
 }
-

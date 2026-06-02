@@ -132,6 +132,16 @@ export function getDb() {
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id)
     );
+    CREATE TABLE IF NOT EXISTS chat_reactions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      message_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL,
+      reaction TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(message_id, user_id, reaction),
+      FOREIGN KEY (message_id) REFERENCES chat_messages(id),
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
     CREATE TABLE IF NOT EXISTS km_log (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER NOT NULL,
@@ -414,6 +424,32 @@ export function getChatMessages() {
     .all() as Array<{ id: number; message: string; created_at: string; username: string }>;
 }
 
+export function toggleChatReaction(messageId: number, userId: number, reaction: string): 'added' | 'removed' {
+  const database = getDb();
+  const existing = database.prepare("SELECT id FROM chat_reactions WHERE message_id = ? AND user_id = ? AND reaction = ?").get(messageId, userId, reaction);
+  if (existing) {
+    database.prepare("DELETE FROM chat_reactions WHERE message_id = ? AND user_id = ? AND reaction = ?").run(messageId, userId, reaction);
+    return 'removed';
+  }
+  database.prepare("INSERT OR IGNORE INTO chat_reactions (message_id, user_id, reaction) VALUES (?, ?, ?)").run(messageId, userId, reaction);
+  return 'added';
+}
+
+export function getChatReactionsForMessages(messageIds: number[], viewerUserId: number | null): Array<{ message_id: number; reaction: string; count: number; user_reacted: boolean }> {
+  if (messageIds.length === 0) return [];
+  const placeholders = messageIds.map(() => "?").join(",");
+  const rows = getDb()
+    .prepare(
+      `SELECT message_id, reaction, COUNT(*) AS count,
+              MAX(CASE WHEN user_id = ? THEN 1 ELSE 0 END) AS user_reacted
+       FROM chat_reactions
+       WHERE message_id IN (${placeholders})
+       GROUP BY message_id, reaction`
+    )
+    .all(viewerUserId ?? 0, ...messageIds) as Array<{ message_id: number; reaction: string; count: number; user_reacted: number }>;
+  return rows.map((r) => ({ ...r, user_reacted: r.user_reacted === 1 }));
+}
+
 export function saveChatMessage(userId: number, message: string) {
   const trimmed = message.trim().slice(0, 500);
   if (!trimmed) return;
@@ -449,14 +485,23 @@ export function getKmLeaderboard() {
          FROM reward_events
          GROUP BY user_id
        ) games_won ON games_won.user_id = users.id
-       GROUP BY users.id
-       ORDER BY total_km DESC`
+       GROUP BY users.id`
     )
     .all() as Array<{ id: number; username: string; total_km: number; games_won: number }>;
 
   const ownedRows = db
     .prepare(`SELECT user_id, player_id FROM user_players`)
     .all() as Array<{ user_id: number; player_id: number }>;
+
+  const boostRows = db
+    .prepare(
+      `SELECT user_id,
+              SUM(CASE WHEN match_id NOT LIKE '%:assist' THEN boost_amount ELSE 0 END) AS goal_bonus,
+              SUM(CASE WHEN match_id LIKE '%:assist' THEN boost_amount ELSE 0 END) AS assist_bonus
+       FROM goal_boosts GROUP BY user_id`
+    )
+    .all() as Array<{ user_id: number; goal_bonus: number; assist_bonus: number }>;
+  const boostByUser = new Map(boostRows.map((r) => [r.user_id, r]));
 
   const byUser = new Map<number, number[]>();
   for (const row of ownedRows) {
@@ -465,12 +510,16 @@ export function getKmLeaderboard() {
     byUser.set(row.user_id, list);
   }
 
-  return rows.map((row) => ({
-    username: row.username,
-    total_km: row.total_km,
-    games_won: row.games_won,
-    best_squad_rating: computeBestSquadRating(byUser.get(row.id) ?? [])
-  }));
+  return rows
+    .map((row) => ({
+      username: row.username,
+      total_km: row.total_km,
+      games_won: row.games_won,
+      best_squad_rating: computeBestSquadRating(byUser.get(row.id) ?? []),
+      goal_bonus: boostByUser.get(row.id)?.goal_bonus ?? 0,
+      assist_bonus: boostByUser.get(row.id)?.assist_bonus ?? 0
+    }))
+    .sort((a, b) => b.best_squad_rating - a.best_squad_rating || b.total_km - a.total_km);
 }
 
 import playerData from "@/data/players.json";
@@ -490,6 +539,46 @@ function computeBestSquadRating(playerIds: number[]): number {
 
   if (picked.length === 0) return 0;
   return Math.round((picked.reduce((s, r) => s + r, 0) / picked.length) * 10) / 10;
+}
+
+export function getUpcomingFixtures(date: string) {
+  return getDb()
+    .prepare(`SELECT match_id, home_team, away_team, kickoff_at, status, winner FROM fixture_results WHERE match_date = ? ORDER BY kickoff_at`)
+    .all(date) as Array<{ match_id: string; home_team: string; away_team: string; kickoff_at: string; status: string; winner: string | null }>;
+}
+
+export function getLockedSquadForDate(userId: number, lockDate: string) {
+  const database = getDb();
+  const locked = database.prepare("SELECT id FROM locked_squads WHERE user_id = ? AND lock_date = ?").get(userId, lockDate) as { id: number } | undefined;
+  if (!locked) return null;
+  const players = database
+    .prepare("SELECT slot, player_id FROM locked_squad_players WHERE locked_squad_id = ? ORDER BY slot")
+    .all(locked.id) as Array<{ slot: string; player_id: number }>;
+  return { lockedSquadId: locked.id, players };
+}
+
+export function lockSquadForDate(userId: number, lockDate: string, lockAt: string, unlockAt: string) {
+  const database = getDb();
+  const existing = database.prepare("SELECT id FROM locked_squads WHERE user_id = ? AND lock_date = ?").get(userId, lockDate);
+  if (existing) return;
+  const draftSquad = getDraftSquad(userId);
+  const allPlayerData = players as Array<{ id: number; nation: string }>;
+  const playerNationMap = new Map(allPlayerData.map((p) => [p.id, p]));
+  const result = database.prepare("INSERT INTO locked_squads (user_id, lock_date, locked_at, unlock_at) VALUES (?, ?, ?, ?)").run(userId, lockDate, lockAt, unlockAt);
+  const lockedSquadId = Number(result.lastInsertRowid);
+  const insertPlayer = database.prepare("INSERT INTO locked_squad_players (locked_squad_id, slot, player_id, nation) VALUES (?, ?, ?, ?)");
+  for (const [slot, playerId] of Object.entries(draftSquad)) {
+    const p = playerNationMap.get(playerId);
+    if (p) insertPlayer.run(lockedSquadId, slot, p.id, p.nation);
+  }
+}
+
+export function unlockSquadForDate(userId: number, lockDate: string) {
+  const database = getDb();
+  const locked = database.prepare("SELECT id FROM locked_squads WHERE user_id = ? AND lock_date = ?").get(userId, lockDate) as { id: number } | undefined;
+  if (!locked) return;
+  database.prepare("DELETE FROM locked_squad_players WHERE locked_squad_id = ?").run(locked.id);
+  database.prepare("DELETE FROM locked_squads WHERE id = ?").run(locked.id);
 }
 
 export function getKmFeed(limit = 30) {

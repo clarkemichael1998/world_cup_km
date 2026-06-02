@@ -7,6 +7,15 @@ import { loadUserStateAsync, saveUserState } from "@/lib/storage";
 import { flagUrl } from "@/lib/flags";
 import type { Player, Position, SquadSlot, UserState } from "@/lib/types";
 
+type LockStatus = {
+  lockDate: string;
+  lockAt: string;
+  unlockAt: string;
+  isLocked: boolean;
+  lockedPlayers: Array<{ slot: string; player: { id: number; name: string; nation: string; rating: number } }>;
+  upcomingFixtures: Array<{ matchId: string; homeTeam: string; awayTeam: string; kickoffAt: string; status: string; winner: string | null }>;
+};
+
 const formationRows: Array<{ label: string; slots: SquadSlot[] }> = [
   { label: "FW", slots: ["FW1", "FW2", "FW3"] },
   { label: "MF", slots: ["MF1", "MF2", "MF3"] },
@@ -21,13 +30,35 @@ export default function SquadPage() {
   const [state, setState] = useState<UserState | null>(null);
   const [activeSlot, setActiveSlot] = useState<SquadSlot | null>(null);
   const [query, setQuery] = useState("");
+  const [lockStatus, setLockStatus] = useState<LockStatus | null>(null);
+  const [lockBusy, setLockBusy] = useState(false);
 
   useEffect(() => {
     loadUserStateAsync().then((loaded) => {
       setState(loaded);
       syncDraftSquad(loaded.squad);
     });
+    loadLockStatus();
   }, []);
+
+  async function loadLockStatus() {
+    try {
+      const r = await fetch("/api/squad/lock", { credentials: "include" });
+      if (r.ok) setLockStatus(await r.json());
+    } catch { /* not logged in */ }
+  }
+
+  async function toggleLock() {
+    if (!lockStatus) return;
+    setLockBusy(true);
+    try {
+      const method = lockStatus.isLocked ? "DELETE" : "POST";
+      const r = await fetch("/api/squad/lock", { method, credentials: "include" });
+      if (r.ok) await loadLockStatus();
+    } finally {
+      setLockBusy(false);
+    }
+  }
 
   function updateSlot(slot: SquadSlot, playerId?: number) {
     if (!state) return;
@@ -84,6 +115,64 @@ export default function SquadPage() {
           Auto-pick Best XI
         </button>
       </div>
+
+      {lockStatus && (
+        <section className="mb-4 rounded-lg border border-green-900/10 bg-white p-5 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-black uppercase tracking-wide text-green-900/60">
+                ⚽ Next Lock — {lockStatus.lockDate}
+              </p>
+              <p className="mt-0.5 text-xs font-semibold text-green-900/50">
+                Locks {new Date(lockStatus.lockAt).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/London" })} UK time
+              </p>
+            </div>
+            <button
+              onClick={toggleLock}
+              disabled={lockBusy}
+              className={`rounded-md px-5 py-2 text-sm font-black text-white transition disabled:opacity-50 ${lockStatus.isLocked ? "bg-amber-600 hover:bg-amber-700" : "bg-pitch hover:bg-green-800"}`}
+            >
+              {lockBusy ? "..." : lockStatus.isLocked ? "🔒 Locked — Click to Unlock" : "🔓 Lock Squad for This Day"}
+            </button>
+          </div>
+
+          {lockStatus.isLocked && lockStatus.lockedPlayers.length > 0 && (
+            <div className="mt-4">
+              <p className="text-xs font-black uppercase tracking-wide text-green-900/50 mb-2">Locked XI</p>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+                {lockStatus.lockedPlayers.map(({ slot, player }) => (
+                  <div key={slot} className="rounded-md bg-green-950/5 px-3 py-2">
+                    <p className="text-[10px] font-black uppercase tracking-wide text-green-900/50">{slot}</p>
+                    <p className="mt-0.5 truncate text-sm font-black text-green-950">{player.name}</p>
+                    <p className="truncate text-xs font-semibold text-green-900/60">{player.nation}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {lockStatus.upcomingFixtures.length > 0 && (
+            <div className="mt-4">
+              <p className="text-xs font-black uppercase tracking-wide text-green-900/50 mb-2">Fixtures on {lockStatus.lockDate}</p>
+              <div className="flex flex-wrap gap-2">
+                {lockStatus.upcomingFixtures.map((f) => (
+                  <div key={f.matchId} className="rounded-md border border-green-900/10 bg-green-950/5 px-3 py-2 text-xs font-bold text-green-950">
+                    {f.homeTeam} vs {f.awayTeam}
+                    {f.winner && <span className="ml-2 text-green-700"> — {f.winner} win</span>}
+                    {f.status === "FINISHED" && !f.winner && <span className="ml-2 text-green-900/50">Draw</span>}
+                  </div>
+                ))}
+              </div>
+              {lockStatus.upcomingFixtures.length === 0 && (
+                <p className="text-xs font-semibold text-green-900/50">No fixtures listed for this date yet.</p>
+              )}
+            </div>
+          )}
+          {lockStatus.upcomingFixtures.length === 0 && (
+            <p className="mt-3 text-xs font-semibold text-green-900/50">No fixtures listed for {lockStatus.lockDate} yet.</p>
+          )}
+        </section>
+      )}
 
       <section className="grid gap-4 md:grid-cols-[minmax(0,1fr)_300px] xl:grid-cols-[minmax(0,1fr)_340px]">
         <div className="rounded-lg bg-pitch p-3 text-white shadow-sm">
