@@ -8,7 +8,7 @@ export default function RulesPage() {
       <div className="space-y-6">
 
         <Section title="1. Log Your KM">
-          <p>Every kilometre you run, walk, or cycle earns you <strong>player cards</strong>. Log your distance on the Add KM page after each activity. Whole kilometres count — any fraction carries over to your next session.</p>
+          <p>Every kilometre you run or walk earns you <strong>player cards</strong>. Log your distance on the Add KM page after each activity. Whole kilometres count — any fraction carries over to your next session.</p>
           <ul className="mt-2 list-disc space-y-1 pl-5 text-green-900/70">
             <li>Maximum <strong>3 logs per day</strong></li>
             <li>Maximum <strong>50 km per log</strong></li>
