@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/server/db";
+import { createAdminChatMessage, getCurrentUser } from "@/lib/server/db";
 import { upsertManualFixture } from "@/lib/server/fixtures";
 
 export async function POST(request: Request) {
@@ -30,6 +30,13 @@ export async function POST(request: Request) {
     winner: body.winner ?? null,
     status: body.status
   });
+
+  const resultText = body.status === "FINISHED"
+    ? body.winner
+      ? `${body.winner} confirmed as winner`
+      : "Draw confirmed"
+    : `${body.status.toLowerCase()} status confirmed`;
+  createAdminChatMessage(`Admin confirmed result: ${body.homeTeam} vs ${body.awayTeam} — ${resultText}.`);
 
   return NextResponse.json({ ok: true });
 }

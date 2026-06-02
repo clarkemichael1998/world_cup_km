@@ -4,7 +4,7 @@ import path from "path";
 import { cookies } from "next/headers";
 import { DatabaseSync } from "node:sqlite";
 import players from "@/data/players.json";
-import type { SquadSlot } from "@/lib/types";
+import type { ActivityType, SquadSlot } from "@/lib/types";
 
 const dbDir = path.join(process.cwd(), "data");
 const dbPath = process.env.SQLITE_DB_PATH ?? path.join(dbDir, "km-footy.sqlite");
@@ -146,9 +146,27 @@ export function getDb() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER NOT NULL,
       distance_km REAL NOT NULL,
+      activity_type TEXT NOT NULL DEFAULT 'walk',
+      activity_amount REAL,
+      activity_unit TEXT,
+      comment TEXT,
+      reward_credit_value REAL,
+      balance_before REAL,
+      balance_after REAL,
+      chat_message_id INTEGER,
+      voided_at TEXT,
+      voided_by INTEGER,
+      void_reason TEXT,
       cards_earned INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id)
+    );
+    CREATE TABLE IF NOT EXISTS km_log_awards (
+      log_id INTEGER NOT NULL,
+      position INTEGER NOT NULL,
+      player_id INTEGER NOT NULL,
+      PRIMARY KEY (log_id, position),
+      FOREIGN KEY (log_id) REFERENCES km_log(id)
     );
     CREATE TABLE IF NOT EXISTS goal_scorers (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -183,11 +201,34 @@ export function getDb() {
       FOREIGN KEY (user_id) REFERENCES users(id)
     );
   `);
+  migrateKmLogActivity(db);
   migrateFixtureResults(db);
   migrateUserState(db);
   migrateGoalScorers(db);
   seedFixtureResults(db);
   return db;
+}
+
+function migrateKmLogActivity(database: DatabaseSync) {
+  for (const statement of [
+    "ALTER TABLE km_log ADD COLUMN activity_type TEXT NOT NULL DEFAULT 'walk'",
+    "ALTER TABLE km_log ADD COLUMN activity_amount REAL",
+    "ALTER TABLE km_log ADD COLUMN activity_unit TEXT",
+    "ALTER TABLE km_log ADD COLUMN comment TEXT",
+    "ALTER TABLE km_log ADD COLUMN reward_credit_value REAL",
+    "ALTER TABLE km_log ADD COLUMN balance_before REAL",
+    "ALTER TABLE km_log ADD COLUMN balance_after REAL",
+    "ALTER TABLE km_log ADD COLUMN chat_message_id INTEGER",
+    "ALTER TABLE km_log ADD COLUMN voided_at TEXT",
+    "ALTER TABLE km_log ADD COLUMN voided_by INTEGER",
+    "ALTER TABLE km_log ADD COLUMN void_reason TEXT"
+  ]) {
+    try {
+      database.exec(statement);
+    } catch {
+      // Existing databases already have this column.
+    }
+  }
 }
 
 export function hashPassword(password: string) {
@@ -453,7 +494,7 @@ export function getChatReactionsForMessages(messageIds: number[], viewerUserId: 
 export function saveChatMessage(userId: number, message: string) {
   const trimmed = message.trim().slice(0, 500);
   if (!trimmed) return;
-  getDb().prepare("INSERT INTO chat_messages (user_id, message) VALUES (?, ?)").run(userId, trimmed);
+  createChatMessage(userId, trimmed);
 }
 
 export function getKmLogsToday(userId: number): number {
@@ -466,8 +507,83 @@ export function getKmLogsToday(userId: number): number {
   return row.count;
 }
 
-export function logKmEntry(userId: number, distanceKm: number, cardsEarned: number) {
-  getDb().prepare("INSERT INTO km_log (user_id, distance_km, cards_earned) VALUES (?, ?, ?)").run(userId, distanceKm, cardsEarned);
+export function createChatMessage(userId: number, message: string) {
+  const trimmed = message.trim().slice(0, 1000);
+  if (!trimmed) return null;
+  const result = getDb().prepare("INSERT INTO chat_messages (user_id, message) VALUES (?, ?)").run(userId, trimmed);
+  return Number(result.lastInsertRowid);
+}
+
+export function createAdminChatMessage(message: string) {
+  const database = getDb();
+  const existing = database.prepare("SELECT id FROM users WHERE username = 'admin'").get() as { id: number } | undefined;
+  const inserted =
+    existing ??
+    (database
+      .prepare("INSERT INTO users (username, password_hash) VALUES ('admin', ?) RETURNING id")
+      .get(`system:${randomBytes(32).toString("hex")}`) as { id: number });
+  const adminUserId = inserted.id;
+  return createChatMessage(adminUserId, message);
+}
+
+export function markChatMessageRemoved(messageId: number, reason: string) {
+  getDb()
+    .prepare("UPDATE chat_messages SET message = ? WHERE id = ?")
+    .run(`[Activity log removed by admin] ${reason ? `Reason: ${reason}` : ""}`.trim(), messageId);
+}
+
+export function logKmEntry({
+  userId,
+  activityCredits,
+  cardsEarned,
+  activityType = "walk",
+  activityAmount = activityCredits,
+  activityUnit = "km",
+  comment,
+  rewardCreditValue,
+  balanceBefore,
+  balanceAfter,
+  awardedPlayerIds,
+  chatMessageId
+}: {
+  userId: number;
+  activityCredits: number;
+  cardsEarned: number;
+  activityType?: ActivityType;
+  activityAmount?: number;
+  activityUnit?: string;
+  comment?: string;
+  rewardCreditValue?: number;
+  balanceBefore?: number;
+  balanceAfter?: number;
+  awardedPlayerIds?: number[];
+  chatMessageId?: number | null;
+}) {
+  const database = getDb();
+  const result = database
+    .prepare(
+      `INSERT INTO km_log (
+        user_id, distance_km, activity_type, activity_amount, activity_unit, comment,
+        reward_credit_value, balance_before, balance_after, chat_message_id, cards_earned
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    )
+    .run(
+      userId,
+      activityCredits,
+      activityType,
+      activityAmount,
+      activityUnit,
+      comment?.trim().slice(0, 240) || null,
+      rewardCreditValue ?? null,
+      balanceBefore ?? null,
+      balanceAfter ?? null,
+      chatMessageId ?? null,
+      cardsEarned
+    );
+  const logId = Number(result.lastInsertRowid);
+  const insertAward = database.prepare("INSERT INTO km_log_awards (log_id, position, player_id) VALUES (?, ?, ?)");
+  (awardedPlayerIds ?? []).forEach((playerId, index) => insertAward.run(logId, index, playerId));
+  return logId;
 }
 
 export function getKmLeaderboard() {
@@ -479,7 +595,7 @@ export function getKmLeaderboard() {
               COALESCE(SUM(km_log.distance_km), 0) AS total_km,
               COALESCE(games_won.count, 0) AS games_won
        FROM users
-       LEFT JOIN km_log ON km_log.user_id = users.id
+       LEFT JOIN km_log ON km_log.user_id = users.id AND km_log.voided_at IS NULL
        LEFT JOIN (
          SELECT user_id, COUNT(DISTINCT match_id) AS count
          FROM reward_events
@@ -520,6 +636,105 @@ export function getKmLeaderboard() {
       assist_bonus: boostByUser.get(row.id)?.assist_bonus ?? 0
     }))
     .sort((a, b) => b.best_squad_rating - a.best_squad_rating || b.total_km - a.total_km);
+}
+
+export function getAdminActivityLogs(limit = 50) {
+  const logs = getDb()
+    .prepare(
+      `SELECT km_log.id, km_log.user_id, users.username, km_log.distance_km, km_log.activity_type,
+              km_log.activity_amount, km_log.activity_unit, km_log.comment, km_log.cards_earned,
+              km_log.reward_credit_value, km_log.balance_before, km_log.balance_after,
+              km_log.chat_message_id, km_log.created_at, km_log.voided_at, km_log.void_reason
+       FROM km_log
+       JOIN users ON users.id = km_log.user_id
+       ORDER BY km_log.created_at DESC, km_log.id DESC
+       LIMIT ?`
+    )
+    .all(limit) as Array<{
+      id: number;
+      user_id: number;
+      username: string;
+      distance_km: number;
+      activity_type: ActivityType;
+      activity_amount: number | null;
+      activity_unit: string | null;
+      comment: string | null;
+      cards_earned: number;
+      reward_credit_value: number | null;
+      balance_before: number | null;
+      balance_after: number | null;
+      chat_message_id: number | null;
+      created_at: string;
+      voided_at: string | null;
+      void_reason: string | null;
+    }>;
+  return logs.map((log) => ({
+    ...log,
+    awards: getLogAwards(log.id)
+  }));
+}
+
+function getLogAwards(logId: number) {
+  return getDb()
+    .prepare("SELECT log_id, player_id FROM km_log_awards WHERE log_id = ? ORDER BY position")
+    .all(logId) as Array<{ log_id: number; player_id: number }>;
+}
+
+export function voidActivityLog(logId: number, adminUserId: number, reason: string) {
+  const database = getDb();
+  const log = database
+    .prepare(
+      `SELECT id, user_id, distance_km, reward_credit_value, balance_before, balance_after,
+              chat_message_id, voided_at
+       FROM km_log WHERE id = ?`
+    )
+    .get(logId) as
+    | {
+        id: number;
+        user_id: number;
+        distance_km: number;
+        reward_credit_value: number | null;
+        balance_before: number | null;
+        balance_after: number | null;
+        chat_message_id: number | null;
+        voided_at: string | null;
+      }
+    | undefined;
+
+  if (!log) return { ok: false, error: "Log not found." };
+  if (log.voided_at) return { ok: false, error: "Log already removed." };
+
+  const awards = getLogAwards(logId);
+  const state = database.prepare("SELECT total_km, km_balance FROM user_state WHERE user_id = ?").get(log.user_id) as { total_km: number; km_balance: number } | undefined;
+  const totalKm = Math.max(0, Number(((state?.total_km ?? 0) - log.distance_km).toFixed(2)));
+  const balanceDelta = log.balance_before != null && log.balance_after != null ? log.balance_after - log.balance_before : (log.reward_credit_value ?? log.distance_km) % 1;
+  const kmBalance = Math.max(0, Math.min(0.99, Number(((state?.km_balance ?? 0) - balanceDelta).toFixed(2))));
+
+  database.prepare("UPDATE user_state SET total_km = ?, km_balance = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?").run(totalKm, kmBalance, log.user_id);
+  for (const award of awards) {
+    removeAwardedPlayer(log.user_id, award.player_id);
+  }
+  database
+    .prepare("DELETE FROM draft_squad_players WHERE user_id = ? AND player_id NOT IN (SELECT player_id FROM user_players WHERE user_id = ?)")
+    .run(log.user_id, log.user_id);
+
+  const trimmedReason = reason.trim().slice(0, 240);
+  database
+    .prepare("UPDATE km_log SET voided_at = CURRENT_TIMESTAMP, voided_by = ?, void_reason = ? WHERE id = ?")
+    .run(adminUserId, trimmedReason, logId);
+  if (log.chat_message_id) markChatMessageRemoved(log.chat_message_id, trimmedReason);
+  return { ok: true };
+}
+
+function removeAwardedPlayer(userId: number, playerId: number) {
+  const database = getDb();
+  const owned = database.prepare("SELECT duplicate_count FROM user_players WHERE user_id = ? AND player_id = ?").get(userId, playerId) as { duplicate_count: number } | undefined;
+  if (!owned) return;
+  if (owned.duplicate_count > 0) {
+    database.prepare("UPDATE user_players SET duplicate_count = duplicate_count - 1 WHERE user_id = ? AND player_id = ?").run(userId, playerId);
+  } else {
+    database.prepare("DELETE FROM user_players WHERE user_id = ? AND player_id = ?").run(userId, playerId);
+  }
 }
 
 import playerData from "@/data/players.json";
@@ -584,13 +799,23 @@ export function unlockSquadForDate(userId: number, lockDate: string) {
 export function getKmFeed(limit = 30) {
   return getDb()
     .prepare(
-      `SELECT km_log.distance_km, km_log.cards_earned, km_log.created_at, users.username
+      `SELECT km_log.distance_km, km_log.activity_type, km_log.activity_amount, km_log.activity_unit, km_log.comment, km_log.cards_earned, km_log.created_at, users.username
        FROM km_log
        JOIN users ON users.id = km_log.user_id
+       WHERE km_log.voided_at IS NULL
        ORDER BY km_log.created_at DESC, km_log.id DESC
        LIMIT ?`
     )
-    .all(limit) as Array<{ distance_km: number; cards_earned: number; created_at: string; username: string }>;
+    .all(limit) as Array<{
+      distance_km: number;
+      activity_type: ActivityType;
+      activity_amount: number | null;
+      activity_unit: string | null;
+      comment: string | null;
+      cards_earned: number;
+      created_at: string;
+      username: string;
+    }>;
 }
 
 function ensureUserState(userId: number) {

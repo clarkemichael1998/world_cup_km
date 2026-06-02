@@ -2,6 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { PageTitle } from "@/components/PageTitle";
+import players from "@/data/players.json";
+import { activityDefinitions } from "@/lib/rewardEngine";
+import type { ActivityType, Player } from "@/lib/types";
 
 type MatchStatus = "SCHEDULED" | "LIVE" | "FINISHED";
 
@@ -29,6 +32,23 @@ type GoalScorerRow = {
   match_date: string | null;
 };
 
+type ActivityLogRow = {
+  id: number;
+  username: string;
+  distance_km: number;
+  activity_type: ActivityType;
+  activity_amount: number | null;
+  activity_unit: string | null;
+  comment: string | null;
+  cards_earned: number;
+  created_at: string;
+  voided_at: string | null;
+  void_reason: string | null;
+  awards: Array<{ player_id: number }>;
+};
+
+const playerMap = new Map((players as Player[]).map((player) => [player.id, player]));
+
 const WC_TEAMS = [
   "Argentina", "Australia", "Belgium", "Brazil", "Cameroon", "Canada",
   "Chile", "Colombia", "Costa Rica", "Croatia", "Czech Republic", "Denmark",
@@ -45,7 +65,7 @@ const WC_TEAMS = [
 const today = new Date().toISOString().slice(0, 10);
 
 export default function AdminPage() {
-  const [tab, setTab] = useState<"results" | "goalscorers">("results");
+  const [tab, setTab] = useState<"results" | "goalscorers" | "activity">("results");
   const [forbidden, setForbidden] = useState(false);
 
   if (forbidden) {
@@ -64,20 +84,133 @@ export default function AdminPage() {
       <PageTitle title="Admin" subtitle="Tournament management" />
 
       <div className="mb-6 flex gap-2">
-        {(["results", "goalscorers"] as const).map((t) => (
+        {(["results", "goalscorers", "activity"] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
             className={`rounded-md px-4 py-2 text-sm font-black transition-colors ${tab === t ? "bg-green-950 text-white" : "bg-green-950/8 text-green-950 hover:bg-green-950/15"}`}
           >
-            {t === "results" ? "Match Results" : "Goal Scorers"}
+            {t === "results" ? "Match Results" : t === "goalscorers" ? "Goal Scorers" : "Activity Review"}
           </button>
         ))}
       </div>
 
       {tab === "results" && <ResultsTab onForbidden={() => setForbidden(true)} />}
       {tab === "goalscorers" && <GoalScorersTab onForbidden={() => setForbidden(true)} />}
+      {tab === "activity" && <ActivityReviewTab onForbidden={() => setForbidden(true)} />}
     </div>
+  );
+}
+
+function ActivityReviewTab({ onForbidden }: { onForbidden: () => void }) {
+  const [logs, setLogs] = useState<ActivityLogRow[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  async function load() {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/admin/activity-logs", { credentials: "include" });
+      if (res.status === 403) { onForbidden(); return; }
+      const data = (await res.json()) as { logs: ActivityLogRow[] };
+      setLogs(data.logs ?? []);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { load(); }, []);
+
+  async function removeLog(logId: number, reason: string) {
+    const res = await fetch("/api/admin/activity-logs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ logId, reason })
+    });
+    if (res.status === 403) { onForbidden(); return; }
+    await load();
+  }
+
+  if (loading) return <p className="text-sm font-semibold text-green-900/60">Loading activity logs...</p>;
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm font-black uppercase tracking-wide text-green-900/60">Recent Activity Submissions</p>
+        <button onClick={load} className="rounded-md bg-green-950/8 px-3 py-1.5 text-xs font-black text-green-950 hover:bg-green-950/15">Refresh</button>
+      </div>
+      {logs.length === 0 ? (
+        <p className="text-sm font-semibold text-green-900/60">No activity logs found.</p>
+      ) : (
+        logs.map((log) => <ActivityLogCard key={log.id} log={log} onRemove={removeLog} />)
+      )}
+    </div>
+  );
+}
+
+function ActivityLogCard({ log, onRemove }: { log: ActivityLogRow; onRemove: (logId: number, reason: string) => void }) {
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const activity = activityDefinitions[log.activity_type] ?? activityDefinitions.walk;
+  const amount = log.activity_amount ?? log.distance_km;
+  const unit = log.activity_unit ?? "km";
+  const awards = log.awards.map((award) => playerMap.get(award.player_id)?.name ?? `Player #${award.player_id}`);
+
+  async function submitRemoval() {
+    if (!reason.trim() || log.voided_at || busy) return;
+    setBusy(true);
+    try {
+      await onRemove(log.id, reason.trim());
+      setReason("");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <article className={`rounded-lg border p-4 text-sm shadow-sm ${log.voided_at ? "border-slate-200 bg-slate-50 opacity-75" : "border-green-900/10 bg-white"}`}>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="font-black text-green-950">{log.username} · {activity.label}</p>
+          <p className="mt-1 font-semibold text-green-900/65">
+            {Number(amount).toFixed(unit === "km" ? 1 : 0)} {unit} · {log.distance_km.toFixed(2)} activity credits · {log.cards_earned} card{log.cards_earned === 1 ? "" : "s"}
+          </p>
+          <p className="mt-1 text-xs font-semibold text-green-900/45">{new Date(log.created_at).toLocaleString("en-GB")}</p>
+        </div>
+        {log.voided_at ? (
+          <span className="rounded-md bg-slate-200 px-2 py-1 text-xs font-black text-slate-700">Removed</span>
+        ) : (
+          <span className="rounded-md bg-green-100 px-2 py-1 text-xs font-black text-green-800">Active</span>
+        )}
+      </div>
+
+      {log.comment ? <p className="mt-3 rounded-md bg-green-950/5 p-3 font-semibold text-green-950">“{log.comment}”</p> : null}
+
+      <div className="mt-3">
+        <p className="text-xs font-black uppercase tracking-wide text-green-900/50">Cards Awarded</p>
+        <p className="mt-1 text-xs font-semibold text-green-900/70">{awards.length > 0 ? awards.join(", ") : "No award detail stored for this log."}</p>
+      </div>
+
+      {log.voided_at ? (
+        <p className="mt-3 rounded-md bg-slate-100 p-3 text-xs font-bold text-slate-700">Reason: {log.void_reason ?? "No reason recorded."}</p>
+      ) : (
+        <div className="mt-4 grid gap-2 md:grid-cols-[1fr_auto]">
+          <input
+            value={reason}
+            onChange={(event) => setReason(event.target.value)}
+            placeholder="Reason for removing this false entry"
+            className="rounded-md border border-red-200 px-3 py-2 text-sm font-semibold text-red-950 outline-none focus:ring-2 focus:ring-red-700/20"
+          />
+          <button
+            onClick={submitRemoval}
+            disabled={!reason.trim() || busy}
+            className="rounded-md bg-red-700 px-4 py-2 text-sm font-black text-white hover:bg-red-800 disabled:opacity-40"
+          >
+            {busy ? "Removing..." : "Remove False Entry"}
+          </button>
+        </div>
+      )}
+    </article>
   );
 }
 

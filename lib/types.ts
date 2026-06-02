@@ -4,6 +4,8 @@ export type Rarity = "clowns" | "common" | "rare" | "epic" | "legend" | "icon";
 
 export type SquadSlot = "GK" | "DF1" | "DF2" | "DF3" | "DF4" | "MF1" | "MF2" | "MF3" | "FW1" | "FW2" | "FW3";
 
+export type ActivityType = "walk" | "run" | "cycle" | "strength" | "sport" | "mobility";
+
 export type Player = {
   id: number;
   slug: string;

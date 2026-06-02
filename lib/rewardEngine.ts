@@ -1,5 +1,5 @@
 import players from "@/data/players.json";
-import type { Player, Position, Rarity, SquadSlot, UserState } from "./types";
+import type { ActivityType, Player, Position, Rarity, SquadSlot, UserState } from "./types";
 
 export const allPlayers = players as Player[];
 
@@ -40,6 +40,23 @@ export function getRandomPlayerByRarity(rarity = rollRarity()): Player {
 const TOURNAMENT_START = new Date("2026-06-11T00:00:00Z");
 const KM_MULTIPLIERS = [1, 1.5, 2, 2.5, 3, 4]; // one per week of tournament
 
+export const activityDefinitions: Record<ActivityType, { label: string; unit: "km" | "minutes"; creditsPerUnit: number; maxPerLog: number }> = {
+  walk: { label: "Walk", unit: "km", creditsPerUnit: 1, maxPerLog: 50 },
+  run: { label: "Run", unit: "km", creditsPerUnit: 1, maxPerLog: 50 },
+  cycle: { label: "Cycle", unit: "km", creditsPerUnit: 1 / 3, maxPerLog: 150 },
+  strength: { label: "Strength workout", unit: "minutes", creditsPerUnit: 1 / 20, maxPerLog: 180 },
+  sport: { label: "Sport session", unit: "minutes", creditsPerUnit: 1 / 15, maxPerLog: 240 },
+  mobility: { label: "Yoga / mobility", unit: "minutes", creditsPerUnit: 1 / 30, maxPerLog: 240 }
+};
+
+export function isActivityType(value: unknown): value is ActivityType {
+  return typeof value === "string" && value in activityDefinitions;
+}
+
+export function calculateActivityCredits(activityType: ActivityType, amount: number) {
+  return Number((amount * activityDefinitions[activityType].creditsPerUnit).toFixed(2));
+}
+
 export function getKmMultiplier(now = new Date()): number {
   const daysSinceStart = Math.floor((now.getTime() - TOURNAMENT_START.getTime()) / 86400000);
   if (daysSinceStart < 0) return 1;
@@ -47,8 +64,8 @@ export function getKmMultiplier(now = new Date()): number {
   return KM_MULTIPLIERS[Math.min(week, KM_MULTIPLIERS.length - 1)];
 }
 
-export function calculateRewards(distance: number, kmBalance: number, multiplier = 1) {
-  const combined = distance * multiplier + kmBalance;
+export function calculateRewards(activityCredits: number, kmBalance: number, multiplier = 1) {
+  const combined = activityCredits * multiplier + kmBalance;
   const rewards = Math.floor(combined);
   const newBalance = Number((combined - rewards).toFixed(2));
   return { rewards, newBalance };

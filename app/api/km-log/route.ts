@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser, getKmFeed, getKmLogsToday, logKmEntry } from "@/lib/server/db";
-import { getKmMultiplier } from "@/lib/rewardEngine";
+import { createChatMessage, getCurrentUser, getKmFeed, getKmLogsToday, logKmEntry } from "@/lib/server/db";
+import { activityDefinitions, calculateActivityCredits, getKmMultiplier, isActivityType } from "@/lib/rewardEngine";
 
 const MAX_LOGS_PER_DAY = 3;
-const MAX_KM_PER_LOG = 50;
 const WC_FINAL_LOCKOUT = new Date("2026-07-19T18:00:00Z");
 
 export async function GET() {
@@ -15,16 +14,33 @@ export async function POST(request: Request) {
   if (!user) return NextResponse.json({ error: "Login required" }, { status: 401 });
 
   if (new Date() >= WC_FINAL_LOCKOUT) {
-    return NextResponse.json({ error: "KM logging is locked — the World Cup Final has kicked off!" }, { status: 403 });
+    return NextResponse.json({ error: "Activity logging is locked — the World Cup Final has kicked off!" }, { status: 403 });
   }
 
-  const body = (await request.json().catch(() => null)) as { distanceKm?: number; cardsEarned?: number } | null;
-  if (!body || typeof body.distanceKm !== "number" || body.distanceKm <= 0) {
+  const body = (await request.json().catch(() => null)) as {
+    activityType?: unknown;
+    amount?: number;
+    distanceKm?: number;
+    cardsEarned?: number;
+    awardedPlayerIds?: number[];
+    comment?: string;
+    rewardCreditValue?: number;
+    balanceBefore?: number;
+    balanceAfter?: number;
+  } | null;
+  if (!body) {
     return NextResponse.json({ error: "Invalid entry." }, { status: 400 });
   }
 
-  if (body.distanceKm > MAX_KM_PER_LOG) {
-    return NextResponse.json({ error: `Maximum ${MAX_KM_PER_LOG}km per log.` }, { status: 400 });
+  const activityType = isActivityType(body.activityType) ? body.activityType : "walk";
+  const activity = activityDefinitions[activityType];
+  const amount = typeof body.amount === "number" ? body.amount : body.distanceKm;
+  if (typeof amount !== "number" || !Number.isFinite(amount) || amount <= 0) {
+    return NextResponse.json({ error: "Invalid entry." }, { status: 400 });
+  }
+
+  if (amount > activity.maxPerLog) {
+    return NextResponse.json({ error: `Maximum ${activity.maxPerLog} ${activity.unit} per ${activity.label.toLowerCase()} log.` }, { status: 400 });
   }
 
   const logsToday = getKmLogsToday(user.id);
@@ -33,6 +49,65 @@ export async function POST(request: Request) {
   }
 
   const multiplier = getKmMultiplier();
-  logKmEntry(user.id, body.distanceKm, body.cardsEarned ?? 0);
+  const activityCredits = calculateActivityCredits(activityType, amount);
+  const awardedPlayerIds = Array.isArray(body.awardedPlayerIds)
+    ? body.awardedPlayerIds.filter((id) => Number.isInteger(id) && id > 0).slice(0, 100)
+    : [];
+  const cardsEarned = awardedPlayerIds.length || Math.max(0, Math.floor(body.cardsEarned ?? 0));
+  const comment = typeof body.comment === "string" ? body.comment.trim().slice(0, 240) : "";
+  const rewardCreditValue = typeof body.rewardCreditValue === "number" ? body.rewardCreditValue : Number((activityCredits * multiplier).toFixed(2));
+  const chatMessageId = createChatMessage(
+    user.id,
+    buildActivityChatMessage({
+      username: user.username,
+      activityLabel: activity.label,
+      amount,
+      unit: activity.unit,
+      activityCredits,
+      cardsEarned,
+      comment
+    })
+  );
+  logKmEntry({
+    userId: user.id,
+    activityCredits,
+    cardsEarned,
+    activityType,
+    activityAmount: amount,
+    activityUnit: activity.unit,
+    comment,
+    rewardCreditValue,
+    balanceBefore: body.balanceBefore,
+    balanceAfter: body.balanceAfter,
+    awardedPlayerIds,
+    chatMessageId
+  });
   return NextResponse.json({ ok: true, logsRemaining: MAX_LOGS_PER_DAY - logsToday - 1, multiplier });
+}
+
+function buildActivityChatMessage({
+  username,
+  activityLabel,
+  amount,
+  unit,
+  activityCredits,
+  cardsEarned,
+  comment
+}: {
+  username: string;
+  activityLabel: string;
+  amount: number;
+  unit: string;
+  activityCredits: number;
+  cardsEarned: number;
+  comment: string;
+}) {
+  const amountText = `${Number(amount).toFixed(unit === "km" ? 1 : 0)} ${unit}`;
+  const cardText = `${cardsEarned} card${cardsEarned === 1 ? "" : "s"}`;
+  return [
+    `${username} logged ${activityLabel}: ${amountText}, earning ${activityCredits.toFixed(2)} activity credits and ${cardText}.`,
+    comment ? `“${comment}”` : ""
+  ]
+    .filter(Boolean)
+    .join("\n\n");
 }

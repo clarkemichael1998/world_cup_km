@@ -67,7 +67,7 @@ export default function RevealPage() {
       <div className="flex min-h-[60vh] flex-col items-center justify-center gap-6 text-center">
         <p className="text-2xl font-black text-green-950">No rewards waiting.</p>
         <Link className="rounded-md bg-pitch px-6 py-3 font-black text-white hover:bg-green-800" href="/add-km">
-          Log some KM
+          Log activity
         </Link>
       </div>
     );
@@ -205,6 +205,11 @@ function FullCard({ player }: { player: Player }) {
       style={{ "--glow-color": glow } as React.CSSProperties}
     >
       <div className="flex min-h-[420px] flex-col rounded-xl border border-white/10 bg-black/20 p-5 gap-4">
+        <div className="flex justify-center">
+          <span className="rounded-full border border-white/20 bg-white/15 px-4 py-1 text-xs font-black uppercase tracking-wide text-white">
+            New signing
+          </span>
+        </div>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-[10px] font-black uppercase tracking-widest text-white/40">{rarityLabel[player.rarity]}</p>
@@ -233,6 +238,10 @@ function FullCard({ player }: { player: Player }) {
               Wikipedia ↗
             </a>
           )}
+        </div>
+        <div className="mt-auto rounded-lg border border-white/10 bg-white/10 px-3 py-2 text-center">
+          <p className="text-[10px] font-black uppercase tracking-[0.25em] text-white/40">Added to collection</p>
+          <p className="mt-0.5 text-xs font-bold text-white/75">{player.nation} · {player.club}</p>
         </div>
       </div>
     </div>

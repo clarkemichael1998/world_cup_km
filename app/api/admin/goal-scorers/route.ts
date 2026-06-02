@@ -1,5 +1,14 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser, getPendingGoalScorers, resolveGoalScorer, upsertGoalScorer, getPendingAssistScorers, resolveAssistScorer, upsertAssistScorer } from "@/lib/server/db";
+import {
+  createAdminChatMessage,
+  getCurrentUser,
+  getPendingGoalScorers,
+  resolveGoalScorer,
+  upsertGoalScorer,
+  getPendingAssistScorers,
+  resolveAssistScorer,
+  upsertAssistScorer
+} from "@/lib/server/db";
 import { findBestPlayerMatch } from "@/lib/server/goalScorers";
 
 function isAdmin(username: string) {
@@ -34,9 +43,18 @@ export async function POST(request: Request) {
 
   if (body.action === "resolve") {
     if (typeof body.id !== "number") return NextResponse.json({ error: "Missing id" }, { status: 400 });
+    const existing = isAssist
+      ? getPendingAssistScorers().find((row) => row.id === body.id)
+      : getPendingGoalScorers().find((row) => row.id === body.id);
     const status = body.playerId != null ? "matched" : "ignored";
     if (isAssist) resolveAssistScorer(body.id, body.playerId ?? null, status);
     else resolveGoalScorer(body.id, body.playerId ?? null, status);
+    const eventLabel = isAssist ? "assist" : "goal";
+    createAdminChatMessage(
+      body.playerId != null
+        ? `Admin confirmed ${eventLabel}: ${existing?.scorer_name_raw ?? `record #${body.id}`} matched to player #${body.playerId}${existing?.match_id ? ` (${existing.match_id})` : ""}.`
+        : `Admin ignored ${eventLabel} record: ${existing?.scorer_name_raw ?? `record #${body.id}`}${existing?.match_id ? ` (${existing.match_id})` : ""}.`
+    );
     return NextResponse.json({ ok: true });
   }
 
@@ -49,6 +67,11 @@ export async function POST(request: Request) {
     } else {
       upsertGoalScorer(body.matchId, body.scorerName, match?.player.id ?? null, match ? "matched" : "pending", "manual", count);
     }
+    createAdminChatMessage(
+      `Admin added ${isAssist ? "assist" : "goal"} record: ${body.scorerName} x${count} (${body.matchId})${
+        match ? ` — matched to ${match.player.name}` : " — pending match"
+      }.`
+    );
     return NextResponse.json({ ok: true, matchedPlayer: match?.player ?? null });
   }
 

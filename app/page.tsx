@@ -5,9 +5,10 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PageTitle } from "@/components/PageTitle";
 import { formatDate } from "@/lib/formatDate";
+import { activityDefinitions } from "@/lib/rewardEngine";
 import { calculateSquadRating } from "@/lib/squadUtils";
 import { loadUserStateAsync } from "@/lib/storage";
-import type { UserState } from "@/lib/types";
+import type { ActivityType, UserState } from "@/lib/types";
 
 const WC_FINAL = new Date("2026-07-19T18:00:00Z");
 
@@ -26,7 +27,16 @@ function useCountdown() {
   return { days, hours, mins, secs };
 }
 
-type FeedEntry = { username: string; distance_km: number; cards_earned: number; created_at: string };
+type FeedEntry = {
+  username: string;
+  distance_km: number;
+  activity_type?: ActivityType;
+  activity_amount?: number | null;
+  activity_unit?: string | null;
+  comment?: string | null;
+  cards_earned: number;
+  created_at: string;
+};
 
 export default function Home() {
   const [state, setState] = useState<UserState | null>(null);
@@ -78,7 +88,7 @@ export default function Home() {
 
   return (
     <div>
-      <PageTitle title="KMXI" subtitle="Log real-world distance, earn player cards, and shape your World Cup XI." />
+      <PageTitle title="KMXI" subtitle="Log walks, runs, workouts, and real-world activity to earn player cards." />
 
       {countdown ? (
         <section className="mb-4 rounded-lg border border-green-900/20 bg-pitch p-4 text-white shadow-sm">
@@ -89,17 +99,17 @@ export default function Home() {
             <CountUnit value={countdown.mins} label="min" />
             <CountUnit value={countdown.secs} label="sec" />
           </div>
-          <p className="mt-2 text-xs font-semibold text-green-200/70">KM logging locks at kick-off · July 19, 2026</p>
+          <p className="mt-2 text-xs font-semibold text-green-200/70">Activity logging locks at kick-off · July 19, 2026</p>
         </section>
       ) : (
         <section className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-4 shadow-sm">
-          <p className="text-sm font-black text-amber-900">The World Cup Final has kicked off — KM logging is now locked. Thanks for playing!</p>
+          <p className="text-sm font-black text-amber-900">The World Cup Final has kicked off — activity logging is now locked. Thanks for playing!</p>
         </section>
       )}
 
       <section className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
-        <Stat label="My KM" value={state ? state.totalKm.toFixed(1) : "..."} />
-        <Stat label="Community KM" value={communityKm === null ? "..." : communityKm.toFixed(1)} />
+        <Stat label="My Credits" value={state ? state.totalKm.toFixed(1) : "..."} />
+        <Stat label="Community Credits" value={communityKm === null ? "..." : communityKm.toFixed(1)} />
         <Stat label="Collection" value={state ? String(state.ownedPlayerIds.length) : "..."} />
         <Stat label="Squad Rating" value={state ? String(squadRating) : "..."} />
       </section>
@@ -134,7 +144,7 @@ export default function Home() {
           <div className="min-w-0">
             <p className="text-sm font-bold uppercase tracking-wide text-green-800/70">Next Reward</p>
             <p className="mt-1 text-sm font-semibold text-green-950">
-              {state ? `${state.kmBalance.toFixed(2)}km banked · ${(1 - state.kmBalance).toFixed(2)}km to go` : "Loading..."}
+              {state ? `${state.kmBalance.toFixed(2)} credits banked · ${(1 - state.kmBalance).toFixed(2)} credits to go` : "Loading..."}
             </p>
           </div>
           <p className="shrink-0 text-2xl font-black text-pitch">{nextRewardProgress}%</p>
@@ -153,26 +163,30 @@ export default function Home() {
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_320px]">
         <section className="grid grid-cols-2 gap-3 md:grid-cols-2 content-start">
-          <HomeLink href="/add-km" title="Add KM" text="Turn whole kilometres into random player rewards." />
+          <HomeLink href="/add-km" title="Add Activity" text="Turn movement and workouts into random player rewards." />
           <HomeLink href="/collection" title="Collection" text="Browse cards, filter by role, rarity, and club." />
           <HomeLink href="/squad" title="Squad" text="Pick your XI manually or auto-select your strongest team." />
           <HomeLink href="/chat" title="Chat" text="Talk tactics, pulls, and live scores with the group." />
         </section>
 
         <section className="rounded-lg border border-green-900/10 bg-white p-5 shadow-sm">
-          <p className="text-sm font-black uppercase tracking-wide text-green-900/60">KM Activity</p>
+          <p className="text-sm font-black uppercase tracking-wide text-green-900/60">Activity Feed</p>
           <div className="mt-3 space-y-2">
             {feed.length === 0 ? (
-              <p className="text-sm font-semibold text-green-900/60">No activity yet — be the first to log a run!</p>
+              <p className="text-sm font-semibold text-green-900/60">No activity yet — be the first to log a session!</p>
             ) : (
               feed.map((entry, i) => (
                 <div key={i} className="flex items-start justify-between gap-3 rounded-md bg-green-950/5 px-3 py-2">
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-black text-green-950">{entry.username}</p>
-                    <p className="text-xs font-semibold text-green-900/60">{formatDate(entry.created_at)}</p>
+                    <div className="flex min-w-0 flex-wrap items-center gap-2">
+                      <p className="truncate text-sm font-black text-green-950">{entry.username}</p>
+                      <ActivityBadge type={entry.activity_type} />
+                    </div>
+                    <p className="mt-1 text-xs font-semibold text-green-900/60">{formatActivity(entry)} · {formatDate(entry.created_at)}</p>
+                    {entry.comment ? <p className="mt-1 line-clamp-2 text-xs font-semibold text-green-950/75">“{entry.comment}”</p> : null}
                   </div>
                   <div className="shrink-0 text-right">
-                    <p className="text-sm font-black text-pitch">+{entry.distance_km.toFixed(1)} km</p>
+                    <p className="text-sm font-black text-pitch">+{entry.distance_km.toFixed(1)} credits</p>
                     {entry.cards_earned > 0 && (
                       <p className="text-xs font-bold text-amber-700">+{entry.cards_earned} card{entry.cards_earned === 1 ? "" : "s"}</p>
                     )}
@@ -184,6 +198,32 @@ export default function Home() {
         </section>
       </div>
     </div>
+  );
+}
+
+function formatActivity(entry: FeedEntry) {
+  const activity = entry.activity_type ? activityDefinitions[entry.activity_type] : undefined;
+  const amount = entry.activity_amount ?? entry.distance_km;
+  const unit = entry.activity_unit ?? "km";
+  return `${activity?.label ?? "Activity"} · ${Number(amount).toFixed(unit === "km" ? 1 : 0)} ${unit}`;
+}
+
+const activityBadgeStyles: Record<ActivityType, string> = {
+  walk: "bg-sky-100 text-sky-800",
+  run: "bg-green-100 text-green-800",
+  cycle: "bg-violet-100 text-violet-800",
+  strength: "bg-amber-100 text-amber-900",
+  sport: "bg-red-100 text-red-800",
+  mobility: "bg-teal-100 text-teal-800"
+};
+
+function ActivityBadge({ type }: { type?: ActivityType }) {
+  const activityType = type ?? "walk";
+  const activity = activityDefinitions[activityType];
+  return (
+    <span className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wide ${activityBadgeStyles[activityType]}`}>
+      {activity.label}
+    </span>
   );
 }
 

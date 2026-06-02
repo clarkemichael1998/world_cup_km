@@ -7,7 +7,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "KMXI",
-  description: "Log kilometres, collect World Cup players, and compete with your XI."
+  description: "Log activity, collect World Cup players, and compete with your XI."
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
@@ -31,7 +31,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
                 ⚽ KMXI
               </Link>
               <div className="flex gap-2 text-sm font-semibold text-green-950">
-                <Link className="rounded-md px-3 py-2 hover:bg-green-100" href="/add-km">Add KM</Link>
+                <Link className="rounded-md px-3 py-2 hover:bg-green-100" href="/add-km">Add Activity</Link>
                 <Link className="rounded-md px-3 py-2 hover:bg-green-100" href="/collection">Collection</Link>
                 <Link className="rounded-md px-3 py-2 hover:bg-green-100" href="/squad">Squad</Link>
                 <Link className="rounded-md px-3 py-2 hover:bg-green-100" href="/leaderboard">Leaderboard</Link>

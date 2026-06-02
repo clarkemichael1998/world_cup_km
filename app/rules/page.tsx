@@ -7,11 +7,15 @@ export default function RulesPage() {
 
       <div className="space-y-6">
 
-        <Section title="1. Log Your KM">
-          <p>Every kilometre you run or walk earns you <strong>player cards</strong>. Log your distance on the Add KM page after each activity. Whole kilometres count — any fraction carries over to your next session.</p>
+        <Section title="1. Log Your Activity">
+          <p>Walks, runs, rides, strength workouts, sport sessions, and mobility work all earn <strong>player cards</strong>. Log your activity on the Add Activity page. Whole activity credits count toward cards, and any fraction carries over to your next session.</p>
           <ul className="mt-2 list-disc space-y-1 pl-5 text-green-900/70">
             <li>Maximum <strong>3 logs per day</strong></li>
-            <li>Maximum <strong>50 km per log</strong></li>
+            <li><strong>Walk/run:</strong> 1 km = 1 activity credit</li>
+            <li><strong>Cycle:</strong> 3 km = 1 activity credit</li>
+            <li><strong>Strength:</strong> 20 minutes = 1 activity credit</li>
+            <li><strong>Sport:</strong> 15 minutes = 1 activity credit</li>
+            <li><strong>Yoga/mobility:</strong> 30 minutes = 1 activity credit</li>
             <li>All logging closes permanently at the <strong>World Cup Final kick-off (19 July 2026)</strong></li>
           </ul>
         </Section>
@@ -47,7 +51,7 @@ export default function RulesPage() {
         </Section>
 
         <Section title="3. Pack Credits">
-          <p>As well as earning cards directly from KM, you accumulate <strong>pack credits</strong> that can be spent on additional card pulls at any time.</p>
+          <p>As well as earning cards directly from activity, you accumulate <strong>pack credits</strong> that can be spent on additional card pulls at any time.</p>
           <ul className="mt-2 list-disc space-y-1 pl-5 text-green-900/70">
             <li><strong>2 free credits</strong> are added to your balance every day you log in during the tournament</li>
             <li><strong>Match credits</strong> are earned when players in your locked squad represent a winning nation — <strong>3 credits per player per match win</strong></li>
@@ -102,10 +106,10 @@ export default function RulesPage() {
         </Section>
 
         <Section title="7. Final Submission &amp; Leaderboard">
-          <p>At the <strong>World Cup Final kick-off (19 July 2026)</strong>, all squad selections and KM logging are permanently locked. Your final squad is your entry.</p>
+          <p>At the <strong>World Cup Final kick-off (19 July 2026)</strong>, all squad selections and activity logging are permanently locked. Your final squad is your entry.</p>
           <p className="mt-2">The <strong>Ranking page</strong> tracks three leaderboards throughout the tournament:</p>
           <ul className="mt-2 list-disc space-y-1 pl-5 text-green-900/70">
-            <li><strong>Total KM</strong> — cumulative distance logged across the tournament</li>
+            <li><strong>Activity Credits</strong> — cumulative reward-equivalent activity logged across the tournament</li>
             <li><strong>Best Squad Rating</strong> — average rating of your strongest possible 4-3-3 XI from your collection, including all accrued boosts</li>
             <li><strong>Games Won</strong> — number of matches in which at least one of your locked players represented a winning nation</li>
           </ul>
@@ -113,7 +117,7 @@ export default function RulesPage() {
 
         <Section title="General Rules">
           <ul className="list-disc space-y-1 pl-5">
-            <li>Log KM honestly — this is based on real physical activity only.</li>
+            <li>Log activity honestly — this is based on real physical activity only.</li>
             <li>One account per person. Do not share accounts.</li>
             <li><strong>If you forget your password, access cannot be recovered.</strong> There is no password reset — keep it safe.</li>
             <li>Keep chat respectful. Abusive messages will be removed.</li>

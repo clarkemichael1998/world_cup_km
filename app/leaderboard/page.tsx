@@ -23,7 +23,7 @@ export default function LeaderboardPage() {
         {leaderboard === null ? (
           <p className="p-6 text-sm font-semibold text-green-900/60">Loading...</p>
         ) : leaderboard.length === 0 ? (
-          <p className="p-6 text-sm font-semibold text-green-900/60">No entries yet — be the first to log a run!</p>
+          <p className="p-6 text-sm font-semibold text-green-900/60">No entries yet — be the first to log an activity!</p>
         ) : (
           <table className="w-full text-sm">
             <thead>
@@ -31,7 +31,7 @@ export default function LeaderboardPage() {
                 <th className="w-10 px-4 py-3">#</th>
                 <th className="px-4 py-3">Player</th>
                 <th className="px-4 py-3 text-right">Squad Avg</th>
-                <th className="px-4 py-3 text-right">Total KM</th>
+                <th className="px-4 py-3 text-right">Activity Credits</th>
                 <th className="px-4 py-3 text-right">Wins</th>
                 <th className="px-4 py-3 text-right">⚽ Bonus</th>
                 <th className="px-4 py-3 text-right">🅰️ Bonus</th>
@@ -47,7 +47,7 @@ export default function LeaderboardPage() {
                     <td className="px-4 py-3 text-right font-black text-pitch">
                       {entry.best_squad_rating > 0 ? entry.best_squad_rating.toFixed(1) : "—"}
                     </td>
-                    <td className="px-4 py-3 text-right font-bold text-green-900/80">{entry.total_km.toFixed(1)} km</td>
+                    <td className="px-4 py-3 text-right font-bold text-green-900/80">{entry.total_km.toFixed(1)}</td>
                     <td className="px-4 py-3 text-right font-bold text-amber-700">{entry.games_won > 0 ? entry.games_won : "—"}</td>
                     <td className="px-4 py-3 text-right font-bold text-green-700">{entry.goal_bonus !== 0 ? (entry.goal_bonus > 0 ? `+${entry.goal_bonus}` : entry.goal_bonus) : "—"}</td>
                     <td className="px-4 py-3 text-right font-bold text-sky-700">{entry.assist_bonus !== 0 ? (entry.assist_bonus > 0 ? `+${entry.assist_bonus}` : entry.assist_bonus) : "—"}</td>

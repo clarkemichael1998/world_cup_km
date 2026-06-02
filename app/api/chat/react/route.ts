@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser, toggleChatReaction } from "@/lib/server/db";
 
-const ALLOWED_REACTIONS = ["👍", "👎", "🔥", "❤️", "😂", "🤡", "💩"];
+const ALLOWED_REACTIONS = ["👍", "👎", "🔥", "❤️", "😂", "🤡", "💩", "🫪"];
 
 export async function POST(request: Request) {
   const user = await getCurrentUser();
