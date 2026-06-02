@@ -43,7 +43,7 @@ export default function CollectionPage() {
 
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {filtered.map((player) => (
-          <PlayerCard key={player.id} player={player} duplicateCount={state?.duplicateCounts[player.id] ?? 0} />
+          <PlayerCard key={player.id} player={player} duplicateCount={state?.duplicateCounts[player.id] ?? 0} ratingBoost={state?.ratingBoosts?.[player.id] ?? 0} />
         ))}
       </section>
       {filtered.length === 0 ? <p className="rounded-lg bg-white p-6 text-center font-bold text-green-950">No players match those filters.</p> : null}

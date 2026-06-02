@@ -1,6 +1,7 @@
 import players from "@/data/players.json";
-import { getDb, getDraftSquad } from "./db";
+import { getDb, getDraftSquad, awardGoalBoost, getMatchedGoalScorers, getMatchedAssistScorers } from "./db";
 import { getProviderStatus, type ProviderStatus } from "./fixtures";
+import { GOAL_BOOST_BY_RARITY, ASSIST_BOOST_BY_RARITY, getPlayerById } from "./goalScorers";
 import type { Player, SquadSlot } from "@/lib/types";
 
 const tournamentStart = "2026-06-11";
@@ -22,6 +23,7 @@ export type LiveStatus = {
   lockedSquad: Array<{ slot: SquadSlot; player: Player }>;
   finishedMatches: Array<{ matchId: string; homeTeam: string; awayTeam: string; winner: string | null; matchDate: string; verified: boolean }>;
   rewardEvents: Array<{ matchId: string; playerId: number; playerName: string; nation: string; credits: number }>;
+  goalBoostEvents: Array<{ matchId: string; playerId: number; playerName: string; boostAmount: number }>;
   leaderboard: Array<{ username: string; averageRating: number; selectedCount: number }>;
 };
 
@@ -32,6 +34,7 @@ export function getLiveStatus(userId: number, now = new Date()): LiveStatus {
   if (tournamentActive) {
     ensureLockedSquad(userId, window);
     awardResultCredits(userId, window.lockDate);
+    awardGoalBoosts(userId, window);
   }
 
   const locked = database.prepare("SELECT id FROM locked_squads WHERE user_id = ? AND lock_date = ?").get(userId, window.lockDate) as { id: number } | undefined;
@@ -49,6 +52,10 @@ export function getLiveStatus(userId: number, now = new Date()): LiveStatus {
   const rewardEvents = database
     .prepare("SELECT match_id, player_id, credits FROM reward_events WHERE user_id = ? AND locked_squad_id = ? ORDER BY created_at DESC")
     .all(userId, locked?.id ?? 0) as Array<{ match_id: string; player_id: number; credits: number }>;
+
+  const goalBoostRows = database
+    .prepare("SELECT player_id, match_id, boost_amount FROM goal_boosts WHERE user_id = ? ORDER BY created_at DESC")
+    .all(userId) as Array<{ player_id: number; match_id: string; boost_amount: number }>;
 
   return {
     tournamentActive,
@@ -76,6 +83,15 @@ export function getLiveStatus(userId: number, now = new Date()): LiveStatus {
         playerName: player?.name ?? `Player ${event.player_id}`,
         nation: player?.nation ?? "Unknown",
         credits: event.credits
+      };
+    }),
+    goalBoostEvents: goalBoostRows.map((row) => {
+      const player = playerMap.get(row.player_id);
+      return {
+        matchId: row.match_id,
+        playerId: row.player_id,
+        playerName: player?.name ?? `Player ${row.player_id}`,
+        boostAmount: row.boost_amount
       };
     }),
     leaderboard: getBestOwnedSquadLeaderboard()
@@ -167,6 +183,45 @@ function awardResultCredits(userId: number, lockDate: string) {
       if (player.nation !== match.winner) continue;
       const result = insertReward.run(userId, locked.id, match.match_id, player.player_id, creditValue);
       if (result.changes > 0) incrementUser.run(creditValue, userId);
+    }
+  }
+}
+
+function awardGoalBoosts(userId: number, _window: ReturnType<typeof londonLockWindow>) {
+  const database = getDb();
+
+  // Scan ALL past locked squads for this user so retroactive admin resolutions are applied
+  const allLocked = database
+    .prepare("SELECT id, locked_at, unlock_at FROM locked_squads WHERE user_id = ?")
+    .all(userId) as Array<{ id: number; locked_at: string; unlock_at: string }>;
+
+  for (const locked of allLocked) {
+    const matches = database
+      .prepare("SELECT match_id FROM fixture_results WHERE status = 'FINISHED' AND verified = 1 AND kickoff_at >= ? AND kickoff_at < ?")
+      .all(locked.locked_at, locked.unlock_at) as Array<{ match_id: string }>;
+
+    const lockedPlayerIds = new Set(
+      (database.prepare("SELECT player_id FROM locked_squad_players WHERE locked_squad_id = ?").all(locked.id) as Array<{ player_id: number }>).map((r) => r.player_id)
+    );
+
+    for (const match of matches) {
+      const scorers = getMatchedGoalScorers(match.match_id);
+      for (const { playerId, goalCount } of scorers) {
+        if (!lockedPlayerIds.has(playerId)) continue;
+        const player = getPlayerById(playerId);
+        if (!player) continue;
+        const boostPerGoal = GOAL_BOOST_BY_RARITY[player.rarity] ?? 0;
+        if (boostPerGoal !== 0) awardGoalBoost(userId, playerId, match.match_id, boostPerGoal * goalCount);
+      }
+
+      const assisters = getMatchedAssistScorers(match.match_id);
+      for (const { playerId, assistCount } of assisters) {
+        if (!lockedPlayerIds.has(playerId)) continue;
+        const player = getPlayerById(playerId);
+        if (!player) continue;
+        const boostPerAssist = ASSIST_BOOST_BY_RARITY[player.rarity] ?? 0;
+        if (boostPerAssist !== 0) awardGoalBoost(userId, playerId, `${match.match_id}:assist`, boostPerAssist * assistCount);
+      }
     }
   }
 }

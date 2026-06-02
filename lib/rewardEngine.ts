@@ -37,8 +37,18 @@ export function getRandomPlayerByRarity(rarity = rollRarity()): Player {
   return fallbackPool[Math.floor(Math.random() * fallbackPool.length)];
 }
 
-export function calculateRewards(distance: number, kmBalance: number) {
-  const combined = distance + kmBalance;
+const TOURNAMENT_START = new Date("2026-06-11T00:00:00Z");
+const KM_MULTIPLIERS = [1, 1.5, 2, 2.5, 3, 4]; // one per week of tournament
+
+export function getKmMultiplier(now = new Date()): number {
+  const daysSinceStart = Math.floor((now.getTime() - TOURNAMENT_START.getTime()) / 86400000);
+  if (daysSinceStart < 0) return 1;
+  const week = Math.floor(daysSinceStart / 7);
+  return KM_MULTIPLIERS[Math.min(week, KM_MULTIPLIERS.length - 1)];
+}
+
+export function calculateRewards(distance: number, kmBalance: number, multiplier = 1) {
+  const combined = distance * multiplier + kmBalance;
   const rewards = Math.floor(combined);
   const newBalance = Number((combined - rewards).toFixed(2));
   return { rewards, newBalance };

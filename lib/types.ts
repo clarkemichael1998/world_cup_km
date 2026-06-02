@@ -29,4 +29,5 @@ export type UserState = {
   ownedPlayerIds: number[];
   duplicateCounts: Record<number, number>;
   squad: Partial<Record<SquadSlot, number>>;
+  ratingBoosts?: Record<number, number>;
 };

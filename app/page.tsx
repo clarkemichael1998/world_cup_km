@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { PageTitle } from "@/components/PageTitle";
 import { formatDate } from "@/lib/formatDate";
 import { calculateSquadRating } from "@/lib/squadUtils";
@@ -31,6 +32,10 @@ export default function Home() {
   const [state, setState] = useState<UserState | null>(null);
   const [communityKm, setCommunityKm] = useState<number | null>(null);
   const [feed, setFeed] = useState<FeedEntry[]>([]);
+  const [rewardCredits, setRewardCredits] = useState<number | null>(null);
+  const [redeemAmount, setRedeemAmount] = useState(1);
+  const [redeeming, setRedeeming] = useState(false);
+  const router = useRouter();
   const countdown = useCountdown();
 
   useEffect(() => {
@@ -38,6 +43,10 @@ export default function Home() {
     fetch("/api/community")
       .then((r) => r.json())
       .then((p) => setCommunityKm(p.community.totalKm))
+      .catch(() => {});
+    fetch("/api/credits", { credentials: "include" })
+      .then((r) => r.json())
+      .then((p) => setRewardCredits(p.credits ?? 0))
       .catch(() => {});
     fetch("/api/km-log")
       .then((r) => r.json())
@@ -47,6 +56,25 @@ export default function Home() {
 
   const squadRating = state ? calculateSquadRating(state) : 0;
   const nextRewardProgress = state ? Math.min(100, Math.round(state.kmBalance * 100)) : 0;
+
+  async function openPack() {
+    if (redeeming || !rewardCredits || rewardCredits < redeemAmount) return;
+    setRedeeming(true);
+    try {
+      const res = await fetch("/api/redeem", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ amount: redeemAmount }),
+      });
+      if (res.ok) {
+        setRewardCredits((c) => (c ?? 0) - redeemAmount);
+        router.push("/reveal");
+      }
+    } finally {
+      setRedeeming(false);
+    }
+  }
 
   return (
     <div>
@@ -75,6 +103,31 @@ export default function Home() {
         <Stat label="Collection" value={state ? String(state.ownedPlayerIds.length) : "..."} />
         <Stat label="Squad Rating" value={state ? String(squadRating) : "..."} />
       </section>
+
+      {rewardCredits !== null && rewardCredits > 0 && (
+        <section className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-5 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-black uppercase tracking-wide text-amber-800">Pack Credits</p>
+              <p className="mt-1 text-2xl font-black text-amber-900">{rewardCredits} <span className="text-sm font-semibold text-amber-700">credit{rewardCredits === 1 ? "" : "s"} available</span></p>
+              <p className="mt-0.5 text-xs font-semibold text-amber-700">1 credit = 1 random player card</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <button onClick={() => setRedeemAmount((a) => Math.max(1, a - 1))} disabled={redeemAmount <= 1}
+                  className="rounded-md bg-amber-200 px-2 py-1 text-sm font-black text-amber-900 hover:bg-amber-300 disabled:opacity-40">−</button>
+                <span className="w-8 text-center text-lg font-black text-amber-900">{redeemAmount}</span>
+                <button onClick={() => setRedeemAmount((a) => Math.min(rewardCredits, 20, a + 1))} disabled={redeemAmount >= Math.min(rewardCredits, 20)}
+                  className="rounded-md bg-amber-200 px-2 py-1 text-sm font-black text-amber-900 hover:bg-amber-300 disabled:opacity-40">+</button>
+              </div>
+              <button onClick={openPack} disabled={redeeming}
+                className="rounded-md bg-amber-600 px-5 py-2.5 font-black text-white hover:bg-amber-700 disabled:opacity-40">
+                {redeeming ? "Opening…" : `Open ${redeemAmount} Pack${redeemAmount === 1 ? "" : "s"}`}
+              </button>
+            </div>
+          </div>
+        </section>
+      )}
 
       <section className="mt-4 rounded-lg border border-green-900/10 bg-white p-5 shadow-sm">
         <div className="flex items-center justify-between gap-4">

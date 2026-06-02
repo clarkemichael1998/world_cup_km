@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 import { PageTitle } from "@/components/PageTitle";
-import { addRewardPlayers, calculateRewards, getRandomPlayerByRarity } from "@/lib/rewardEngine";
+import { addRewardPlayers, calculateRewards, getKmMultiplier, getRandomPlayerByRarity } from "@/lib/rewardEngine";
 import { loadUserStateAsync, saveRevealPlayers, saveUserState } from "@/lib/storage";
 import type { UserState } from "@/lib/types";
 
@@ -17,10 +17,11 @@ export default function AddKmPage() {
   const [error, setError] = useState("");
   const [liveCredits, setLiveCredits] = useState(0);
   const [logsToday, setLogsToday] = useState<number | null>(null);
+  const multiplier = getKmMultiplier();
   const numericDistance = Number(distance);
   const preview =
     state && Number.isFinite(numericDistance) && numericDistance > 0 && numericDistance <= MAX_KM_PER_LOG
-      ? calculateRewards(numericDistance, state.kmBalance)
+      ? calculateRewards(numericDistance, state.kmBalance, multiplier)
       : null;
   const logsRemaining = logsToday === null ? null : MAX_LOGS_PER_DAY - logsToday;
   const limitReached = logsRemaining !== null && logsRemaining <= 0;
@@ -58,7 +59,7 @@ export default function AddKmPage() {
       return;
     }
 
-    const { rewards, newBalance } = calculateRewards(value, state.kmBalance);
+    const { rewards, newBalance } = calculateRewards(value, state.kmBalance, multiplier);
     const bonusCredits = await consumeLiveCredits();
     const rewardPlayers = Array.from({ length: rewards + bonusCredits }, () => getRandomPlayerByRarity());
     const updated = addRewardPlayers(
@@ -131,7 +132,7 @@ export default function AddKmPage() {
             You&apos;ve logged {MAX_LOGS_PER_DAY} times today — the daily maximum. Come back tomorrow!
           </p>
         ) : (
-          <p className="mt-3 text-xs font-semibold text-green-900/50">Max {MAX_KM_PER_LOG}km per log · {MAX_LOGS_PER_DAY} logs per day</p>
+          <p className="mt-3 text-xs font-semibold text-green-900/50">Max {MAX_KM_PER_LOG}km per log · {MAX_LOGS_PER_DAY} logs per day · <span className="text-green-700 font-black">{multiplier}× cards/km this week</span></p>
         )}
         <div className="mt-3 rounded-md bg-green-50 p-4 text-sm font-semibold text-green-950">
           Current carry-over balance: {state ? state.kmBalance.toFixed(2) : "..."}km

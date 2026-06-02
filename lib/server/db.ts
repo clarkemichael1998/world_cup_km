@@ -57,6 +57,7 @@ export function getDb() {
       user_id INTEGER PRIMARY KEY,
       total_km REAL NOT NULL DEFAULT 0,
       km_balance REAL NOT NULL DEFAULT 0,
+      daily_credits_granted_date TEXT,
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id)
     );
@@ -139,8 +140,42 @@ export function getDb() {
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id)
     );
+    CREATE TABLE IF NOT EXISTS goal_scorers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      match_id TEXT NOT NULL,
+      scorer_name_raw TEXT NOT NULL,
+      player_id INTEGER,
+      goal_count INTEGER NOT NULL DEFAULT 1,
+      status TEXT NOT NULL DEFAULT 'pending',
+      source TEXT NOT NULL DEFAULT 'auto',
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(match_id, scorer_name_raw)
+    );
+    CREATE TABLE IF NOT EXISTS assist_scorers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      match_id TEXT NOT NULL,
+      scorer_name_raw TEXT NOT NULL,
+      player_id INTEGER,
+      assist_count INTEGER NOT NULL DEFAULT 1,
+      status TEXT NOT NULL DEFAULT 'pending',
+      source TEXT NOT NULL DEFAULT 'auto',
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(match_id, scorer_name_raw)
+    );
+    CREATE TABLE IF NOT EXISTS goal_boosts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      player_id INTEGER NOT NULL,
+      match_id TEXT NOT NULL,
+      boost_amount INTEGER NOT NULL,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(user_id, player_id, match_id),
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
   `);
   migrateFixtureResults(db);
+  migrateUserState(db);
+  migrateGoalScorers(db);
   seedFixtureResults(db);
   return db;
 }
@@ -241,6 +276,110 @@ export function savePersistedUserState(userId: number, state: { totalKm: number;
     insert.run(userId, playerId, state.duplicateCounts[playerId] ?? 0);
   }
   saveDraftSquad(userId, state.squad);
+}
+
+export function getRatingBoosts(userId: number): Record<number, number> {
+  const rows = getDb()
+    .prepare("SELECT player_id, SUM(boost_amount) AS total FROM goal_boosts WHERE user_id = ? GROUP BY player_id")
+    .all(userId) as Array<{ player_id: number; total: number }>;
+  return Object.fromEntries(rows.map((row) => [row.player_id, row.total]));
+}
+
+const DAILY_FREE_CREDITS = 2;
+
+export function awardDailyCredits(userId: number): number {
+  const db = getDb();
+  const todayUTC = new Date().toISOString().slice(0, 10);
+  const row = db.prepare("SELECT daily_credits_granted_date FROM user_state WHERE user_id = ?").get(userId) as { daily_credits_granted_date: string | null } | undefined;
+  if (row?.daily_credits_granted_date === todayUTC) return 0;
+  db.prepare("UPDATE user_state SET daily_credits_granted_date = ? WHERE user_id = ?").run(todayUTC, userId);
+  db.prepare("UPDATE users SET reward_credits = reward_credits + ? WHERE id = ?").run(DAILY_FREE_CREDITS, userId);
+  return DAILY_FREE_CREDITS;
+}
+
+export function spendCredits(userId: number, amount: number): boolean {
+  const db = getDb();
+  const user = db.prepare("SELECT reward_credits FROM users WHERE id = ?").get(userId) as { reward_credits: number } | undefined;
+  if (!user || user.reward_credits < amount) return false;
+  db.prepare("UPDATE users SET reward_credits = reward_credits - ? WHERE id = ?").run(amount, userId);
+  return true;
+}
+
+export function upsertGoalScorer(matchId: string, scorerNameRaw: string, playerId: number | null, status: "matched" | "pending" | "ignored", source: "auto" | "manual", goalCount = 1) {
+  getDb()
+    .prepare(`INSERT INTO goal_scorers (match_id, scorer_name_raw, player_id, goal_count, status, source)
+      VALUES (?, ?, ?, ?, ?, ?)
+      ON CONFLICT(match_id, scorer_name_raw) DO UPDATE SET
+        player_id = CASE WHEN excluded.source = 'manual' OR goal_scorers.status = 'pending' THEN excluded.player_id ELSE goal_scorers.player_id END,
+        goal_count = excluded.goal_count,
+        status = CASE WHEN excluded.source = 'manual' THEN excluded.status ELSE goal_scorers.status END,
+        source = excluded.source`)
+    .run(matchId, scorerNameRaw, playerId, goalCount, status, source);
+}
+
+export function getPendingGoalScorers() {
+  return getDb()
+    .prepare(`SELECT gs.id, gs.match_id, gs.scorer_name_raw, gs.player_id, gs.goal_count, gs.status, gs.source,
+                     fr.home_team, fr.away_team, fr.match_date
+              FROM goal_scorers gs
+              LEFT JOIN fixture_results fr ON fr.match_id = gs.match_id
+              ORDER BY fr.match_date DESC, gs.id DESC`)
+    .all() as Array<{ id: number; match_id: string; scorer_name_raw: string; player_id: number | null; goal_count: number; status: string; source: string; home_team: string | null; away_team: string | null; match_date: string | null }>;
+}
+
+export function resolveGoalScorer(id: number, playerId: number | null, status: "matched" | "ignored") {
+  getDb()
+    .prepare("UPDATE goal_scorers SET player_id = ?, status = ?, source = 'manual' WHERE id = ?")
+    .run(playerId, status, id);
+}
+
+export function getMatchedGoalScorers(matchId: string): Array<{ playerId: number; goalCount: number }> {
+  const rows = getDb()
+    .prepare("SELECT player_id, goal_count FROM goal_scorers WHERE match_id = ? AND status = 'matched' AND player_id IS NOT NULL")
+    .all(matchId) as Array<{ player_id: number; goal_count: number }>;
+  return rows.map((r) => ({ playerId: r.player_id, goalCount: r.goal_count }));
+}
+
+export function awardGoalBoost(userId: number, playerId: number, matchId: string, boostAmount: number): boolean {
+  const result = getDb()
+    .prepare("INSERT OR IGNORE INTO goal_boosts (user_id, player_id, match_id, boost_amount) VALUES (?, ?, ?, ?)")
+    .run(userId, playerId, matchId, boostAmount);
+  return result.changes > 0;
+}
+
+export function upsertAssistScorer(matchId: string, scorerNameRaw: string, playerId: number | null, status: "matched" | "pending" | "ignored", source: "auto" | "manual", assistCount = 1) {
+  getDb()
+    .prepare(`INSERT INTO assist_scorers (match_id, scorer_name_raw, player_id, assist_count, status, source)
+      VALUES (?, ?, ?, ?, ?, ?)
+      ON CONFLICT(match_id, scorer_name_raw) DO UPDATE SET
+        player_id = CASE WHEN excluded.source = 'manual' OR assist_scorers.status = 'pending' THEN excluded.player_id ELSE assist_scorers.player_id END,
+        assist_count = excluded.assist_count,
+        status = CASE WHEN excluded.source = 'manual' THEN excluded.status ELSE assist_scorers.status END,
+        source = excluded.source`)
+    .run(matchId, scorerNameRaw, playerId, assistCount, status, source);
+}
+
+export function getMatchedAssistScorers(matchId: string): Array<{ playerId: number; assistCount: number }> {
+  const rows = getDb()
+    .prepare("SELECT player_id, assist_count FROM assist_scorers WHERE match_id = ? AND status = 'matched' AND player_id IS NOT NULL")
+    .all(matchId) as Array<{ player_id: number; assist_count: number }>;
+  return rows.map((r) => ({ playerId: r.player_id, assistCount: r.assist_count }));
+}
+
+export function getPendingAssistScorers() {
+  return getDb()
+    .prepare(`SELECT as2.id, as2.match_id, as2.scorer_name_raw, as2.player_id, as2.assist_count, as2.status, as2.source,
+                     fr.home_team, fr.away_team, fr.match_date
+              FROM assist_scorers as2
+              LEFT JOIN fixture_results fr ON fr.match_id = as2.match_id
+              ORDER BY fr.match_date DESC, as2.id DESC`)
+    .all() as Array<{ id: number; match_id: string; scorer_name_raw: string; player_id: number | null; assist_count: number; status: string; source: string; home_team: string | null; away_team: string | null; match_date: string | null }>;
+}
+
+export function resolveAssistScorer(id: number, playerId: number | null, status: "matched" | "ignored") {
+  getDb()
+    .prepare("UPDATE assist_scorers SET player_id = ?, status = ?, source = 'manual' WHERE id = ?")
+    .run(playerId, status, id);
 }
 
 export function getRevealPlayerIds(userId: number) {
@@ -407,6 +546,22 @@ function createStarterStateSnapshot() {
     duplicateCounts: Object.fromEntries(Array.from(picked).map((id) => [id, 0])),
     squad
   };
+}
+
+function migrateUserState(database: DatabaseSync) {
+  const cols = database.prepare("PRAGMA table_info(user_state)").all() as Array<{ name: string }>;
+  const colNames = new Set(cols.map((c) => c.name));
+  if (!colNames.has("daily_credits_granted_date")) {
+    database.exec("ALTER TABLE user_state ADD COLUMN daily_credits_granted_date TEXT");
+  }
+}
+
+function migrateGoalScorers(database: DatabaseSync) {
+  const cols = database.prepare("PRAGMA table_info(goal_scorers)").all() as Array<{ name: string }>;
+  const colNames = new Set(cols.map((c) => c.name));
+  if (colNames.size > 0 && !colNames.has("goal_count")) {
+    database.exec("ALTER TABLE goal_scorers ADD COLUMN goal_count INTEGER NOT NULL DEFAULT 1");
+  }
 }
 
 function migrateFixtureResults(database: DatabaseSync) {

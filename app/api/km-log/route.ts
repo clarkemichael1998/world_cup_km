@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser, getKmFeed, getKmLogsToday, logKmEntry } from "@/lib/server/db";
+import { getKmMultiplier } from "@/lib/rewardEngine";
 
 const MAX_LOGS_PER_DAY = 3;
 const MAX_KM_PER_LOG = 50;
@@ -31,6 +32,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: `You've reached the limit of ${MAX_LOGS_PER_DAY} logs per day. Come back tomorrow!` }, { status: 400 });
   }
 
+  const multiplier = getKmMultiplier();
   logKmEntry(user.id, body.distanceKm, body.cardsEarned ?? 0);
-  return NextResponse.json({ ok: true, logsRemaining: MAX_LOGS_PER_DAY - logsToday - 1 });
+  return NextResponse.json({ ok: true, logsRemaining: MAX_LOGS_PER_DAY - logsToday - 1, multiplier });
 }

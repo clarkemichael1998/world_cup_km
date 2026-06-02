@@ -1,4 +1,5 @@
 import { getDb } from "./db";
+import { processGoalScorers, processAssistScorers } from "./goalScorers";
 
 type FixtureResult = {
   matchId: string;
@@ -77,6 +78,7 @@ async function syncFootballData() {
         homeTeam?: { name?: string };
         awayTeam?: { name?: string };
         score?: { winner?: "HOME_TEAM" | "AWAY_TEAM" | "DRAW" | null };
+        goals?: Array<{ scorer?: { name?: string }; assist?: { name?: string }; minute?: number }>;
       }>;
     };
 
@@ -98,6 +100,17 @@ async function syncFootballData() {
     });
 
     upsertFixtures(fixtures);
+
+    // Extract goal scorers from finished matches
+    for (const match of payload.matches ?? []) {
+      if (match.status === "FINISHED" && match.goals && match.goals.length > 0) {
+        const matchId = `football-data-${match.id}`;
+        const scorerNames = match.goals.map((g) => g.scorer?.name).filter((n): n is string => Boolean(n));
+        const assistNames = match.goals.map((g) => g.assist?.name).filter((n): n is string => Boolean(n));
+        if (scorerNames.length > 0) processGoalScorers(matchId, scorerNames);
+        if (assistNames.length > 0) processAssistScorers(matchId, assistNames);
+      }
+    }
     recordProviderRun(provider, "ok", `Synced ${fixtures.length} World Cup fixtures.`);
     return getProviderStatus();
   } catch (error) {

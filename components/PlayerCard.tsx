@@ -14,9 +14,10 @@ function formatNumber(value: number | null) {
   return value === null ? "Unknown" : value.toLocaleString();
 }
 
-export function PlayerCard({ player, duplicateCount = 0, large = false }: { player: Player; duplicateCount?: number; large?: boolean }) {
+export function PlayerCard({ player, duplicateCount = 0, large = false, ratingBoost = 0 }: { player: Player; duplicateCount?: number; large?: boolean; ratingBoost?: number }) {
   const detailClass = large ? "grid-cols-2" : "grid-cols-1";
   const flag = flagUrl(player.nation);
+  const effectiveRating = player.rating + ratingBoost;
 
   return (
     <article className={`card-sheen rounded-lg border-2 p-4 shadow-sm ${rarityStyles[player.rarity]} ${player.rarity === "icon" ? "card-icon" : player.rarity === "legend" ? "card-legend" : ""} ${large ? "min-h-72" : ""}`}>
@@ -26,8 +27,9 @@ export function PlayerCard({ player, duplicateCount = 0, large = false }: { play
           <h3 className={`${large ? "text-3xl" : "text-lg"} break-words font-black leading-tight`}>{player.name}</h3>
         </div>
         <div className="shrink-0 rounded-md bg-white/70 px-3 py-2 text-center text-green-950">
-          <div className={`${large ? "text-3xl" : "text-xl"} font-black`}>{player.rating}</div>
+          <div className={`${large ? "text-3xl" : "text-xl"} font-black`}>{effectiveRating}</div>
           <div className="text-xs font-bold">{player.pos}</div>
+          {ratingBoost > 0 && <div className="text-[10px] font-black text-green-600">+{ratingBoost} ⚽</div>}
         </div>
       </div>
 

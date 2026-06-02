@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser, getPersistedUserState, savePersistedUserState } from "@/lib/server/db";
+import { getCurrentUser, getPersistedUserState, savePersistedUserState, getRatingBoosts, awardDailyCredits } from "@/lib/server/db";
 
 export async function GET() {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Login required" }, { status: 401 });
 
-  return NextResponse.json({ state: getPersistedUserState(user.id) });
+  awardDailyCredits(user.id);
+  const state = getPersistedUserState(user.id);
+  const ratingBoosts = getRatingBoosts(user.id);
+  return NextResponse.json({ state: { ...state, ratingBoosts } });
 }
 
 export async function PUT(request: Request) {
