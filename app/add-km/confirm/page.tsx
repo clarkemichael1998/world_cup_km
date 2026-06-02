@@ -106,6 +106,7 @@ export default function ConfirmActivityPage() {
         amount: currentPending.amount,
         activityCredits,
         rewardCreditValue,
+        activityCardsEarned: preview.rewards,
         balanceBefore: currentState.kmBalance,
         balanceAfter: preview.newBalance,
         cardsEarned: finalPlayers.length,

@@ -99,6 +99,11 @@ button {
   50%       { box-shadow: 0 0 0 6px rgba(250,204,21,0), 0 0 32px 10px rgba(250,204,21,0.6); }
 }
 
+@keyframes icon-shine-sweep {
+  from { transform: translateX(-140%) rotate(18deg); }
+  to   { transform: translateX(140%) rotate(18deg); }
+}
+
 @keyframes legend-shimmer {
   0%   { background-position: 0% 50%; }
   50%  { background-position: 100% 50%; }
@@ -109,8 +114,15 @@ button {
   background: linear-gradient(135deg, #0f0f0f, #1a1a2e, #0f0f0f) !important;
   border-color: transparent !important;
   position: relative;
+  isolation: isolate;
+  overflow: hidden;
   animation: icon-pulse 2.5s ease-in-out infinite;
   color: #fef9c3 !important;
+}
+
+.card-icon > * {
+  position: relative;
+  z-index: 1;
 }
 
 .card-icon::before {
@@ -123,6 +135,21 @@ button {
   animation: icon-shimmer 3s ease infinite;
   z-index: -1;
   border-radius: 10px;
+}
+
+.card-icon::after {
+  content: "";
+  position: absolute;
+  top: -35%;
+  bottom: -35%;
+  left: 0;
+  width: 42%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.34), rgba(250,204,21,0.32), transparent);
+  filter: blur(2px);
+  opacity: 0.85;
+  pointer-events: none;
+  animation: icon-shine-sweep 2.8s ease-in-out infinite;
+  z-index: 0;
 }
 
 .card-legend {

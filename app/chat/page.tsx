@@ -34,7 +34,7 @@ export default function ChatPage() {
   async function loadMessages() {
     const response = await fetch("/api/chat");
     const payload = await response.json();
-    setMessages(payload.messages ?? []);
+    setMessages(sortNewestFirst(payload.messages ?? []));
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -54,7 +54,7 @@ export default function ChatPage() {
       return;
     }
     setMessage("");
-    setMessages(payload.messages ?? []);
+    setMessages(sortNewestFirst(payload.messages ?? []));
   }
 
   async function react(messageId: number, reaction: string) {
@@ -152,6 +152,13 @@ export default function ChatPage() {
       </section>
     </div>
   );
+}
+
+function sortNewestFirst(messages: ChatMessage[]) {
+  return [...messages].sort((a, b) => {
+    const dateDiff = new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    return dateDiff || b.id - a.id;
+  });
 }
 
 function getMessageTone(item: ChatMessage) {

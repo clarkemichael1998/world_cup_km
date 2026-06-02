@@ -25,6 +25,7 @@ export async function POST(request: Request) {
     awardedPlayerIds?: number[];
     comment?: string;
     rewardCreditValue?: number;
+    activityCardsEarned?: number;
     balanceBefore?: number;
     balanceAfter?: number;
   } | null;
@@ -56,6 +57,7 @@ export async function POST(request: Request) {
   const cardsEarned = awardedPlayerIds.length || Math.max(0, Math.floor(body.cardsEarned ?? 0));
   const comment = typeof body.comment === "string" ? body.comment.trim().slice(0, 240) : "";
   const rewardCreditValue = typeof body.rewardCreditValue === "number" ? body.rewardCreditValue : Number((activityCredits * multiplier).toFixed(2));
+  const activityCardsEarned = Math.max(0, Math.floor(body.activityCardsEarned ?? Math.floor(rewardCreditValue + (body.balanceBefore ?? 0))));
   const chatMessageId = createChatMessage(
     user.id,
     buildActivityChatMessage({
@@ -64,7 +66,7 @@ export async function POST(request: Request) {
       amount,
       unit: activity.unit,
       activityCredits,
-      cardsEarned,
+      activityCardsEarned,
       comment
     })
   );
@@ -91,7 +93,7 @@ function buildActivityChatMessage({
   amount,
   unit,
   activityCredits,
-  cardsEarned,
+  activityCardsEarned,
   comment
 }: {
   username: string;
@@ -99,11 +101,11 @@ function buildActivityChatMessage({
   amount: number;
   unit: string;
   activityCredits: number;
-  cardsEarned: number;
+  activityCardsEarned: number;
   comment: string;
 }) {
   const amountText = `${Number(amount).toFixed(unit === "km" ? 1 : 0)} ${unit}`;
-  const cardText = `${cardsEarned} card${cardsEarned === 1 ? "" : "s"}`;
+  const cardText = `${activityCardsEarned} card${activityCardsEarned === 1 ? "" : "s"}`;
   return [
     `${username} logged ${activityLabel}: ${amountText}, earning ${activityCredits.toFixed(2)} activity credits and ${cardText}.`,
     comment ? `“${comment}”` : ""
