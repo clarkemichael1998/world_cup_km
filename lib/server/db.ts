@@ -356,6 +356,44 @@ export function spendCredits(userId: number, amount: number): boolean {
   return true;
 }
 
+export function spendCreditsForPlayers(userId: number, amount: number, playerIds: number[]): boolean {
+  const db = getDb();
+  db.exec("BEGIN IMMEDIATE");
+
+  try {
+    const user = db.prepare("SELECT reward_credits FROM users WHERE id = ?").get(userId) as { reward_credits: number } | undefined;
+    if (!user || user.reward_credits < amount) {
+      db.exec("ROLLBACK");
+      return false;
+    }
+
+    db.prepare("UPDATE users SET reward_credits = reward_credits - ? WHERE id = ?").run(amount, userId);
+
+    const existingPlayer = db.prepare("SELECT duplicate_count FROM user_players WHERE user_id = ? AND player_id = ?");
+    const insertPlayer = db.prepare("INSERT INTO user_players (user_id, player_id, duplicate_count) VALUES (?, ?, 0)");
+    const updateDuplicate = db.prepare("UPDATE user_players SET duplicate_count = duplicate_count + 1 WHERE user_id = ? AND player_id = ?");
+
+    for (const playerId of playerIds) {
+      const owned = existingPlayer.get(userId, playerId);
+      if (owned) {
+        updateDuplicate.run(userId, playerId);
+      } else {
+        insertPlayer.run(userId, playerId);
+      }
+    }
+
+    db.prepare("DELETE FROM reveal_players WHERE user_id = ?").run(userId);
+    const insertReveal = db.prepare("INSERT INTO reveal_players (user_id, position, player_id) VALUES (?, ?, ?)");
+    playerIds.forEach((playerId, index) => insertReveal.run(userId, index, playerId));
+
+    db.exec("COMMIT");
+    return true;
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
+}
+
 export function upsertGoalScorer(matchId: string, scorerNameRaw: string, playerId: number | null, status: "matched" | "pending" | "ignored", source: "auto" | "manual", goalCount = 1) {
   getDb()
     .prepare(`INSERT INTO goal_scorers (match_id, scorer_name_raw, player_id, goal_count, status, source)
@@ -845,8 +883,17 @@ function createStarterStateSnapshot() {
   const squad: Partial<Record<SquadSlot, number>> = {};
 
   for (const item of plan) {
-    const pool = playerRows.filter((player) => item.positions.includes(player.pos) && !picked.has(player.id)).sort((a, b) => a.rating - b.rating);
-    const player = pool[0];
+    const preferred = playerRows.filter(
+      (player) =>
+        item.positions.includes(player.pos) &&
+        !picked.has(player.id) &&
+        ["common", "rare"].includes(player.rarity) &&
+        player.rating >= 60 &&
+        player.rating <= 74
+    );
+    const fallback = playerRows.filter((player) => item.positions.includes(player.pos) && !picked.has(player.id));
+    const pool = preferred.length > 0 ? preferred : fallback;
+    const player = pool[Math.floor(Math.random() * pool.length)];
     if (player) {
       picked.add(player.id);
       squad[item.slot] = player.id;
