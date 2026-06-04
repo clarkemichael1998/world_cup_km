@@ -142,6 +142,24 @@ export function getDb() {
       FOREIGN KEY (message_id) REFERENCES chat_messages(id),
       FOREIGN KEY (user_id) REFERENCES users(id)
     );
+    CREATE TABLE IF NOT EXISTS suggestions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      title TEXT NOT NULL,
+      details TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
+    CREATE TABLE IF NOT EXISTS suggestion_votes (
+      suggestion_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL,
+      vote INTEGER NOT NULL CHECK (vote IN (-1, 1)),
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (suggestion_id, user_id),
+      FOREIGN KEY (suggestion_id) REFERENCES suggestions(id),
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
     CREATE TABLE IF NOT EXISTS km_log (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER NOT NULL,
@@ -533,6 +551,65 @@ export function saveChatMessage(userId: number, message: string) {
   const trimmed = message.trim().slice(0, 500);
   if (!trimmed) return;
   createChatMessage(userId, trimmed);
+}
+
+export function getSuggestions(viewerUserId: number | null) {
+  return getDb()
+    .prepare(
+      `SELECT suggestions.id, suggestions.title, suggestions.details, suggestions.created_at, users.username,
+              COALESCE(SUM(CASE WHEN suggestion_votes.vote = 1 THEN 1 ELSE 0 END), 0) AS upvotes,
+              COALESCE(SUM(CASE WHEN suggestion_votes.vote = -1 THEN 1 ELSE 0 END), 0) AS downvotes,
+              COALESCE(MAX(CASE WHEN suggestion_votes.user_id = ? THEN suggestion_votes.vote ELSE 0 END), 0) AS user_vote
+       FROM suggestions
+       JOIN users ON users.id = suggestions.user_id
+       LEFT JOIN suggestion_votes ON suggestion_votes.suggestion_id = suggestions.id
+       GROUP BY suggestions.id
+       ORDER BY (upvotes - downvotes) DESC, upvotes DESC, suggestions.created_at DESC`
+    )
+    .all(viewerUserId ?? 0) as Array<{
+      id: number;
+      title: string;
+      details: string | null;
+      created_at: string;
+      username: string;
+      upvotes: number;
+      downvotes: number;
+      user_vote: -1 | 0 | 1;
+    }>;
+}
+
+export function saveSuggestion(userId: number, title: string, details: string) {
+  const cleanTitle = title.trim().slice(0, 120);
+  const cleanDetails = details.trim().slice(0, 1000);
+  if (!cleanTitle) return null;
+  const result = getDb()
+    .prepare("INSERT INTO suggestions (user_id, title, details) VALUES (?, ?, ?)")
+    .run(userId, cleanTitle, cleanDetails || null);
+  return Number(result.lastInsertRowid);
+}
+
+export function toggleSuggestionVote(suggestionId: number, userId: number, vote: -1 | 1): "added" | "changed" | "removed" {
+  const database = getDb();
+  const existing = database
+    .prepare("SELECT vote FROM suggestion_votes WHERE suggestion_id = ? AND user_id = ?")
+    .get(suggestionId, userId) as { vote: number } | undefined;
+
+  if (existing?.vote === vote) {
+    database.prepare("DELETE FROM suggestion_votes WHERE suggestion_id = ? AND user_id = ?").run(suggestionId, userId);
+    return "removed";
+  }
+
+  if (existing) {
+    database
+      .prepare("UPDATE suggestion_votes SET vote = ?, updated_at = CURRENT_TIMESTAMP WHERE suggestion_id = ? AND user_id = ?")
+      .run(vote, suggestionId, userId);
+    return "changed";
+  }
+
+  database
+    .prepare("INSERT INTO suggestion_votes (suggestion_id, user_id, vote) VALUES (?, ?, ?)")
+    .run(suggestionId, userId, vote);
+  return "added";
 }
 
 export function getKmLogsToday(userId: number): number {

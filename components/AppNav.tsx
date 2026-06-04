@@ -20,6 +20,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <Link className="rounded-md px-3 py-2 hover:bg-green-100" href="/squads">Squads</Link>
             <Link className="rounded-md px-3 py-2 hover:bg-green-100" href="/leaderboard">Leaderboard</Link>
             <Link className="rounded-md px-3 py-2 hover:bg-green-100" href="/chat">Chat</Link>
+            <Link className="rounded-md px-3 py-2 hover:bg-green-100" href="/suggestions">Suggestions</Link>
             <Link className="rounded-md px-3 py-2 hover:bg-green-100" href="/rules">Rules</Link>
             <Link className="rounded-md px-3 py-2 hover:bg-green-100" href="/login">Login</Link>
             <NavActions />
@@ -39,6 +40,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </svg>
             Chat
           </Link>
+          <Link href="/suggestions" className="text-xs font-black uppercase tracking-wide text-green-900/60 hover:text-green-950">Ideas</Link>
           <Link href="/rules" className="text-xs font-black uppercase tracking-wide text-green-900/60 hover:text-green-950">Rules</Link>
           <NavActions />
         </div>
