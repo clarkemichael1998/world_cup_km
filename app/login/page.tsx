@@ -26,8 +26,9 @@ export default function LoginPage() {
       setError(payload.error ?? "Could not log in.");
       return;
     }
-    await migrateLocalState();
-    router.push("/live");
+    window.localStorage.removeItem("km-footy-state-v1");
+    window.sessionStorage.removeItem("km-footy-last-rewards-v1");
+    router.push("/squad");
     router.refresh();
   }
 
@@ -53,18 +54,4 @@ export default function LoginPage() {
       </form>
     </div>
   );
-}
-
-async function migrateLocalState() {
-  const saved = window.localStorage.getItem("km-footy-state-v1");
-  if (!saved) return;
-
-  try {
-    await fetch("/api/state", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ state: JSON.parse(saved) })
-    });
-  } catch {}
 }

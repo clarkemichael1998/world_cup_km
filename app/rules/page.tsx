@@ -1,5 +1,4 @@
 import { PageTitle } from "@/components/PageTitle";
-import { goLiveLabel, isPreLaunch } from "@/lib/launch";
 
 const rarityRows = [
   { rarity: "Icon", rating: "93+", chance: "0.5%", colour: "text-zinc-950 font-black" },
@@ -20,8 +19,6 @@ const boostRows = [
 ];
 
 export default function RulesPage() {
-  const preLaunch = isPreLaunch();
-
   return (
     <div className="mx-auto max-w-3xl">
       <PageTitle
@@ -30,15 +27,6 @@ export default function RulesPage() {
       />
 
       <div className="space-y-6">
-        {preLaunch ? (
-          <section className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-amber-950">
-            <p className="text-sm font-black uppercase tracking-wide">Pre-launch</p>
-            <p className="mt-1 text-sm font-semibold">
-              KMXI goes live on <strong>{goLiveLabel()}</strong>. Until then, visitors are redirected here and only the rules are visible so everyone starts from a blank slate.
-            </p>
-          </section>
-        ) : null}
-
         <Section title="What Is KMXI?">
           <p>
             KMXI is a World Cup 2026 sticker chase powered by real activity. Log workouts, earn card pulls, collect players from the tournament squad pool, then build the strongest 4-3-3 XI you can.
@@ -51,13 +39,11 @@ export default function RulesPage() {
           </ul>
         </Section>
 
-        <Section title="1. Accounts and Launch">
+        <Section title="1. Accounts">
           <p>
-            The game is locked until <strong>{goLiveLabel()}</strong>. Before Thursday, every app page redirects to the Rules page so nobody can log activity, open packs, build a squad, or sneak an early advantage.
+            Create or reopen your account from the Login page. Your account keeps your World Cup 2026 activity, stickers, credits, squad, chat messages, and leaderboard progress tied to you.
           </p>
           <ul className="mt-3 list-disc space-y-1 pl-5 text-green-900/70">
-            <li>Create or reopen your account from the Login page once the game is live.</li>
-            <li>Your account stores your activity logs, cards, credits, squad, chat messages, and leaderboard progress.</li>
             <li><strong>There is no password recovery.</strong> If you forget your password, the account cannot be accessed again.</li>
             <li>One account per person. Shared accounts, duplicate accounts, and funny business are not part of the game.</li>
           </ul>
