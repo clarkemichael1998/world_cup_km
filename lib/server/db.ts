@@ -777,6 +777,8 @@ function removeAwardedPlayer(userId: number, playerId: number) {
 
 import playerData from "@/data/players.json";
 const _allPlayersForRating = playerData as Array<{ id: number; rating: number; pos: string }>;
+const _allPlayersForSquads = playerData as Array<{ id: number; name: string; nation: string; club: string; rating: number; pos: string; rarity: string }>;
+const communitySquadSlots: SquadSlot[] = ["GK", "DF1", "DF2", "DF3", "DF4", "MF1", "MF2", "MF3", "FW1", "FW2", "FW3"];
 
 function computeBestSquadRating(playerIds: number[]): number {
   if (playerIds.length === 0) return 0;
@@ -792,6 +794,130 @@ function computeBestSquadRating(playerIds: number[]): number {
 
   if (picked.length === 0) return 0;
   return Math.round((picked.reduce((s, r) => s + r, 0) / picked.length) * 10) / 10;
+}
+
+export function getCommunitySquads() {
+  const db = getDb();
+  const users = db
+    .prepare("SELECT id, username FROM users ORDER BY username")
+    .all() as Array<{ id: number; username: string }>;
+  const ownedRows = db
+    .prepare("SELECT user_id, player_id FROM user_players")
+    .all() as Array<{ user_id: number; player_id: number }>;
+  const boostRows = db
+    .prepare("SELECT user_id, player_id, SUM(boost_amount) AS boost FROM goal_boosts GROUP BY user_id, player_id")
+    .all() as Array<{ user_id: number; player_id: number; boost: number }>;
+  const lockedRows = db
+    .prepare(
+      `SELECT locked_squads.user_id, locked_squads.lock_date, locked_squad_players.slot, locked_squad_players.player_id
+       FROM locked_squads
+       JOIN locked_squad_players ON locked_squad_players.locked_squad_id = locked_squads.id
+       JOIN (
+         SELECT user_id, MAX(lock_date) AS lock_date
+         FROM locked_squads
+         GROUP BY user_id
+       ) latest ON latest.user_id = locked_squads.user_id AND latest.lock_date = locked_squads.lock_date
+       ORDER BY locked_squads.user_id, locked_squad_players.slot`
+    )
+    .all() as Array<{ user_id: number; lock_date: string; slot: SquadSlot; player_id: number }>;
+
+  const playerById = new Map(_allPlayersForSquads.map((player) => [player.id, player]));
+  const ownedByUser = new Map<number, number[]>();
+  const boostsByUser = new Map<number, Map<number, number>>();
+  const lockedByUser = new Map<number, { lockDate: string; players: Array<{ slot: SquadSlot; playerId: number }> }>();
+
+  for (const row of ownedRows) {
+    const list = ownedByUser.get(row.user_id) ?? [];
+    list.push(row.player_id);
+    ownedByUser.set(row.user_id, list);
+  }
+
+  for (const row of boostRows) {
+    const boosts = boostsByUser.get(row.user_id) ?? new Map<number, number>();
+    boosts.set(row.player_id, row.boost ?? 0);
+    boostsByUser.set(row.user_id, boosts);
+  }
+
+  for (const row of lockedRows) {
+    const locked = lockedByUser.get(row.user_id) ?? { lockDate: row.lock_date, players: [] };
+    locked.players.push({ slot: row.slot, playerId: row.player_id });
+    lockedByUser.set(row.user_id, locked);
+  }
+
+  return users
+    .map((user) => {
+      const boosts = boostsByUser.get(user.id) ?? new Map<number, number>();
+      const best = pickBestCommunitySquad(ownedByUser.get(user.id) ?? [], boosts, playerById);
+      const locked = lockedByUser.get(user.id);
+      const lockedPlayers = locked
+        ? communitySquadSlots
+            .map((slot) => locked.players.find((player) => player.slot === slot))
+            .filter((player): player is { slot: SquadSlot; playerId: number } => Boolean(player))
+            .map((player) => toCommunitySquadPlayer(player.slot, player.playerId, boosts, playerById))
+            .filter((player): player is NonNullable<ReturnType<typeof toCommunitySquadPlayer>> => Boolean(player))
+        : [];
+
+      return {
+        username: user.username,
+        best,
+        locked: locked
+          ? {
+              lockDate: locked.lockDate,
+              rating: averageCommunityRating(lockedPlayers),
+              players: lockedPlayers
+            }
+          : null
+      };
+    })
+    .sort((a, b) => b.best.rating - a.best.rating || a.username.localeCompare(b.username));
+}
+
+function pickBestCommunitySquad(playerIds: number[], boosts: Map<number, number>, playerById: Map<number, (typeof _allPlayersForSquads)[number]>) {
+  const owned = playerIds
+    .map((id) => playerById.get(id))
+    .filter((player): player is (typeof _allPlayersForSquads)[number] => Boolean(player));
+  const used = new Set<number>();
+  const players: Array<NonNullable<ReturnType<typeof toCommunitySquadPlayer>>> = [];
+
+  for (const slot of communitySquadSlots) {
+    const position = slot.startsWith("DF") ? "DF" : slot.startsWith("MF") ? "MF" : slot.startsWith("FW") ? "FW" : "GK";
+    const player = owned
+      .filter((candidate) => candidate.pos === position && !used.has(candidate.id))
+      .sort((a, b) => b.rating + (boosts.get(b.id) ?? 0) - (a.rating + (boosts.get(a.id) ?? 0)) || a.name.localeCompare(b.name))[0];
+    if (player) {
+      used.add(player.id);
+      const squadPlayer = toCommunitySquadPlayer(slot, player.id, boosts, playerById);
+      if (squadPlayer) players.push(squadPlayer);
+    }
+  }
+
+  return {
+    rating: averageCommunityRating(players),
+    players
+  };
+}
+
+function toCommunitySquadPlayer(slot: SquadSlot, playerId: number, boosts: Map<number, number>, playerById: Map<number, (typeof _allPlayersForSquads)[number]>) {
+  const player = playerById.get(playerId);
+  if (!player) return null;
+  const boost = boosts.get(player.id) ?? 0;
+  return {
+    slot,
+    id: player.id,
+    name: player.name,
+    nation: player.nation,
+    club: player.club,
+    pos: player.pos,
+    rarity: player.rarity,
+    rating: player.rating,
+    boost,
+    effectiveRating: player.rating + boost
+  };
+}
+
+function averageCommunityRating(players: Array<{ effectiveRating: number }>) {
+  if (players.length === 0) return 0;
+  return Math.round((players.reduce((sum, player) => sum + player.effectiveRating, 0) / players.length) * 10) / 10;
 }
 
 export function getUpcomingFixtures(date: string) {

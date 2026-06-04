@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { PageTitle } from "@/components/PageTitle";
 
@@ -17,13 +18,18 @@ export default function LeaderboardPage() {
 
   return (
     <div>
-      <PageTitle title="⚽ Ranking" subtitle="Sorted by best squad average rating." />
+      <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
+        <PageTitle title="⚽ Ranking" subtitle="Sorted by best squad average rating." />
+        <Link className="mb-6 self-start rounded-md bg-pitch px-4 py-2 text-sm font-black text-white hover:bg-green-800 sm:mb-8" href="/squads">
+          View squads
+        </Link>
+      </div>
 
       <section className="mt-2 overflow-x-auto overflow-hidden rounded-lg border border-green-900/10 bg-white shadow-sm">
         {leaderboard === null ? (
           <p className="p-6 text-sm font-semibold text-green-900/60">Loading...</p>
         ) : leaderboard.length === 0 ? (
-          <p className="p-6 text-sm font-semibold text-green-900/60">No entries yet — be the first to log an activity!</p>
+          <p className="p-6 text-sm font-semibold text-green-900/60">No entries yet - be the first to log an activity!</p>
         ) : (
           <table className="w-full text-sm">
             <thead>
