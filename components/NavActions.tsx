@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 
-export function NavActions() {
+export function NavActions({ compact = false }: { compact?: boolean }) {
   const router = useRouter();
 
   async function logout() {
@@ -14,7 +14,7 @@ export function NavActions() {
   return (
     <button
       onClick={logout}
-      className="rounded-md px-3 py-2 text-sm font-semibold text-green-950 hover:bg-green-100"
+      className={`rounded-md font-semibold text-green-950 hover:bg-green-100 ${compact ? "px-2 py-1 text-xs" : "px-3 py-2 text-sm"}`}
     >
       Logout
     </button>

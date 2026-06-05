@@ -29,26 +29,41 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </header>
 
       <header
-        className="nav-blur sticky top-0 z-40 flex items-center justify-between border-b border-green-900/10 bg-white/80 px-4 py-3 md:hidden"
+        className="nav-blur sticky top-0 z-40 flex items-center justify-between gap-3 border-b border-green-900/10 bg-white/80 px-4 py-3 md:hidden"
         style={{ paddingTop: "max(0.75rem, env(safe-area-inset-top, 0px))" }}
       >
-        <Link href="/" className="text-lg font-black tracking-tight text-pitch">⚽ KMXI</Link>
-        <div className="flex items-center gap-3">
-          <Link href="/chat" className="flex items-center gap-1.5 rounded-md bg-pitch px-3 py-1.5 text-xs font-black text-white hover:bg-green-800">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-            </svg>
-            Chat
+        <Link href="/" className="shrink-0 text-lg font-black tracking-tight text-pitch">⚽ KMXI</Link>
+        <div className="flex min-w-0 items-center gap-2">
+          <Link href="/suggestions" className="whitespace-nowrap rounded-md bg-green-950/5 px-2 py-1 text-xs font-black uppercase tracking-wide text-green-900 hover:bg-green-950/10">
+            Ideas
           </Link>
-          <Link href="/suggestions" className="text-xs font-black uppercase tracking-wide text-green-900/60 hover:text-green-950">Ideas</Link>
-          <Link href="/rules" className="text-xs font-black uppercase tracking-wide text-green-900/60 hover:text-green-950">Rules</Link>
-          <NavActions />
+          <Link href="/rules" className="whitespace-nowrap rounded-md bg-green-950/5 px-2 py-1 text-xs font-black uppercase tracking-wide text-green-900 hover:bg-green-950/10">
+            Rules
+          </Link>
+          <NavActions compact />
         </div>
       </header>
 
+      <NewsBanner />
       <AuthGuard />
       <main className="mx-auto max-w-6xl px-4 py-6 md:py-8">{children}</main>
       <MobileNav />
+    </div>
+  );
+}
+
+function NewsBanner() {
+  const message = "Martin O'Neill appointed new Celtic manager";
+
+  return (
+    <div className="overflow-hidden border-y border-green-900/10 bg-pitch text-white">
+      <div className="news-ticker flex whitespace-nowrap py-2 text-xs font-black uppercase tracking-wide">
+        {Array.from({ length: 6 }).map((_, index) => (
+          <span key={index} className="mx-8">
+            {message}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }
