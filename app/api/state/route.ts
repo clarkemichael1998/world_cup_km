@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser, getPersistedUserState, savePersistedUserState, getRatingBoosts, awardDailyCredits } from "@/lib/server/db";
+import { getCurrentUser, getPersistedUserState, saveClientDraftState, getRatingBoosts, awardDailyCredits } from "@/lib/server/db";
 
 export async function GET() {
   const user = await getCurrentUser();
@@ -18,6 +18,6 @@ export async function PUT(request: Request) {
   const body = await request.json().catch(() => null);
   if (!body?.state) return NextResponse.json({ error: "Missing state." }, { status: 400 });
 
-  savePersistedUserState(user.id, body.state);
+  saveClientDraftState(user.id, body.state);
   return NextResponse.json({ ok: true });
 }

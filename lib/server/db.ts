@@ -4,7 +4,7 @@ import path from "path";
 import { cookies } from "next/headers";
 import { DatabaseSync } from "node:sqlite";
 import players from "@/data/players.json";
-import type { ActivityType, SquadSlot } from "@/lib/types";
+import type { ActivityType, Rarity, SquadSlot } from "@/lib/types";
 
 const dbDir = path.join(process.cwd(), "data");
 const dbPath = process.env.SQLITE_DB_PATH ?? path.join(dbDir, "km-footy.sqlite");
@@ -186,6 +186,17 @@ export function getDb() {
       PRIMARY KEY (log_id, position),
       FOREIGN KEY (log_id) REFERENCES km_log(id)
     );
+    CREATE TABLE IF NOT EXISTS card_awards (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      player_id INTEGER NOT NULL,
+      rarity TEXT NOT NULL,
+      source TEXT NOT NULL,
+      source_id INTEGER,
+      position INTEGER NOT NULL,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
     CREATE TABLE IF NOT EXISTS goal_scorers (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       match_id TEXT NOT NULL,
@@ -347,6 +358,10 @@ export function savePersistedUserState(userId: number, state: { totalKm: number;
   saveDraftSquad(userId, state.squad);
 }
 
+export function saveClientDraftState(userId: number, state: { squad?: Partial<Record<SquadSlot, number>> }) {
+  saveDraftSquad(userId, state.squad ?? {});
+}
+
 export function getRatingBoosts(userId: number): Record<number, number> {
   const rows = getDb()
     .prepare("SELECT player_id, SUM(boost_amount) AS total FROM goal_boosts WHERE user_id = ? GROUP BY player_id")
@@ -387,18 +402,7 @@ export function spendCreditsForPlayers(userId: number, amount: number, playerIds
 
     db.prepare("UPDATE users SET reward_credits = reward_credits - ? WHERE id = ?").run(amount, userId);
 
-    const existingPlayer = db.prepare("SELECT duplicate_count FROM user_players WHERE user_id = ? AND player_id = ?");
-    const insertPlayer = db.prepare("INSERT INTO user_players (user_id, player_id, duplicate_count) VALUES (?, ?, 0)");
-    const updateDuplicate = db.prepare("UPDATE user_players SET duplicate_count = duplicate_count + 1 WHERE user_id = ? AND player_id = ?");
-
-    for (const playerId of playerIds) {
-      const owned = existingPlayer.get(userId, playerId);
-      if (owned) {
-        updateDuplicate.run(userId, playerId);
-      } else {
-        insertPlayer.run(userId, playerId);
-      }
-    }
+    awardPlayersInTransaction(db, userId, playerIds, "credit_pack", null);
 
     db.prepare("DELETE FROM reveal_players WHERE user_id = ?").run(userId);
     const insertReveal = db.prepare("INSERT INTO reveal_players (user_id, position, player_id) VALUES (?, ?, ?)");
@@ -410,6 +414,28 @@ export function spendCreditsForPlayers(userId: number, amount: number, playerIds
     db.exec("ROLLBACK");
     throw error;
   }
+}
+
+function awardPlayersInTransaction(database: DatabaseSync, userId: number, playerIds: number[], source: string, sourceId: number | null) {
+  const existingPlayer = database.prepare("SELECT duplicate_count FROM user_players WHERE user_id = ? AND player_id = ?");
+  const insertPlayer = database.prepare("INSERT INTO user_players (user_id, player_id, duplicate_count) VALUES (?, ?, 0)");
+  const updateDuplicate = database.prepare("UPDATE user_players SET duplicate_count = duplicate_count + 1 WHERE user_id = ? AND player_id = ?");
+  const insertAward = database.prepare("INSERT INTO card_awards (user_id, player_id, rarity, source, source_id, position) VALUES (?, ?, ?, ?, ?, ?)");
+
+  for (const [index, playerId] of playerIds.entries()) {
+    const owned = existingPlayer.get(userId, playerId);
+    if (owned) {
+      updateDuplicate.run(userId, playerId);
+    } else {
+      insertPlayer.run(userId, playerId);
+    }
+    insertAward.run(userId, playerId, getPlayerRarity(playerId), source, sourceId, index);
+  }
+}
+
+function getPlayerRarity(playerId: number): Rarity {
+  const player = (players as Array<{ id: number; rarity: Rarity }>).find((item) => item.id === playerId);
+  return player?.rarity ?? "common";
 }
 
 export function upsertGoalScorer(matchId: string, scorerNameRaw: string, playerId: number | null, status: "matched" | "pending" | "ignored", source: "auto" | "manual", goalCount = 1) {
@@ -699,6 +725,83 @@ export function logKmEntry({
   const insertAward = database.prepare("INSERT INTO km_log_awards (log_id, position, player_id) VALUES (?, ?, ?)");
   (awardedPlayerIds ?? []).forEach((playerId, index) => insertAward.run(logId, index, playerId));
   return logId;
+}
+
+export function logActivityWithServerAwards({
+  userId,
+  activityCredits,
+  cardsEarned,
+  activityType = "walk",
+  activityAmount = activityCredits,
+  activityUnit = "km",
+  comment,
+  rewardCreditValue,
+  balanceBefore,
+  balanceAfter,
+  awardedPlayerIds,
+  chatMessageId
+}: {
+  userId: number;
+  activityCredits: number;
+  cardsEarned: number;
+  activityType?: ActivityType;
+  activityAmount?: number;
+  activityUnit?: string;
+  comment?: string;
+  rewardCreditValue?: number;
+  balanceBefore: number;
+  balanceAfter: number;
+  awardedPlayerIds: number[];
+  chatMessageId?: number | null;
+}) {
+  const database = getDb();
+  database.exec("BEGIN IMMEDIATE");
+
+  try {
+    ensureUserState(userId);
+    const current = database.prepare("SELECT total_km FROM user_state WHERE user_id = ?").get(userId) as { total_km: number };
+    const newTotalKm = Number((current.total_km + activityCredits).toFixed(2));
+
+    database
+      .prepare("UPDATE user_state SET total_km = ?, km_balance = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?")
+      .run(newTotalKm, balanceAfter, userId);
+    database.prepare("UPDATE users SET reward_credits = 0 WHERE id = ?").run(userId);
+
+    const result = database
+      .prepare(
+        `INSERT INTO km_log (
+          user_id, distance_km, activity_type, activity_amount, activity_unit, comment,
+          reward_credit_value, balance_before, balance_after, chat_message_id, cards_earned
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .run(
+        userId,
+        activityCredits,
+        activityType,
+        activityAmount,
+        activityUnit,
+        comment?.trim().slice(0, 240) || null,
+        rewardCreditValue ?? null,
+        balanceBefore,
+        balanceAfter,
+        chatMessageId ?? null,
+        cardsEarned
+      );
+    const logId = Number(result.lastInsertRowid);
+    const insertLogAward = database.prepare("INSERT INTO km_log_awards (log_id, position, player_id) VALUES (?, ?, ?)");
+    awardedPlayerIds.forEach((playerId, index) => insertLogAward.run(logId, index, playerId));
+    awardPlayersInTransaction(database, userId, awardedPlayerIds, "activity", logId);
+
+    database.prepare("DELETE FROM reveal_players WHERE user_id = ?").run(userId);
+    const insertReveal = database.prepare("INSERT INTO reveal_players (user_id, position, player_id) VALUES (?, ?, ?)");
+    awardedPlayerIds.forEach((playerId, index) => insertReveal.run(userId, index, playerId));
+
+    database.exec("COMMIT");
+    return { logId, totalKm: newTotalKm, kmBalance: balanceAfter };
+  } catch (error) {
+    database.exec("ROLLBACK");
+    throw error;
+  }
 }
 
 export function getKmLeaderboard() {

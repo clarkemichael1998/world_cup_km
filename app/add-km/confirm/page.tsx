@@ -6,15 +6,13 @@ import { useEffect, useState } from "react";
 import { PageTitle } from "@/components/PageTitle";
 import {
   activityDefinitions,
-  addRewardPlayers,
   calculateActivityCredits,
   calculateRewards,
   getKmMultiplier,
-  getRandomPlayerByRarity,
   isActivityType
 } from "@/lib/rewardEngine";
-import { loadUserStateAsync, saveRevealPlayers, saveUserState } from "@/lib/storage";
-import type { ActivityType, UserState } from "@/lib/types";
+import { cacheUserState, loadUserStateAsync, saveRevealPlayers } from "@/lib/storage";
+import type { ActivityType, Player, UserState } from "@/lib/types";
 
 const pendingActivityKey = "km-footy-pending-activity-v1";
 
@@ -81,22 +79,6 @@ export default function ConfirmActivityPage() {
     setSubmitting(true);
     setError("");
 
-    const rewardPlayers = Array.from({ length: totalCards }, () => getRandomPlayerByRarity());
-    const updated = addRewardPlayers(
-      {
-        ...currentState,
-        totalKm: Number((currentState.totalKm + activityCredits).toFixed(2)),
-        kmBalance: preview.newBalance
-      },
-      rewardPlayers
-    );
-
-    const bonusCredits = await consumeLiveCredits();
-    const finalPlayers =
-      bonusCredits === liveCredits
-        ? rewardPlayers
-        : Array.from({ length: preview.rewards + bonusCredits }, () => getRandomPlayerByRarity());
-
     const logResponse = await fetch("/api/km-log", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -104,13 +86,6 @@ export default function ConfirmActivityPage() {
       body: JSON.stringify({
         activityType: currentPending.activityType,
         amount: currentPending.amount,
-        activityCredits,
-        rewardCreditValue,
-        activityCardsEarned: preview.rewards,
-        balanceBefore: currentState.kmBalance,
-        balanceAfter: preview.newBalance,
-        cardsEarned: finalPlayers.length,
-        awardedPlayerIds: finalPlayers.map((player) => player.id),
         comment: currentPending.comment
       })
     });
@@ -122,9 +97,9 @@ export default function ConfirmActivityPage() {
       return;
     }
 
-    const finalUpdated = finalPlayers === rewardPlayers ? updated : addRewardPlayers({ ...currentState, totalKm: Number((currentState.totalKm + activityCredits).toFixed(2)), kmBalance: preview.newBalance }, finalPlayers);
-    saveUserState(finalUpdated);
-    saveRevealPlayers(finalPlayers);
+    const payload = (await logResponse.json()) as { players?: Player[]; state?: UserState };
+    if (payload.state) cacheUserState(payload.state);
+    saveRevealPlayers(payload.players ?? [], false);
     window.sessionStorage.removeItem(pendingActivityKey);
     router.push("/reveal");
   }
@@ -179,14 +154,4 @@ function Summary({ label, value }: { label: string; value: string }) {
       <p className="mt-1 text-lg font-black text-green-950">{value}</p>
     </div>
   );
-}
-
-async function consumeLiveCredits() {
-  try {
-    const response = await fetch("/api/live/consume-credits", { method: "POST" });
-    const payload = await response.json();
-    return Number(payload.credits ?? 0);
-  } catch {
-    return 0;
-  }
 }

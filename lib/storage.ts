@@ -38,9 +38,15 @@ export function saveUserState(state: UserState) {
   }).catch(() => {});
 }
 
-export function saveRevealPlayers(players: Player[]) {
+export function cacheUserState(state: UserState) {
+  if (typeof window === "undefined") return;
+  saveLocalState(normalizeState(state));
+}
+
+export function saveRevealPlayers(players: Player[], syncServer = true) {
   if (typeof window === "undefined") return;
   window.sessionStorage.setItem(revealKey, JSON.stringify(players));
+  if (!syncServer) return;
   fetch("/api/reveal", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },

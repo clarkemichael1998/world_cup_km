@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { createChatMessage, getCurrentUser, getKmFeed, getKmLogsToday, logKmEntry } from "@/lib/server/db";
-import { activityDefinitions, calculateActivityCredits, getKmMultiplier, isActivityType } from "@/lib/rewardEngine";
+import { createChatMessage, getCurrentUser, getKmFeed, getKmLogsToday, getPersistedUserState, logActivityWithServerAwards } from "@/lib/server/db";
+import { activityDefinitions, allPlayers, calculateActivityCredits, calculateRewards, getKmMultiplier, getRandomPlayerByRarity, isActivityType } from "@/lib/rewardEngine";
 
 const MAX_LOGS_PER_DAY = 3;
 const WC_FINAL_LOCKOUT = new Date("2026-07-19T18:00:00Z");
@@ -21,13 +21,7 @@ export async function POST(request: Request) {
     activityType?: unknown;
     amount?: number;
     distanceKm?: number;
-    cardsEarned?: number;
-    awardedPlayerIds?: number[];
     comment?: string;
-    rewardCreditValue?: number;
-    activityCardsEarned?: number;
-    balanceBefore?: number;
-    balanceAfter?: number;
   } | null;
   if (!body) {
     return NextResponse.json({ error: "Invalid entry." }, { status: 400 });
@@ -51,13 +45,15 @@ export async function POST(request: Request) {
 
   const multiplier = getKmMultiplier();
   const activityCredits = calculateActivityCredits(activityType, amount);
-  const awardedPlayerIds = Array.isArray(body.awardedPlayerIds)
-    ? body.awardedPlayerIds.filter((id) => Number.isInteger(id) && id > 0).slice(0, 100)
-    : [];
-  const cardsEarned = awardedPlayerIds.length || Math.max(0, Math.floor(body.cardsEarned ?? 0));
+  const currentState = getPersistedUserState(user.id);
+  const preview = calculateRewards(activityCredits, currentState.kmBalance, multiplier);
+  const bonusCredits = Math.max(0, Math.floor(user.rewardCredits));
+  const cardsEarned = preview.rewards + bonusCredits;
+  const awardedPlayers = Array.from({ length: cardsEarned }, () => getRandomPlayerByRarity());
+  const awardedPlayerIds = awardedPlayers.map((player) => player.id);
   const comment = typeof body.comment === "string" ? body.comment.trim().slice(0, 240) : "";
-  const rewardCreditValue = typeof body.rewardCreditValue === "number" ? body.rewardCreditValue : Number((activityCredits * multiplier).toFixed(2));
-  const activityCardsEarned = Math.max(0, Math.floor(body.activityCardsEarned ?? Math.floor(rewardCreditValue + (body.balanceBefore ?? 0))));
+  const rewardCreditValue = Number((activityCredits * multiplier).toFixed(2));
+  const activityCardsEarned = preview.rewards;
   const chatMessageId = createChatMessage(
     user.id,
     buildActivityChatMessage({
@@ -70,7 +66,7 @@ export async function POST(request: Request) {
       comment
     })
   );
-  logKmEntry({
+  const persisted = logActivityWithServerAwards({
     userId: user.id,
     activityCredits,
     cardsEarned,
@@ -79,12 +75,21 @@ export async function POST(request: Request) {
     activityUnit: activity.unit,
     comment,
     rewardCreditValue,
-    balanceBefore: body.balanceBefore,
-    balanceAfter: body.balanceAfter,
+    balanceBefore: currentState.kmBalance,
+    balanceAfter: preview.newBalance,
     awardedPlayerIds,
     chatMessageId
   });
-  return NextResponse.json({ ok: true, logsRemaining: MAX_LOGS_PER_DAY - logsToday - 1, multiplier });
+  const nextState = getPersistedUserState(user.id);
+  return NextResponse.json({
+    ok: true,
+    logsRemaining: MAX_LOGS_PER_DAY - logsToday - 1,
+    multiplier,
+    bonusCredits,
+    playerIds: awardedPlayerIds,
+    players: awardedPlayerIds.map((id) => allPlayers.find((player) => player.id === id)).filter(Boolean),
+    state: { ...nextState, totalKm: persisted.totalKm, kmBalance: persisted.kmBalance }
+  });
 }
 
 function buildActivityChatMessage({
