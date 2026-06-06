@@ -19,6 +19,7 @@ export default function CollectionPage() {
   const [position, setPosition] = useState<Position | "all">("all");
   const [club, setClub] = useState("all");
   const [nation, setNation] = useState("Argentina");
+  const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
 
   useEffect(() => {
     loadUserStateAsync().then(setState);
@@ -72,6 +73,7 @@ export default function CollectionPage() {
                 onClick={() => {
                   setNation(item);
                   setClub("all");
+                  setSelectedPlayer(null);
                 }}
                 className={`shrink-0 rounded-md border px-3 py-2 text-left transition ${
                   nation === item ? "border-pitch bg-pitch text-white shadow-sm" : "border-green-900/10 bg-green-950/5 text-green-950 hover:bg-green-950/10"
@@ -131,19 +133,20 @@ export default function CollectionPage() {
           </div>
         </div>
 
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7">
           {visiblePlayers.map((player) => (
-            <div key={player.id} className="sticker-slot rounded-lg border border-dashed border-green-900/20 bg-white/45 p-2 shadow-inner">
-              <div className="mb-2 flex items-center justify-between px-1 text-[9px] font-black uppercase tracking-wide text-green-900/35">
-                <span>{player.nation}</span>
-                <span>{player.pos}</span>
-              </div>
+            <button
+              key={player.id}
+              type="button"
+              onClick={() => setSelectedPlayer(player)}
+              className="sticker-slot group rounded-md border border-dashed border-green-900/20 bg-white/45 p-1.5 text-left shadow-inner transition hover:-translate-y-0.5 hover:border-pitch hover:bg-white/70 hover:shadow-sm"
+            >
               {ownedIds.has(player.id) ? (
-                <PlayerCard player={player} duplicateCount={state?.duplicateCounts[player.id] ?? 0} ratingBoost={state?.ratingBoosts?.[player.id] ?? 0} variant="album" />
+                <CompactSticker player={player} ratingBoost={state?.ratingBoosts?.[player.id] ?? 0} duplicateCount={state?.duplicateCounts[player.id] ?? 0} />
               ) : (
-                <EmptyStickerSlot player={player} />
+                <EmptyStickerSlot player={player} compact />
               )}
-            </div>
+            </button>
           ))}
         </div>
       </section>
@@ -160,12 +163,61 @@ export default function CollectionPage() {
           ) : null}
         </div>
       ) : null}
+
+      {selectedPlayer ? (
+        <StickerDetails
+          player={selectedPlayer}
+          owned={ownedIds.has(selectedPlayer.id)}
+          duplicateCount={state?.duplicateCounts[selectedPlayer.id] ?? 0}
+          ratingBoost={state?.ratingBoosts?.[selectedPlayer.id] ?? 0}
+          onClose={() => setSelectedPlayer(null)}
+        />
+      ) : null}
     </div>
   );
 }
 
-function EmptyStickerSlot({ player }: { player: Player }) {
+function CompactSticker({ player, ratingBoost, duplicateCount }: { player: Player; ratingBoost: number; duplicateCount: number }) {
   const flag = flagUrl(player.nation);
+  const effectiveRating = player.rating + ratingBoost;
+
+  return (
+    <div className="flex aspect-[3/4] min-h-32 flex-col rounded-md border-2 border-white bg-white p-2 shadow-sm ring-1 ring-green-950/10">
+      <div className="mb-1 flex items-center justify-between gap-1">
+        <span className="rounded bg-green-950/10 px-1 text-[9px] font-black text-green-950">{player.pos}</span>
+        <span className="rounded bg-gold px-1.5 py-0.5 text-[10px] font-black text-green-950">{effectiveRating}</span>
+      </div>
+      <div className="flex flex-1 flex-col items-center justify-center text-center">
+        {flag ? <img src={flag} alt="" className="mb-1 h-4 w-6 rounded-sm object-cover shadow-sm" /> : null}
+        <p className="line-clamp-3 text-[11px] font-black leading-tight text-green-950">{player.name}</p>
+        <p className="mt-1 line-clamp-1 text-[9px] font-bold text-green-900/55">{player.club}</p>
+      </div>
+      <div className="mt-1 flex items-center justify-between border-t border-green-900/10 pt-1 text-[8px] font-black uppercase tracking-wide text-green-900/40">
+        <span>{player.rarity}</span>
+        <span>{duplicateCount > 0 ? `x${duplicateCount + 1}` : `#${player.id}`}</span>
+      </div>
+    </div>
+  );
+}
+
+function EmptyStickerSlot({ player, compact = false }: { player: Player; compact?: boolean }) {
+  const flag = flagUrl(player.nation);
+
+  if (compact) {
+    return (
+      <div className="sticker-missing flex aspect-[3/4] min-h-32 flex-col rounded-md border-2 border-dashed border-green-900/20 bg-white/35 p-2 text-green-950/45">
+        <div className="flex items-center justify-between text-[8px] font-black uppercase tracking-wide">
+          <span>{player.pos}</span>
+          <span>#{player.id}</span>
+        </div>
+        <div className="flex flex-1 flex-col items-center justify-center text-center">
+          {flag ? <img src={flag} alt="" className="mb-2 h-4 w-6 rounded-sm object-cover opacity-35 grayscale" /> : null}
+          <p className="text-[9px] font-black uppercase tracking-wide">Missing</p>
+          <p className="mt-1 line-clamp-3 text-[11px] font-black leading-tight text-green-950/50">{player.name}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="sticker-missing flex min-h-64 flex-col rounded-lg border-2 border-dashed border-green-900/20 bg-white/35 p-4 text-green-950/45">
@@ -182,6 +234,42 @@ function EmptyStickerSlot({ player }: { player: Player }) {
       <div className="mt-4 flex items-center justify-between border-t border-green-900/10 pt-2 text-[9px] font-black uppercase tracking-wide">
         <span>KMXI 2026</span>
         <span>{player.teamId}</span>
+      </div>
+    </div>
+  );
+}
+
+function StickerDetails({
+  player,
+  owned,
+  duplicateCount,
+  ratingBoost,
+  onClose
+}: {
+  player: Player;
+  owned: boolean;
+  duplicateCount: number;
+  ratingBoost: number;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-green-950/50 p-3 backdrop-blur-sm sm:items-center" onClick={onClose}>
+      <div className="max-h-[92svh] w-full max-w-md overflow-y-auto rounded-lg bg-[#fbf7ea] p-4 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.24em] text-green-900/45">Sticker Details</p>
+            <p className="text-sm font-bold text-green-950">{owned ? "Collected" : "Still missing from your album"}</p>
+          </div>
+          <button type="button" onClick={onClose} className="rounded-md bg-green-950/10 px-3 py-1.5 text-sm font-black text-green-950 hover:bg-green-950/15">
+            Close
+          </button>
+        </div>
+
+        {owned ? (
+          <PlayerCard player={player} duplicateCount={duplicateCount} ratingBoost={ratingBoost} variant="album" large />
+        ) : (
+          <EmptyStickerSlot player={player} />
+        )}
       </div>
     </div>
   );
