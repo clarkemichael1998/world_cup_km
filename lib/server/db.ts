@@ -160,6 +160,14 @@ export function getDb() {
       FOREIGN KEY (suggestion_id) REFERENCES suggestions(id),
       FOREIGN KEY (user_id) REFERENCES users(id)
     );
+    CREATE TABLE IF NOT EXISTS news_reel (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      message TEXT NOT NULL,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      updated_by INTEGER,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (updated_by) REFERENCES users(id)
+    );
     CREATE TABLE IF NOT EXISTS km_log (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER NOT NULL,
@@ -236,6 +244,31 @@ export function getDb() {
   migrateGoalScorers(db);
   seedFixtureResults(db);
   return db;
+}
+
+export function getNewsReel() {
+  const row = getDb()
+    .prepare("SELECT message, is_active, updated_at FROM news_reel WHERE id = 1")
+    .get() as { message: string; is_active: number; updated_at: string } | undefined;
+  return row
+    ? { message: row.message, isActive: row.is_active === 1, updatedAt: row.updated_at }
+    : { message: "Martin O'Neill appointed new Celtic manager", isActive: true, updatedAt: null };
+}
+
+export function updateNewsReel(message: string, isActive: boolean, updatedBy: number) {
+  const cleanMessage = message.trim().slice(0, 180);
+  getDb()
+    .prepare(
+      `INSERT INTO news_reel (id, message, is_active, updated_by, updated_at)
+       VALUES (1, ?, ?, ?, CURRENT_TIMESTAMP)
+       ON CONFLICT(id) DO UPDATE SET
+         message = excluded.message,
+         is_active = excluded.is_active,
+         updated_by = excluded.updated_by,
+         updated_at = CURRENT_TIMESTAMP`
+    )
+    .run(cleanMessage, isActive ? 1 : 0, updatedBy);
+  return getNewsReel();
 }
 
 function migrateKmLogActivity(database: DatabaseSync) {
@@ -806,6 +839,7 @@ export function logActivityWithServerAwards({
 
 export function getKmLeaderboard() {
   const db = getDb();
+  const adminUsername = process.env.ADMIN_USERNAME?.trim().toLowerCase();
 
   const rows = db
     .prepare(
@@ -822,10 +856,13 @@ export function getKmLeaderboard() {
        GROUP BY users.id`
     )
     .all() as Array<{ id: number; username: string; total_km: number; games_won: number }>;
+  const visibleRows = adminUsername ? rows.filter((row) => row.username.toLowerCase() !== adminUsername) : rows;
+  const visibleUserIds = new Set(visibleRows.map((row) => row.id));
 
   const ownedRows = db
     .prepare(`SELECT user_id, player_id FROM user_players`)
     .all() as Array<{ user_id: number; player_id: number }>;
+  const visibleOwnedRows = ownedRows.filter((row) => visibleUserIds.has(row.user_id));
 
   const boostRows = db
     .prepare(
@@ -838,13 +875,13 @@ export function getKmLeaderboard() {
   const boostByUser = new Map(boostRows.map((r) => [r.user_id, r]));
 
   const byUser = new Map<number, number[]>();
-  for (const row of ownedRows) {
+  for (const row of visibleOwnedRows) {
     const list = byUser.get(row.user_id) ?? [];
     list.push(row.player_id);
     byUser.set(row.user_id, list);
   }
 
-  return rows
+  return visibleRows
     .map((row) => ({
       username: row.username,
       total_km: row.total_km,

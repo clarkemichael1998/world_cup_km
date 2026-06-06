@@ -47,6 +47,12 @@ type ActivityLogRow = {
   awards: Array<{ player_id: number }>;
 };
 
+type NewsReel = {
+  message: string;
+  isActive: boolean;
+  updatedAt: string | null;
+};
+
 const playerMap = new Map((players as Player[]).map((player) => [player.id, player]));
 
 const WC_TEAMS = [
@@ -65,7 +71,7 @@ const WC_TEAMS = [
 const today = new Date().toISOString().slice(0, 10);
 
 export default function AdminPage() {
-  const [tab, setTab] = useState<"results" | "goalscorers" | "activity">("results");
+  const [tab, setTab] = useState<"results" | "goalscorers" | "activity" | "news">("results");
   const [forbidden, setForbidden] = useState(false);
 
   if (forbidden) {
@@ -84,13 +90,13 @@ export default function AdminPage() {
       <PageTitle title="Admin" subtitle="Tournament management" />
 
       <div className="mb-6 flex gap-2">
-        {(["results", "goalscorers", "activity"] as const).map((t) => (
+        {(["results", "goalscorers", "activity", "news"] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
             className={`rounded-md px-4 py-2 text-sm font-black transition-colors ${tab === t ? "bg-green-950 text-white" : "bg-green-950/8 text-green-950 hover:bg-green-950/15"}`}
           >
-            {t === "results" ? "Match Results" : t === "goalscorers" ? "Goal Scorers" : "Activity Review"}
+            {t === "results" ? "Match Results" : t === "goalscorers" ? "Goal Scorers" : t === "activity" ? "Activity Review" : "News Reel"}
           </button>
         ))}
       </div>
@@ -98,7 +104,129 @@ export default function AdminPage() {
       {tab === "results" && <ResultsTab onForbidden={() => setForbidden(true)} />}
       {tab === "goalscorers" && <GoalScorersTab onForbidden={() => setForbidden(true)} />}
       {tab === "activity" && <ActivityReviewTab onForbidden={() => setForbidden(true)} />}
+      {tab === "news" && <NewsReelTab onForbidden={() => setForbidden(true)} />}
     </div>
+  );
+}
+
+function NewsReelTab({ onForbidden }: { onForbidden: () => void }) {
+  const [message, setMessage] = useState("");
+  const [isActive, setIsActive] = useState(true);
+  const [updatedAt, setUpdatedAt] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [notice, setNotice] = useState("");
+  const [error, setError] = useState("");
+
+  async function load() {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch("/api/admin/news", { credentials: "include" });
+      if (res.status === 403) { onForbidden(); return; }
+      const data = (await res.json()) as { news?: NewsReel; error?: string };
+      if (!res.ok) {
+        setError(data.error ?? "Could not load news reel.");
+        return;
+      }
+      setMessage(data.news?.message ?? "");
+      setIsActive(data.news?.isActive !== false);
+      setUpdatedAt(data.news?.updatedAt ?? null);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { load(); }, []);
+
+  async function save(event: React.FormEvent) {
+    event.preventDefault();
+    if (!message.trim() || saving) return;
+    setSaving(true);
+    setNotice("");
+    setError("");
+    try {
+      const res = await fetch("/api/admin/news", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ message, isActive })
+      });
+      if (res.status === 403) { onForbidden(); return; }
+      const data = (await res.json()) as { news?: NewsReel; error?: string };
+      if (!res.ok) {
+        setError(data.error ?? "Could not save news reel.");
+        return;
+      }
+      setMessage(data.news?.message ?? message);
+      setIsActive(data.news?.isActive !== false);
+      setUpdatedAt(data.news?.updatedAt ?? null);
+      setNotice("News reel updated.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (loading) return <p className="text-sm font-semibold text-green-900/60">Loading news reel...</p>;
+
+  return (
+    <form onSubmit={save} className="max-w-2xl rounded-lg border border-green-900/10 bg-white p-6 shadow-sm">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-sm font-black uppercase tracking-wide text-green-900/60">News Reel</p>
+          <p className="mt-1 text-sm font-semibold text-green-900/60">This updates the scrolling banner across the app without a redeploy.</p>
+        </div>
+        <label className="flex items-center gap-2 rounded-md bg-green-950/5 px-3 py-2 text-sm font-black text-green-950">
+          <input type="checkbox" checked={isActive} onChange={(event) => setIsActive(event.target.checked)} />
+          Active
+        </label>
+      </div>
+
+      <textarea
+        value={message}
+        onChange={(event) => {
+          setMessage(event.target.value.slice(0, 180));
+          setNotice("");
+          setError("");
+        }}
+        rows={3}
+        maxLength={180}
+        className="mt-5 w-full rounded-md border border-green-900/20 px-4 py-3 text-sm font-bold text-green-950 outline-none focus:border-pitch focus:ring-2 focus:ring-green-700/20"
+        placeholder="Enter today's headline"
+      />
+      <div className="mt-2 flex items-center justify-between gap-3 text-xs font-bold text-green-900/50">
+        <span>{updatedAt ? `Last updated ${new Date(updatedAt).toLocaleString("en-GB")}` : "Not yet updated"}</span>
+        <span>{message.length}/180</span>
+      </div>
+
+      <div className="mt-4 overflow-hidden rounded-md border border-green-900/10 bg-pitch text-white">
+        <div className="news-ticker flex whitespace-nowrap py-2 text-xs font-black uppercase tracking-wide">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <span key={index} className="mx-8">{message || "News reel preview"}</span>
+          ))}
+        </div>
+      </div>
+
+      {notice ? <p className="mt-4 rounded-md bg-green-50 p-3 text-sm font-bold text-green-800">{notice}</p> : null}
+      {error ? <p className="mt-4 rounded-md bg-red-50 p-3 text-sm font-bold text-red-700">{error}</p> : null}
+
+      <div className="mt-5 flex gap-3">
+        <button
+          type="submit"
+          disabled={!message.trim() || saving}
+          className="rounded-md bg-pitch px-5 py-3 font-black text-white hover:bg-green-800 disabled:opacity-40"
+        >
+          {saving ? "Saving..." : "Save News Reel"}
+        </button>
+        <button
+          type="button"
+          onClick={load}
+          className="rounded-md bg-green-950/8 px-5 py-3 font-black text-green-950 hover:bg-green-950/15"
+        >
+          Reset
+        </button>
+      </div>
+    </form>
   );
 }
 

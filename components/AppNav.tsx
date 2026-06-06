@@ -1,11 +1,21 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { AuthGuard } from "@/components/AuthGuard";
 import { MobileNav } from "@/components/MobileNav";
 import { NavActions } from "@/components/NavActions";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/auth/me", { credentials: "include" })
+      .then((response) => response.json())
+      .then((payload) => setIsAdmin(Boolean(payload.user?.isAdmin)))
+      .catch(() => setIsAdmin(false));
+  }, []);
+
   return (
     <div className="min-h-screen pb-16 md:pb-0" style={{ paddingBottom: "calc(4rem + env(safe-area-inset-bottom, 0px))" }}>
       <header className="nav-blur hidden border-b border-green-900/10 bg-white/80 md:block sticky top-0 z-40">
@@ -22,6 +32,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <Link className="rounded-md px-3 py-2 hover:bg-green-100" href="/chat">Chat</Link>
             <Link className="rounded-md px-3 py-2 hover:bg-green-100" href="/suggestions">Suggestions</Link>
             <Link className="rounded-md px-3 py-2 hover:bg-green-100" href="/rules">Rules</Link>
+            {isAdmin ? <Link className="rounded-md bg-amber-100 px-3 py-2 font-black text-amber-900 hover:bg-amber-200" href="/admin">Admin</Link> : null}
             <Link className="rounded-md px-3 py-2 hover:bg-green-100" href="/login">Login</Link>
             <NavActions />
           </div>
@@ -40,6 +51,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <Link href="/rules" className="whitespace-nowrap rounded-md bg-green-950/5 px-2 py-1 text-xs font-black uppercase tracking-wide text-green-900 hover:bg-green-950/10">
             Rules
           </Link>
+          {isAdmin ? (
+            <Link href="/admin" className="whitespace-nowrap rounded-md bg-amber-100 px-2 py-1 text-xs font-black uppercase tracking-wide text-amber-900 hover:bg-amber-200">
+              Admin
+            </Link>
+          ) : null}
           <NavActions compact />
         </div>
       </header>
@@ -53,14 +69,27 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 }
 
 function NewsBanner() {
-  const message = "Martin O'Neill appointed new Celtic manager";
+  const [news, setNews] = useState({ message: "Martin O'Neill appointed new Celtic manager", isActive: true });
+
+  useEffect(() => {
+    fetch("/api/news")
+      .then((response) => response.json())
+      .then((payload) => {
+        if (payload.news?.message) {
+          setNews({ message: payload.news.message, isActive: payload.news.isActive !== false });
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  if (!news.isActive) return null;
 
   return (
     <div className="overflow-hidden border-y border-green-900/10 bg-pitch text-white">
       <div className="news-ticker flex whitespace-nowrap py-2 text-xs font-black uppercase tracking-wide">
         {Array.from({ length: 6 }).map((_, index) => (
           <span key={index} className="mx-8">
-            {message}
+            {news.message}
           </span>
         ))}
       </div>
