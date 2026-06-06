@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import { PageTitle } from "@/components/PageTitle";
 
 const rarityRows = [
@@ -19,6 +22,8 @@ const boostRows = [
 ];
 
 export default function RulesPage() {
+  const [tab, setTab] = useState<"simple" | "detailed">("simple");
+
   return (
     <div className="mx-auto max-w-3xl">
       <PageTitle
@@ -26,6 +31,98 @@ export default function RulesPage() {
         subtitle="A World Cup 2026 activity game: move your body, earn player stickers, build your XI, and ride the tournament chaos."
       />
 
+      <div className="mb-6 grid grid-cols-2 gap-2 rounded-lg border border-green-900/10 bg-white p-1 shadow-sm">
+        <TabButton active={tab === "simple"} onClick={() => setTab("simple")}>
+          Simple Rules
+        </TabButton>
+        <TabButton active={tab === "detailed"} onClick={() => setTab("detailed")}>
+          Detailed Rules
+        </TabButton>
+      </div>
+
+      {tab === "simple" ? <SimpleRules /> : <DetailedRules />}
+
+      <p className="mt-10 pb-4 text-center text-[10px] font-semibold uppercase tracking-[0.35em] text-green-950/20">
+        Clarke Enterprises
+      </p>
+    </div>
+  );
+}
+
+function SimpleRules() {
+  return (
+    <div className="space-y-6">
+      <Section title="KMXI in 30 Seconds">
+        <p>
+          KMXI is a World Cup 2026 activity game. Move in real life, earn player stickers, build a 4-3-3 squad, and let the tournament chaos boost or bruise your cards.
+        </p>
+        <ul className="mt-3 grid gap-2 text-green-900/75 sm:grid-cols-2">
+          <Callout label="Move" text="Log walks, runs, cycling, workouts, sport, or mobility." />
+          <Callout label="Pull" text="Whole activity credits become random player cards." />
+          <Callout label="Build" text="Pick your best XI and lock it before matchdays." />
+          <Callout label="Win" text="Goals, assists, match wins, and viral moments can swing ratings." />
+        </ul>
+      </Section>
+
+      <Section title="How You Earn Cards">
+        <ul className="list-disc space-y-1 pl-5">
+          <li>Walk/run: <strong>1 km = 1 activity credit</strong>.</li>
+          <li>Cycle: <strong>3 km = 1 activity credit</strong>.</li>
+          <li>Strength: <strong>20 minutes = 1 activity credit</strong>.</li>
+          <li>Sport: <strong>15 minutes = 1 activity credit</strong>.</li>
+          <li>Yoga/mobility: <strong>30 minutes = 1 activity credit</strong>.</li>
+          <li>Whole credits earn cards. Fractions carry over.</li>
+          <li>You can submit up to <strong>3 activity logs per day</strong>.</li>
+        </ul>
+      </Section>
+
+      <Section title="Packs and Rarity">
+        <p>
+          Cards come from the World Cup 2026 player pool. Icons and legends are rare, commons are everywhere, and clown cards are dangerous fun.
+        </p>
+        <DataTable
+          headers={["Rarity", "Rating", "Chance"]}
+          rows={rarityRows.map((row) => [<span key={row.rarity} className={row.colour}>{row.rarity}</span>, row.rating, row.chance])}
+        />
+        <p className="mt-3 text-green-900/70">
+          Log in during the tournament to receive <strong>2 free pack credits per day</strong>. Match wins can also earn pack credits from your locked squad.
+        </p>
+      </Section>
+
+      <Section title="Squad Lock and Boosts">
+        <ul className="list-disc space-y-1 pl-5">
+          <li>Build a strict <strong>4-3-3</strong>: 1 GK, 4 DF, 3 MF, 3 FW.</li>
+          <li>Your squad locks each day at <strong>11:00 AM UK time</strong>.</li>
+          <li>Players must be in your locked XI on the day to earn match rewards.</li>
+          <li>Goals and assists permanently change ratings.</li>
+          <li>Viral World Cup moments can also affect ratings at admin discretion.</li>
+        </ul>
+      </Section>
+
+      <Section title="How the Leaderboard Works">
+        <ul className="list-disc space-y-1 pl-5">
+          <li>Your main score is your <strong>Best Squad Rating</strong>.</li>
+          <li>Activity credits, games won, goal boosts, and assist boosts also show on the leaderboard.</li>
+          <li>Everything locks at <strong>World Cup Final kick-off on 19 July 2026</strong>.</li>
+        </ul>
+      </Section>
+
+      <Section title="Do Not Cheat" tone="danger">
+        <p>
+          KMXI suffers no fools. Log real activity only.
+        </p>
+        <ul className="mt-3 list-disc space-y-1 pl-5">
+          <li>Admins can remove false logs.</li>
+          <li>Admins can claw back stickers, credits, boosts, and leaderboard progress.</li>
+          <li>Fraud, duplicate accounts, or suspicious behaviour can lead to penalties or removal from the game.</li>
+        </ul>
+      </Section>
+    </div>
+  );
+}
+
+function DetailedRules() {
+  return (
       <div className="space-y-6">
         <Section title="What Is KMXI?">
           <p>
@@ -164,11 +261,20 @@ export default function RulesPage() {
           </ul>
         </Section>
       </div>
+  );
+}
 
-      <p className="mt-10 pb-4 text-center text-[10px] font-semibold uppercase tracking-[0.35em] text-green-950/20">
-        Clarke Enterprises
-      </p>
-    </div>
+function TabButton({ active, children, onClick }: { active: boolean; children: React.ReactNode; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-md px-4 py-3 text-sm font-black transition-colors ${
+        active ? "bg-pitch text-white shadow-sm" : "text-green-950 hover:bg-green-950/8"
+      }`}
+    >
+      {children}
+    </button>
   );
 }
 

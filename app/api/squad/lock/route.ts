@@ -71,7 +71,11 @@ export async function POST() {
 
   const window = nextLockWindow();
   lockSquadForDate(user.id, window.lockDate, window.lockAt.toISOString(), window.unlockAt.toISOString());
-  return NextResponse.json({ ok: true, lockDate: window.lockDate });
+  return NextResponse.json({
+    ok: true,
+    lockDate: window.lockDate,
+    message: `Your XI is locked for ${window.lockDate}.`
+  });
 }
 
 export async function DELETE() {
@@ -80,5 +84,5 @@ export async function DELETE() {
 
   const window = nextLockWindow();
   unlockSquadForDate(user.id, window.lockDate);
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, message: `Your XI is unlocked for ${window.lockDate}.` });
 }

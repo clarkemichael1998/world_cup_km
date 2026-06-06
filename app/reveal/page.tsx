@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { flagUrl } from "@/lib/flags";
-import { loadRevealPlayersAsync } from "@/lib/storage";
-import type { Player } from "@/lib/types";
+import { loadRevealPlayersAsync, loadUserStateAsync } from "@/lib/storage";
+import type { Player, UserState } from "@/lib/types";
 
 // 0 = sealed  1 = rating  2 = player  3 = full card
 type Stage = 0 | 1 | 2 | 3;
@@ -38,13 +38,16 @@ const rarityLabel: Record<Player["rarity"], string> = {
 
 export default function RevealPage() {
   const [players, setPlayers] = useState<Player[]>([]);
+  const [state, setState] = useState<UserState | null>(null);
   const [index, setIndex] = useState(0);
   const [stage, setStage] = useState<Stage>(0);
+  const [showSummary, setShowSummary] = useState(false);
   const [animKey, setAnimKey] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     loadRevealPlayersAsync().then(setPlayers);
+    loadUserStateAsync().then(setState);
   }, []);
 
   const current = players[index];
@@ -59,6 +62,8 @@ export default function RevealPage() {
       setIndex((i) => i + 1);
       setStage(0);
       setAnimKey((k) => k + 1);
+    } else {
+      setShowSummary(true);
     }
   }
 
@@ -74,6 +79,10 @@ export default function RevealPage() {
   }
 
   if (!current) return null;
+
+  if (showSummary) {
+    return <RevealSummary players={players} state={state} />;
+  }
 
   return (
     <div
@@ -109,19 +118,89 @@ export default function RevealPage() {
       {/* Tap hint / action */}
       <div className="pb-2 text-center">
         {isFinal && isLast ? (
-          <Link
+          <button
             className="inline-flex rounded-md bg-pitch px-6 py-3 font-black text-white hover:bg-green-800"
-            href="/collection"
-            onClick={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowSummary(true);
+            }}
           >
-            Go to collection
-          </Link>
+            View summary
+          </button>
         ) : (
           <p className="animate-pulse text-xs font-black uppercase tracking-widest text-green-900/40">
             {stage === 0 ? "Tap to open" : stage === 3 ? "Tap for next card" : "Tap to reveal"}
           </p>
         )}
       </div>
+    </div>
+  );
+}
+
+function RevealSummary({ players, state }: { players: Player[]; state: UserState | null }) {
+  const best = [...players].sort((a, b) => b.rating - a.rating)[0];
+  const rarityCounts = players.reduce<Record<Player["rarity"], number>>((acc, player) => {
+    acc[player.rarity] = (acc[player.rarity] ?? 0) + 1;
+    return acc;
+  }, {} as Record<Player["rarity"], number>);
+  const duplicateTotal = state
+    ? players.filter((player) => (state.duplicateCounts[player.id] ?? 0) > 0).length
+    : 0;
+  const newTotal = Math.max(0, players.length - duplicateTotal);
+
+  return (
+    <div className="mx-auto flex min-h-[60vh] max-w-2xl flex-col justify-center">
+      <section className="rounded-lg border border-green-900/10 bg-white p-6 shadow-sm">
+        <p className="text-xs font-black uppercase tracking-wide text-green-900/50">Opening Summary</p>
+        <h1 className="mt-1 text-3xl font-black text-green-950">{players.length} card{players.length === 1 ? "" : "s"} revealed</h1>
+
+        <div className="mt-5 grid gap-3 sm:grid-cols-3">
+          <SummaryStat label="New Cards" value={String(newTotal)} />
+          <SummaryStat label="Duplicates" value={String(duplicateTotal)} />
+          <SummaryStat label="Best Pull" value={best ? `${best.rating} ${best.name}` : "--"} />
+        </div>
+
+        <div className="mt-5 rounded-lg bg-green-950/5 p-4">
+          <p className="text-xs font-black uppercase tracking-wide text-green-900/50">Rarity Breakdown</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {Object.entries(rarityLabel).map(([rarity, label]) => {
+              const count = rarityCounts[rarity as Player["rarity"]] ?? 0;
+              if (count === 0) return null;
+              return (
+                <span key={rarity} className="rounded-md bg-white px-3 py-2 text-sm font-black text-green-950 shadow-sm">
+                  {label}: {count}
+                </span>
+              );
+            })}
+          </div>
+        </div>
+
+        {best ? (
+          <div className="mt-5 rounded-lg border border-green-900/10 bg-green-50 p-4">
+            <p className="text-xs font-black uppercase tracking-wide text-green-900/50">Best Pull</p>
+            <p className="mt-1 text-xl font-black text-green-950">{best.name}</p>
+            <p className="text-sm font-bold text-green-900/70">{best.rating} {rarityLabel[best.rarity]} - {best.nation} - {best.club}</p>
+          </div>
+        ) : null}
+
+        <div className="mt-6 flex flex-wrap gap-3">
+          <Link className="rounded-md bg-pitch px-5 py-3 font-black text-white hover:bg-green-800" href="/collection">
+            Go to collection
+          </Link>
+          <Link className="rounded-md bg-green-950/10 px-5 py-3 font-black text-green-950 hover:bg-green-950/15" href="/squad">
+            Update squad
+          </Link>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function SummaryStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md bg-green-950/5 p-3">
+      <p className="text-xs font-black uppercase tracking-wide text-green-900/50">{label}</p>
+      <p className="mt-1 break-words text-lg font-black text-green-950">{value}</p>
     </div>
   );
 }

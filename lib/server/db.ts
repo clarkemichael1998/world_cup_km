@@ -425,13 +425,15 @@ export function spendCredits(userId: number, amount: number): boolean {
 export function spendCreditsForPlayers(userId: number, amount: number, playerIds: number[]): boolean {
   const db = getDb();
   db.exec("BEGIN IMMEDIATE");
+  let username = "";
 
   try {
-    const user = db.prepare("SELECT reward_credits FROM users WHERE id = ?").get(userId) as { reward_credits: number } | undefined;
+    const user = db.prepare("SELECT username, reward_credits FROM users WHERE id = ?").get(userId) as { username: string; reward_credits: number } | undefined;
     if (!user || user.reward_credits < amount) {
       db.exec("ROLLBACK");
       return false;
     }
+    username = user.username;
 
     db.prepare("UPDATE users SET reward_credits = reward_credits - ? WHERE id = ?").run(amount, userId);
 
@@ -442,6 +444,7 @@ export function spendCreditsForPlayers(userId: number, amount: number, playerIds
     playerIds.forEach((playerId, index) => insertReveal.run(userId, index, playerId));
 
     db.exec("COMMIT");
+    announcePremiumPulls(userId, username, playerIds, "pack");
     return true;
   } catch (error) {
     db.exec("ROLLBACK");
@@ -469,6 +472,19 @@ function awardPlayersInTransaction(database: DatabaseSync, userId: number, playe
 function getPlayerRarity(playerId: number): Rarity {
   const player = (players as Array<{ id: number; rarity: Rarity }>).find((item) => item.id === playerId);
   return player?.rarity ?? "common";
+}
+
+function announcePremiumPulls(userId: number, username: string, playerIds: number[], source: "pack" | "activity") {
+  const premiumPlayers = playerIds
+    .map((playerId) => (players as Array<{ id: number; name: string; rarity: Rarity; rating: number; nation: string }>).find((player) => player.id === playerId))
+    .filter((player): player is { id: number; name: string; rarity: Rarity; rating: number; nation: string } => Boolean(player))
+    .filter((player) => player.rarity === "legend" || player.rarity === "icon");
+
+  for (const player of premiumPlayers) {
+    const rarity = player.rarity === "icon" ? "Icon" : "Legend";
+    const sourceText = source === "pack" ? "opened a pack" : "logged activity";
+    createChatMessage(userId, `${username} ${sourceText} and pulled ${player.name} (${player.rating} ${rarity}, ${player.nation}).`);
+  }
 }
 
 export function upsertGoalScorer(matchId: string, scorerNameRaw: string, playerId: number | null, status: "matched" | "pending" | "ignored", source: "auto" | "manual", goalCount = 1) {
@@ -789,9 +805,12 @@ export function logActivityWithServerAwards({
 }) {
   const database = getDb();
   database.exec("BEGIN IMMEDIATE");
+  let username = "";
 
   try {
     ensureUserState(userId);
+    const user = database.prepare("SELECT username FROM users WHERE id = ?").get(userId) as { username: string } | undefined;
+    username = user?.username ?? "Someone";
     const current = database.prepare("SELECT total_km FROM user_state WHERE user_id = ?").get(userId) as { total_km: number };
     const newTotalKm = Number((current.total_km + activityCredits).toFixed(2));
 
@@ -830,6 +849,7 @@ export function logActivityWithServerAwards({
     awardedPlayerIds.forEach((playerId, index) => insertReveal.run(userId, index, playerId));
 
     database.exec("COMMIT");
+    announcePremiumPulls(userId, username, awardedPlayerIds, "activity");
     return { logId, totalKm: newTotalKm, kmBalance: balanceAfter };
   } catch (error) {
     database.exec("ROLLBACK");
@@ -1015,9 +1035,11 @@ function computeBestSquadRating(playerIds: number[]): number {
 
 export function getCommunitySquads() {
   const db = getDb();
+  const adminUsername = process.env.ADMIN_USERNAME?.trim().toLowerCase();
   const users = db
     .prepare("SELECT id, username FROM users ORDER BY username")
     .all() as Array<{ id: number; username: string }>;
+  const visibleUsers = adminUsername ? users.filter((user) => user.username.toLowerCase() !== adminUsername) : users;
   const ownedRows = db
     .prepare("SELECT user_id, player_id FROM user_players")
     .all() as Array<{ user_id: number; player_id: number }>;
@@ -1061,7 +1083,7 @@ export function getCommunitySquads() {
     lockedByUser.set(row.user_id, locked);
   }
 
-  return users
+  return visibleUsers
     .map((user) => {
       const boosts = boostsByUser.get(user.id) ?? new Map<number, number>();
       const best = pickBestCommunitySquad(ownedByUser.get(user.id) ?? [], boosts, playerById);

@@ -32,6 +32,7 @@ export default function SquadPage() {
   const [query, setQuery] = useState("");
   const [lockStatus, setLockStatus] = useState<LockStatus | null>(null);
   const [lockBusy, setLockBusy] = useState(false);
+  const [lockNotice, setLockNotice] = useState("");
 
   useEffect(() => {
     loadUserStateAsync().then((loaded) => {
@@ -54,7 +55,11 @@ export default function SquadPage() {
     try {
       const method = lockStatus.isLocked ? "DELETE" : "POST";
       const r = await fetch("/api/squad/lock", { method, credentials: "include" });
-      if (r.ok) await loadLockStatus();
+      if (r.ok) {
+        const payload = (await r.json().catch(() => ({}))) as { message?: string };
+        setLockNotice(payload.message ?? (method === "POST" ? "Your XI is locked." : "Your XI is unlocked."));
+        await loadLockStatus();
+      }
     } finally {
       setLockBusy(false);
     }
@@ -135,6 +140,17 @@ export default function SquadPage() {
               {lockBusy ? "..." : lockStatus.isLocked ? "🔒 Locked — Click to Unlock" : "🔓 Lock Squad for This Day"}
             </button>
           </div>
+
+          {lockNotice ? (
+            <div className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm font-bold text-emerald-900">
+              {lockNotice}
+              {lockStatus.isLocked ? (
+                <span className="block text-xs font-semibold text-emerald-800/70">
+                  Unlocks {new Date(lockStatus.unlockAt).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/London" })} UK time.
+                </span>
+              ) : null}
+            </div>
+          ) : null}
 
           {lockStatus.isLocked && lockStatus.lockedPlayers.length > 0 && (
             <div className="mt-4">
