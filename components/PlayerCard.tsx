@@ -14,14 +14,39 @@ function formatNumber(value: number | null) {
   return value === null ? "Unknown" : value.toLocaleString();
 }
 
-export function PlayerCard({ player, duplicateCount = 0, large = false, ratingBoost = 0 }: { player: Player; duplicateCount?: number; large?: boolean; ratingBoost?: number }) {
+export function PlayerCard({
+  player,
+  duplicateCount = 0,
+  large = false,
+  ratingBoost = 0,
+  variant = "default"
+}: {
+  player: Player;
+  duplicateCount?: number;
+  large?: boolean;
+  ratingBoost?: number;
+  variant?: "default" | "album";
+}) {
   const detailClass = large ? "grid-cols-2" : "grid-cols-1";
   const flag = flagUrl(player.nation);
   const effectiveRating = player.rating + ratingBoost;
   const boostText = ratingBoost > 0 ? `+${ratingBoost}` : ratingBoost < 0 ? String(ratingBoost) : "";
+  const album = variant === "album";
 
   return (
-    <article className={`card-sheen rounded-lg border-2 p-4 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-md ${rarityStyles[player.rarity]} ${player.rarity === "icon" ? "card-icon" : player.rarity === "legend" ? "card-legend" : ""} ${large ? "min-h-72" : "min-h-64"}`}>
+    <article
+      className={`card-sheen relative rounded-lg border-2 p-4 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-md ${
+        rarityStyles[player.rarity]
+      } ${player.rarity === "icon" ? "card-icon" : player.rarity === "legend" ? "card-legend" : ""} ${
+        large ? "min-h-72" : "min-h-64"
+      } ${album ? "outline outline-4 outline-white ring-1 ring-green-950/10" : ""}`}
+    >
+      {album ? (
+        <div className="mb-3 flex items-center justify-between gap-2 border-b border-black/10 pb-2">
+          <span className="text-[9px] font-black uppercase tracking-[0.22em] opacity-60">KMXI Official Sticker</span>
+          <span className="rounded-sm bg-black/10 px-1.5 py-0.5 text-[9px] font-black tabular-nums opacity-70">#{player.id}</span>
+        </div>
+      ) : null}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="inline-flex rounded-full bg-black/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide opacity-80">{player.rarity}</p>
@@ -51,7 +76,7 @@ export function PlayerCard({ player, duplicateCount = 0, large = false, ratingBo
       )}
 
       {duplicateCount > 0 ? (
-        <p className="mt-4 inline-flex rounded-md bg-black/10 px-2 py-1 text-xs font-bold">Duplicate pulls: {duplicateCount}</p>
+        <p className="mt-4 inline-flex rounded-md bg-black/10 px-2 py-1 text-xs font-bold">{album ? `Swap pile x${duplicateCount}` : `Duplicate pulls: ${duplicateCount}`}</p>
       ) : null}
     </article>
   );
