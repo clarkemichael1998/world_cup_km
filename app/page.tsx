@@ -88,7 +88,7 @@ export default function Home() {
 
   return (
     <div>
-      <PageTitle title="KMXI" subtitle="Log walks, runs, workouts, and real-world activity to earn player cards." />
+      <PageTitle title="KMXI" subtitle="Your World Cup 2026 card chase. Log activity, open packs, and keep your XI sharp." />
 
       {countdown ? (
         <section className="mb-4 rounded-lg border border-green-900/20 bg-pitch p-4 text-white shadow-sm">
@@ -107,11 +107,33 @@ export default function Home() {
         </section>
       )}
 
+      <section className="mb-4 rounded-lg border border-green-900/10 bg-white p-4 shadow-sm">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-xs font-black uppercase tracking-wide text-green-900/50">Next best move</p>
+            <h2 className="mt-1 text-2xl font-black text-green-950">{rewardCredits && rewardCredits > 0 ? "Open your available packs" : "Log activity to earn your next card"}</h2>
+            <p className="mt-1 text-sm font-semibold text-green-900/65">
+              {state ? `${state.kmBalance.toFixed(2)} activity credits banked. ${(1 - state.kmBalance).toFixed(2)} to the next pull.` : "Loading your progress..."}
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Link href="/add-km" className="rounded-md bg-boot px-5 py-3 text-sm font-black text-white shadow-sm hover:bg-red-700">
+              Log Activity
+            </Link>
+            {rewardCredits && rewardCredits > 0 ? (
+              <button onClick={openPack} disabled={redeeming} className="rounded-md bg-amber-600 px-5 py-3 text-sm font-black text-white shadow-sm hover:bg-amber-700 disabled:opacity-40">
+                {redeeming ? "Opening..." : "Open Pack"}
+              </button>
+            ) : null}
+          </div>
+        </div>
+      </section>
+
       <section className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
-        <Stat label="My Credits" value={state ? state.totalKm.toFixed(1) : "..."} />
-        <Stat label="Community Credits" value={communityKm === null ? "..." : communityKm.toFixed(1)} />
-        <Stat label="Collection" value={state ? String(state.ownedPlayerIds.length) : "..."} />
-        <Stat label="Squad Rating" value={state ? String(squadRating) : "..."} />
+        <Stat label="Activity Credits" value={state ? state.totalKm.toFixed(1) : "..."} />
+        <Stat label="Group Credits" value={communityKm === null ? "..." : communityKm.toFixed(1)} />
+        <Stat label="Cards Owned" value={state ? String(state.ownedPlayerIds.length) : "..."} />
+        <Stat label="Squad Avg" value={state ? String(squadRating) : "..."} />
       </section>
 
       {rewardCredits !== null && rewardCredits > 0 && (
@@ -120,7 +142,7 @@ export default function Home() {
             <div>
               <p className="text-sm font-black uppercase tracking-wide text-amber-800">Pack Credits</p>
               <p className="mt-1 text-2xl font-black text-amber-900">{rewardCredits} <span className="text-sm font-semibold text-amber-700">credit{rewardCredits === 1 ? "" : "s"} available</span></p>
-              <p className="mt-0.5 text-xs font-semibold text-amber-700">1 credit = 1 random player card</p>
+              <p className="mt-0.5 text-xs font-semibold text-amber-700">1 pack credit = 1 random player card</p>
             </div>
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2">
@@ -163,9 +185,9 @@ export default function Home() {
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_320px]">
         <section className="grid grid-cols-2 gap-3 md:grid-cols-2 content-start">
-          <HomeLink href="/add-km" title="Add Activity" text="Turn movement and workouts into random player rewards." />
+          <HomeLink href="/add-km" title="Log Activity" text="Turn movement and workouts into player cards." />
           <HomeLink href="/collection" title="Collection" text="Browse cards, filter by role, rarity, and club." />
-          <HomeLink href="/squad" title="Squad" text="Pick your XI manually or auto-select your strongest team." />
+          <HomeLink href="/squad" title="Squad" text="Pick your XI and lock it before matchday." />
           <HomeLink href="/chat" title="Chat" text="Talk tactics, pulls, and live scores with the group." />
         </section>
 
@@ -229,7 +251,7 @@ function ActivityBadge({ type }: { type?: ActivityType }) {
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-green-900/10 bg-white p-4 shadow-sm md:p-5">
+    <div className="rounded-lg border border-green-900/10 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md md:p-5">
       <p className="text-xs font-bold uppercase tracking-wide text-green-800/70 md:text-sm">{label}</p>
       <p className="mt-2 text-3xl font-black text-green-950 md:text-4xl">{value}</p>
     </div>
@@ -247,7 +269,7 @@ function CountUnit({ value, label }: { value: number; label: string }) {
 
 function HomeLink({ href, title, text }: { href: string; title: string; text: string }) {
   return (
-    <Link href={href} className="rounded-lg bg-pitch p-4 text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-green-800 md:p-5">
+    <Link href={href} className="rounded-lg border border-white/10 bg-pitch p-4 text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-green-800 hover:shadow-md md:p-5">
       <h2 className="text-xl font-black md:text-2xl">{title}</h2>
       <p className="mt-2 text-xs font-medium text-green-50/85 md:text-sm">{text}</p>
     </Link>

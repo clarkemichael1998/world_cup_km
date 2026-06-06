@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { PlayerCard } from "@/components/PlayerCard";
 import { PageTitle } from "@/components/PageTitle";
@@ -46,7 +47,19 @@ export default function CollectionPage() {
           <PlayerCard key={player.id} player={player} duplicateCount={state?.duplicateCounts[player.id] ?? 0} ratingBoost={state?.ratingBoosts?.[player.id] ?? 0} />
         ))}
       </section>
-      {filtered.length === 0 ? <p className="rounded-lg bg-white p-6 text-center font-bold text-green-950">No players match those filters.</p> : null}
+      {filtered.length === 0 ? (
+        <div className="rounded-lg border border-green-900/10 bg-white p-6 text-center shadow-sm">
+          <p className="text-lg font-black text-green-950">{owned.length === 0 ? "Your collection is waiting." : "No cards match those filters."}</p>
+          <p className="mt-1 text-sm font-semibold text-green-900/60">
+            {owned.length === 0 ? "Log activity or open packs to add your first player cards." : "Try clearing a filter or searching by another position, rarity, or club."}
+          </p>
+          {owned.length === 0 ? (
+            <Link href="/add-km" className="mt-4 inline-flex rounded-md bg-boot px-5 py-3 text-sm font-black text-white hover:bg-red-700">
+              Log Activity
+            </Link>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }

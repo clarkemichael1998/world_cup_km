@@ -6,8 +6,8 @@ const rarityStyles: Record<Player["rarity"], string> = {
   common: "border-slate-300 bg-slate-50 text-slate-900",
   rare: "border-sky-300 bg-sky-50 text-sky-950",
   epic: "border-fuchsia-300 bg-fuchsia-50 text-fuchsia-950",
-  legend: "border-amber-300 bg-amber-50 text-amber-950",
-  icon: "border-zinc-300 bg-zinc-950 text-zinc-50"
+  legend: "border-amber-300 bg-amber-50 text-amber-950 shadow-amber-200/60",
+  icon: "border-zinc-300 bg-zinc-950 text-zinc-50 shadow-zinc-400/40"
 };
 
 function formatNumber(value: number | null) {
@@ -18,15 +18,16 @@ export function PlayerCard({ player, duplicateCount = 0, large = false, ratingBo
   const detailClass = large ? "grid-cols-2" : "grid-cols-1";
   const flag = flagUrl(player.nation);
   const effectiveRating = player.rating + ratingBoost;
+  const boostText = ratingBoost > 0 ? `+${ratingBoost}` : ratingBoost < 0 ? String(ratingBoost) : "";
 
   return (
-    <article className={`card-sheen rounded-lg border-2 p-4 shadow-sm ${rarityStyles[player.rarity]} ${player.rarity === "icon" ? "card-icon" : player.rarity === "legend" ? "card-legend" : ""} ${large ? "min-h-72" : ""}`}>
+    <article className={`card-sheen rounded-lg border-2 p-4 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-md ${rarityStyles[player.rarity]} ${player.rarity === "icon" ? "card-icon" : player.rarity === "legend" ? "card-legend" : ""} ${large ? "min-h-72" : "min-h-64"}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-xs font-black uppercase tracking-wide opacity-70">{player.rarity}</p>
+          <p className="inline-flex rounded-full bg-black/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide opacity-80">{player.rarity}</p>
           <h3 className={`${large ? "text-3xl" : "text-lg"} break-words font-black leading-tight`}>{player.name}</h3>
         </div>
-        <div className="shrink-0 rounded-md bg-white/70 px-3 py-2 text-center text-green-950">
+        <div className="shrink-0 rounded-lg border border-black/5 bg-white/80 px-3 py-2 text-center text-green-950 shadow-sm">
           <div className={`${large ? "text-3xl" : "text-xl"} font-black`}>{effectiveRating}</div>
           <div className="text-xs font-bold">{player.pos}</div>
           {ratingBoost > 0 && <div className="text-[10px] font-black text-green-600">+{ratingBoost} ⚽</div>}
@@ -50,7 +51,7 @@ export function PlayerCard({ player, duplicateCount = 0, large = false, ratingBo
       )}
 
       {duplicateCount > 0 ? (
-        <p className="mt-4 inline-flex rounded-md bg-black/10 px-2 py-1 text-xs font-bold">+{duplicateCount} duplicate{duplicateCount === 1 ? "" : "s"}</p>
+        <p className="mt-4 inline-flex rounded-md bg-black/10 px-2 py-1 text-xs font-bold">Duplicate pulls: {duplicateCount}</p>
       ) : null}
     </article>
   );

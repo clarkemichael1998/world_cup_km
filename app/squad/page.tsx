@@ -122,9 +122,12 @@ export default function SquadPage() {
       </div>
 
       {lockStatus && (
-        <section className="mb-4 rounded-lg border border-green-900/10 bg-white p-5 shadow-sm">
+        <section className={`mb-4 rounded-lg border p-5 shadow-sm ${lockStatus.isLocked ? "border-amber-300 bg-amber-50" : "border-green-900/10 bg-white"}`}>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
+              <span className={`mb-2 inline-flex rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wide ${lockStatus.isLocked ? "bg-amber-200 text-amber-950" : "bg-green-100 text-green-800"}`}>
+                {lockStatus.isLocked ? "Locked" : "Unlocked"}
+              </span>
               <p className="text-sm font-black uppercase tracking-wide text-green-900/60">
                 ⚽ Next Lock — {lockStatus.lockDate}
               </p>

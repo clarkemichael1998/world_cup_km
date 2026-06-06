@@ -72,7 +72,7 @@ export default function ChatPage() {
 
   return (
     <div>
-      <PageTitle title="⚽ Chat" subtitle="Share pulls, squads, and World Cup live chaos with the group." />
+      <PageTitle title="Chat" subtitle="Pulls, squads, activity logs, and World Cup chaos in one place." />
 
       <section className="space-y-4">
         <div className="sticky top-[4.25rem] z-30 rounded-lg border border-green-900/10 bg-white/95 p-4 shadow-sm backdrop-blur">
@@ -111,7 +111,7 @@ export default function ChatPage() {
               messages.map((item) => {
                 const tone = getMessageTone(item);
                 return (
-                <article key={item.id} className={`rounded-md border px-3 py-2 ${tone.container}`}>
+                <article key={item.id} className={`rounded-md border px-3 py-2 shadow-sm ${tone.container}`}>
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex min-w-0 items-center gap-2">
                       <p className={`truncate text-sm font-black ${tone.name}`}>{item.username}</p>
@@ -187,6 +187,15 @@ function getMessageTone(item: ChatMessage) {
       text: "text-green-950",
       badge: "Activity",
       badgeClass: "bg-green-200 text-green-900"
+    };
+  }
+  if (item.message.includes(" pulled ") && (item.message.includes("Legend") || item.message.includes("Icon"))) {
+    return {
+      container: "border-amber-300 bg-amber-50",
+      name: "text-amber-950",
+      text: "text-amber-950",
+      badge: "Big Pull",
+      badgeClass: "bg-amber-200 text-amber-950"
     };
   }
   return {
