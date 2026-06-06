@@ -10,14 +10,10 @@ import { getOwnedPlayers } from "@/lib/squadUtils";
 import { loadUserStateAsync } from "@/lib/storage";
 import type { Player, Position, Rarity, UserState } from "@/lib/types";
 
-const rarities: Array<Rarity | "all"> = ["all", "clowns", "common", "rare", "epic", "legend", "icon"];
 const positions: Array<Position | "all"> = ["all", "GK", "DF", "MF", "FW"];
 
 export default function CollectionPage() {
   const [state, setState] = useState<UserState | null>(null);
-  const [rarity, setRarity] = useState<Rarity | "all">("all");
-  const [position, setPosition] = useState<Position | "all">("all");
-  const [club, setClub] = useState("all");
   const [nation, setNation] = useState("Argentina");
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
 
@@ -30,24 +26,13 @@ export default function CollectionPage() {
     () => allPlayers.filter((player) => player.nation === nation).sort((a, b) => positionRank(a.pos) - positionRank(b.pos) || b.rating - a.rating || a.name.localeCompare(b.name)),
     [nation]
   );
-  const clubs = useMemo(() => ["all", ...Array.from(new Set(countryPlayers.map((player) => player.club))).sort()], [countryPlayers]);
   const owned = state ? getOwnedPlayers(state) : [];
   const ownedIds = new Set(owned.map((player) => player.id));
-  const visiblePlayers = countryPlayers.filter((player) => {
-    return (
-      (rarity === "all" || player.rarity === rarity) &&
-      (position === "all" || player.pos === position) &&
-      (club === "all" || player.club === club)
-    );
-  });
   const collectedOnPage = countryPlayers.filter((player) => ownedIds.has(player.id)).length;
-  const visibleCollected = visiblePlayers.filter((player) => ownedIds.has(player.id)).length;
-  const raritySummary = rarities
-    .filter((item): item is Rarity => item !== "all")
+  const raritySummary = (["clowns", "common", "rare", "epic", "legend", "icon"] as Rarity[])
     .map((item) => ({ rarity: item, count: countryPlayers.filter((player) => player.rarity === item && ownedIds.has(player.id)).length }))
     .filter((item) => item.count > 0);
   const albumCode = `KMXI-${nation.slice(0, 3).toUpperCase()}-${String(collectedOnPage).padStart(2, "0")}`;
-  const activeFilters = [rarity !== "all" ? rarity : null, position !== "all" ? position : null, club !== "all" ? club : null].filter(Boolean);
   const selectedFlag = flagUrl(nation);
 
   return (
@@ -72,7 +57,6 @@ export default function CollectionPage() {
                 type="button"
                 onClick={() => {
                   setNation(item);
-                  setClub("all");
                   setSelectedPlayer(null);
                 }}
                 className={`shrink-0 rounded-md border px-3 py-2 text-left transition ${
@@ -100,7 +84,7 @@ export default function CollectionPage() {
                 <h2 className="text-2xl font-black text-green-950">{nation}</h2>
               </div>
               <p className="mt-1 text-sm font-bold text-green-900/55">
-                {collectedOnPage}/{countryPlayers.length} stickers collected. {visiblePlayers.length} spaces showing{activeFilters.length > 0 ? ` - filtered by ${activeFilters.join(", ")}` : " - full country page"}.
+                {collectedOnPage}/{countryPlayers.length} stickers collected.
               </p>
             </div>
             {raritySummary.length > 0 ? (
@@ -115,11 +99,6 @@ export default function CollectionPage() {
           </div>
         </div>
 
-        <div className="relative grid gap-3 p-4 sm:pl-16 md:grid-cols-3">
-          <Filter label="Rarity" value={rarity} onChange={(value) => setRarity(value as Rarity | "all")} options={rarities} />
-          <Filter label="Position" value={position} onChange={(value) => setPosition(value as Position | "all")} options={positions} />
-          <Filter label="Club" value={club} onChange={setClub} options={clubs} />
-        </div>
       </section>
 
       <section className="album-paper relative rounded-lg border border-green-900/10 bg-[#fbf7ea] p-3 shadow-sm md:p-5">
@@ -129,12 +108,12 @@ export default function CollectionPage() {
             <p className="text-sm font-black text-green-950">{nation} sticker spaces</p>
           </div>
           <div className="rounded-md border border-green-900/10 bg-white/60 px-2 py-1 text-[10px] font-black uppercase tracking-wide text-green-900/50">
-            {visibleCollected}/{visiblePlayers.length} filled
+            {collectedOnPage}/{countryPlayers.length} filled
           </div>
         </div>
 
         <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7">
-          {visiblePlayers.map((player) => (
+          {countryPlayers.map((player) => (
             <button
               key={player.id}
               type="button"
@@ -150,17 +129,13 @@ export default function CollectionPage() {
           ))}
         </div>
       </section>
-      {visiblePlayers.length === 0 ? (
+      {owned.length === 0 ? (
         <div className="mt-4 rounded-lg border border-green-900/10 bg-[#fbf7ea] p-6 text-center shadow-sm">
-          <p className="text-lg font-black text-green-950">{owned.length === 0 ? "Your album is waiting." : "No sticker spaces match those filters."}</p>
-          <p className="mt-1 text-sm font-semibold text-green-900/60">
-            {owned.length === 0 ? "Log activity or open packs to add your first player stickers." : "Try clearing a filter or choosing another country page."}
-          </p>
-          {owned.length === 0 ? (
-            <Link href="/add-km" className="mt-4 inline-flex rounded-md bg-boot px-5 py-3 text-sm font-black text-white hover:bg-red-700">
-              Log Activity
-            </Link>
-          ) : null}
+          <p className="text-lg font-black text-green-950">Your album is waiting.</p>
+          <p className="mt-1 text-sm font-semibold text-green-900/60">Log activity or open packs to add your first player stickers.</p>
+          <Link href="/add-km" className="mt-4 inline-flex rounded-md bg-boot px-5 py-3 text-sm font-black text-white hover:bg-red-700">
+            Log Activity
+          </Link>
         </div>
       ) : null}
 
@@ -272,21 +247,6 @@ function StickerDetails({
         )}
       </div>
     </div>
-  );
-}
-
-function Filter({ label, value, onChange, options }: { label: string; value: string; onChange: (value: string) => void; options: string[] }) {
-  return (
-    <label className="text-xs font-black uppercase tracking-wide text-green-900/60">
-      {label}
-      <select className="mt-2 w-full rounded-md border border-green-900/20 bg-white/85 px-3 py-2 text-sm font-bold normal-case tracking-normal text-green-950" value={value} onChange={(event) => onChange(event.target.value)}>
-        {options.map((option) => (
-          <option key={option} value={option}>
-            {option === "all" ? "All" : option}
-          </option>
-        ))}
-      </select>
-    </label>
   );
 }
 

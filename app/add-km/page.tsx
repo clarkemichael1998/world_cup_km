@@ -148,7 +148,7 @@ export default function AddKmPage() {
         ) : (
           <p className="mt-3 text-xs font-semibold text-green-900/50">
             Max {activity.maxPerLog} {activity.unit} per log · {MAX_LOGS_PER_DAY} logs per day ·{" "}
-            <span className="font-black text-green-700">{multiplier}x cards/activity credit this week</span>
+            <span className="font-black text-green-700">{multiplier}x stickers/activity credit this week</span>
           </p>
         )}
         <div className="mt-3 rounded-md bg-green-50 p-4 text-sm font-semibold text-green-950">
@@ -161,7 +161,7 @@ export default function AddKmPage() {
         ) : null}
         {preview ? (
           <div className="mt-3 rounded-md bg-amber-50 p-4 text-sm font-semibold text-amber-950">
-            {activity.label} gives {activityCredits.toFixed(2)} activity credit{activityCredits === 1 ? "" : "s"}. This will earn {preview.rewards} card{preview.rewards === 1 ? "" : "s"} and leave {preview.newBalance.toFixed(2)} credits banked.
+            {activity.label} gives {activityCredits.toFixed(2)} activity credit{activityCredits === 1 ? "" : "s"}. This will earn {preview.rewards} sticker{preview.rewards === 1 ? "" : "s"} and leave {preview.newBalance.toFixed(2)} credits banked.
           </div>
         ) : null}
       </form>

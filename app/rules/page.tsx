@@ -54,31 +54,31 @@ function SimpleRules() {
     <div className="space-y-6">
       <Section title="KMXI in 30 Seconds">
         <p>
-          KMXI is a World Cup 2026 activity game. Move in real life, earn player stickers, build a 4-3-3 squad, and let the tournament chaos boost or bruise your cards.
+          KMXI is a World Cup 2026 activity game. Move in real life, earn player stickers, build a 4-3-3 squad, and let the tournament chaos boost or bruise your stickers.
         </p>
         <ul className="mt-3 grid gap-2 text-green-900/75 sm:grid-cols-2">
           <Callout label="Move" text="Log walks, runs, cycling, workouts, sport, or mobility." />
-          <Callout label="Pull" text="Whole activity credits become random player cards." />
+          <Callout label="Pull" text="Whole activity credits become random player stickers." />
           <Callout label="Build" text="Pick your best XI and lock it before matchdays." />
           <Callout label="Win" text="Goals, assists, match wins, and viral moments can swing ratings." />
         </ul>
       </Section>
 
-      <Section title="How You Earn Cards">
+      <Section title="How You Earn Stickers">
         <ul className="list-disc space-y-1 pl-5">
           <li>Walk/run: <strong>1 km = 1 activity credit</strong>.</li>
           <li>Cycle: <strong>3 km = 1 activity credit</strong>.</li>
           <li>Strength: <strong>20 minutes = 1 activity credit</strong>.</li>
           <li>Sport: <strong>15 minutes = 1 activity credit</strong>.</li>
           <li>Yoga/mobility: <strong>30 minutes = 1 activity credit</strong>.</li>
-          <li>Whole credits earn cards. Fractions carry over.</li>
+          <li>Whole credits earn stickers. Fractions carry over.</li>
           <li>You can submit up to <strong>3 activity logs per day</strong>.</li>
         </ul>
       </Section>
 
       <Section title="Packs and Rarity">
         <p>
-          Cards come from the World Cup 2026 player pool. Icons and legends are rare, commons are everywhere, and clown cards are dangerous fun.
+          Stickers come from the World Cup 2026 player pool. Icons and legends are rare, commons are everywhere, and clown stickers are dangerous fun.
         </p>
         <DataTable
           headers={["Rarity", "Rating", "Chance"]}
@@ -126,7 +126,7 @@ function DetailedRules() {
       <div className="space-y-6">
         <Section title="What Is KMXI?">
           <p>
-            KMXI is a World Cup 2026 sticker chase powered by real activity. Log workouts, earn card pulls, collect players from the tournament squad pool, then build the strongest 4-3-3 XI you can.
+            KMXI is a World Cup 2026 sticker chase powered by real activity. Log workouts, earn sticker pulls, collect players from the tournament squad pool, then build the strongest 4-3-3 XI you can.
           </p>
           <ul className="mt-3 grid gap-2 text-green-900/75 sm:grid-cols-2">
             <Callout label="Move" text="Walk, run, ride, train, play sport, or do mobility work." />
@@ -148,7 +148,7 @@ function DetailedRules() {
 
         <Section title="2. Log Your Activity">
           <p>
-            Physical activity is the fuel. Log activity honestly on the Add Activity page. Whole activity credits count toward cards, and any fraction carries over to your next session.
+            Physical activity is the fuel. Log activity honestly on the Add Activity page. Whole activity credits count toward stickers, and any fraction carries over to your next session.
           </p>
           <div className="mt-3 overflow-hidden rounded-lg border border-green-900/10">
             <table className="w-full text-sm">
@@ -175,26 +175,26 @@ function DetailedRules() {
 
         <Section title="3. Collect Player Stickers">
           <p>
-            Every pull draws from the World Cup 2026 player pool. Rarer cards are harder to find, higher rated, and much louder when they land.
+            Every pull draws from the World Cup 2026 player pool. Rarer stickers are harder to find, higher rated, and much louder when they land.
           </p>
           <DataTable
             headers={["Rarity", "Rating range", "Pull chance"]}
             rows={rarityRows.map((row) => [<span key={row.rarity} className={row.colour}>{row.rarity}</span>, row.rating, row.chance])}
           />
           <p className="mt-3 text-green-900/70">
-            You cannot hold duplicate cards. If you pull a player you already own, it is counted as a duplicate on that card instead.
+            You cannot hold duplicate stickers. If you pull a player you already own, it is counted as a duplicate on that sticker instead.
           </p>
         </Section>
 
         <Section title="4. Pack Credits">
           <p>
-            Activity earns cards directly, but pack credits give you extra shots at the sticker pile.
+            Activity earns stickers directly, but pack credits give you extra shots at the sticker pile.
           </p>
           <ul className="mt-3 list-disc space-y-1 pl-5 text-green-900/70">
             <li><strong>2 free credits</strong> are added to your balance every day you log in during the tournament.</li>
             <li><strong>Match credits</strong> are earned when players in your locked squad represent a winning nation.</li>
             <li>A match win gives <strong>3 credits per eligible locked player</strong>.</li>
-            <li>Credits can be spent on the home page. <strong>1 credit = 1 card pull</strong>, up to 20 at a time.</li>
+            <li>Credits can be spent on the home page. <strong>1 credit = 1 sticker pull</strong>, up to 20 at a time.</li>
             <li>Credits do not expire and carry over until spent.</li>
           </ul>
         </Section>
@@ -220,11 +220,11 @@ function DetailedRules() {
             rows={boostRows.map((row) => [<span key={row.rarity} className={row.colour}>{row.rarity}</span>, row.goal, row.assist])}
           />
           <ul className="mt-3 list-disc space-y-1 pl-5 text-green-900/70">
-            <li>Goals and assists permanently boost that player card.</li>
+            <li>Goals and assists permanently boost that player sticker.</li>
             <li>Boosts stack across the tournament. A hattrick earns 3x the goal boost.</li>
             <li>The player must be in your <strong>locked squad on the day of the performance</strong>.</li>
             <li>Packing a player later gives no retroactive boost for earlier goals or assists.</li>
-            <li>Clown cards lose rating for goals and assists. Choose carefully. The game has jokes, but it also has consequences.</li>
+            <li>Clown stickers lose rating for goals and assists. Choose carefully. The game has jokes, but it also has consequences.</li>
           </ul>
         </Section>
 
@@ -255,7 +255,7 @@ function DetailedRules() {
           <ul className="mt-3 list-disc space-y-1 pl-5">
             <li>Admins can review, edit, or remove fraudulent activity logs.</li>
             <li>Admins can claw back stickers, pack credits, rating boosts, and leaderboard progress gained from bad logs.</li>
-            <li>Admins can impose punishments, including rating penalties, card removals, account restrictions, or removal from the game.</li>
+            <li>Admins can impose punishments, including rating penalties, sticker removals, account restrictions, or removal from the game.</li>
             <li>Admins can correct match data, scoring errors, rating boosts, and viral-moment awards throughout the tournament.</li>
             <li>Log honestly, play properly, and keep the chat respectful.</li>
           </ul>

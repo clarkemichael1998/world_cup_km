@@ -88,7 +88,7 @@ export default function Home() {
 
   return (
     <div>
-      <PageTitle title="KMXI" subtitle="Your World Cup 2026 card chase. Log activity, open packs, and keep your XI sharp." />
+      <PageTitle title="KMXI" subtitle="Your World Cup 2026 sticker chase. Log activity, open packs, and keep your XI sharp." />
 
       {countdown ? (
         <section className="mb-4 rounded-lg border border-green-900/20 bg-pitch p-4 text-white shadow-sm">
@@ -111,7 +111,7 @@ export default function Home() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-xs font-black uppercase tracking-wide text-green-900/50">Next best move</p>
-            <h2 className="mt-1 text-2xl font-black text-green-950">{rewardCredits && rewardCredits > 0 ? "Open your available packs" : "Log activity to earn your next card"}</h2>
+            <h2 className="mt-1 text-2xl font-black text-green-950">{rewardCredits && rewardCredits > 0 ? "Open your available packs" : "Log activity to earn your next sticker"}</h2>
             <p className="mt-1 text-sm font-semibold text-green-900/65">
               {state ? `${state.kmBalance.toFixed(2)} activity credits banked. ${(1 - state.kmBalance).toFixed(2)} to the next pull.` : "Loading your progress..."}
             </p>
@@ -132,7 +132,7 @@ export default function Home() {
       <section className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
         <Stat label="Activity Credits" value={state ? state.totalKm.toFixed(1) : "..."} />
         <Stat label="Group Credits" value={communityKm === null ? "..." : communityKm.toFixed(1)} />
-        <Stat label="Cards Owned" value={state ? String(state.ownedPlayerIds.length) : "..."} />
+        <Stat label="Stickers" value={state ? String(state.ownedPlayerIds.length) : "..."} />
         <Stat label="Squad Avg" value={state ? String(squadRating) : "..."} />
       </section>
 
@@ -142,7 +142,7 @@ export default function Home() {
             <div>
               <p className="text-sm font-black uppercase tracking-wide text-amber-800">Pack Credits</p>
               <p className="mt-1 text-2xl font-black text-amber-900">{rewardCredits} <span className="text-sm font-semibold text-amber-700">credit{rewardCredits === 1 ? "" : "s"} available</span></p>
-              <p className="mt-0.5 text-xs font-semibold text-amber-700">1 pack credit = 1 random player card</p>
+              <p className="mt-0.5 text-xs font-semibold text-amber-700">1 pack credit = 1 random player sticker</p>
             </div>
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2">
@@ -185,8 +185,8 @@ export default function Home() {
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_320px]">
         <section className="grid grid-cols-2 gap-3 md:grid-cols-2 content-start">
-          <HomeLink href="/add-km" title="Log Activity" text="Turn movement and workouts into player cards." />
-          <HomeLink href="/collection" title="Collection" text="Browse cards, filter by role, rarity, and club." />
+          <HomeLink href="/add-km" title="Log Activity" text="Turn movement and workouts into player stickers." />
+          <HomeLink href="/collection" title="Stickers" text="Browse your sticker album by nation." />
           <HomeLink href="/squad" title="Squad" text="Pick your XI and lock it before matchday." />
           <HomeLink href="/chat" title="Chat" text="Talk tactics, pulls, and live scores with the group." />
         </section>
@@ -210,7 +210,7 @@ export default function Home() {
                   <div className="shrink-0 text-right">
                     <p className="text-sm font-black text-pitch">+{entry.distance_km.toFixed(1)} credits</p>
                     {entry.cards_earned > 0 && (
-                      <p className="text-xs font-bold text-amber-700">+{entry.cards_earned} card{entry.cards_earned === 1 ? "" : "s"}</p>
+                      <p className="text-xs font-bold text-amber-700">+{entry.cards_earned} sticker{entry.cards_earned === 1 ? "" : "s"}</p>
                     )}
                   </div>
                 </div>

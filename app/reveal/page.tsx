@@ -152,10 +152,10 @@ function RevealSummary({ players, state }: { players: Player[]; state: UserState
     <div className="mx-auto flex min-h-[60vh] max-w-2xl flex-col justify-center">
       <section className="rounded-lg border border-green-900/10 bg-white p-6 shadow-sm">
         <p className="text-xs font-black uppercase tracking-wide text-green-900/50">Opening Summary</p>
-        <h1 className="mt-1 text-3xl font-black text-green-950">{players.length} card{players.length === 1 ? "" : "s"} revealed</h1>
+        <h1 className="mt-1 text-3xl font-black text-green-950">{players.length} sticker{players.length === 1 ? "" : "s"} revealed</h1>
 
         <div className="mt-5 grid gap-3 sm:grid-cols-3">
-          <SummaryStat label="New Cards" value={String(newTotal)} />
+          <SummaryStat label="New Stickers" value={String(newTotal)} />
           <SummaryStat label="Duplicates" value={String(duplicateTotal)} />
           <SummaryStat label="Best Pull" value={best ? `${best.rating} ${best.name}` : "--"} />
         </div>

@@ -28,7 +28,7 @@ const tabs = [
   },
   {
     href: "/collection",
-    label: "Cards",
+    label: "Stickers",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
         <rect x="2" y="5" width="20" height="14" rx="2" />

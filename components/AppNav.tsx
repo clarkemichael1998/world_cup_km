@@ -25,7 +25,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </Link>
           <div className="flex gap-2 text-sm font-semibold text-green-950">
             <Link className="rounded-md px-3 py-2 hover:bg-green-100" href="/add-km">Add Activity</Link>
-            <Link className="rounded-md px-3 py-2 hover:bg-green-100" href="/collection">Collection</Link>
+            <Link className="rounded-md px-3 py-2 hover:bg-green-100" href="/collection">Stickers</Link>
             <Link className="rounded-md px-3 py-2 hover:bg-green-100" href="/squad">Squad</Link>
             <Link className="rounded-md px-3 py-2 hover:bg-green-100" href="/squads">Squads</Link>
             <Link className="rounded-md px-3 py-2 hover:bg-green-100" href="/leaderboard">Leaderboard</Link>
