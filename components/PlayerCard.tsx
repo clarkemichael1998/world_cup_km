@@ -43,7 +43,7 @@ export function PlayerCard({
     >
       {album ? (
         <div className="mb-3 flex items-center justify-between gap-2 border-b border-black/10 pb-2">
-          <span className="text-[9px] font-black uppercase tracking-[0.22em] opacity-60">KMXI Official Sticker</span>
+          <span className="text-[9px] font-black uppercase tracking-[0.22em] opacity-60">Official Tournament Sticker</span>
           <span className="rounded-sm bg-black/10 px-1.5 py-0.5 text-[9px] font-black tabular-nums opacity-70">#{player.id}</span>
         </div>
       ) : null}
@@ -77,6 +77,13 @@ export function PlayerCard({
 
       {duplicateCount > 0 ? (
         <p className="mt-4 inline-flex rounded-md bg-black/10 px-2 py-1 text-xs font-bold">{album ? `Swap pile x${duplicateCount}` : `Duplicate pulls: ${duplicateCount}`}</p>
+      ) : null}
+
+      {album ? (
+        <div className="mt-4 flex items-center justify-between border-t border-black/10 pt-2 text-[9px] font-black uppercase tracking-wide opacity-55">
+          <span>KMXI 2026</span>
+          <span>{player.teamId}</span>
+        </div>
       ) : null}
     </article>
   );

@@ -54,6 +54,43 @@ button {
     radial-gradient(circle at 20% 15%, rgba(255, 255, 255, 0.4), transparent 24%);
 }
 
+.album-paper {
+  background-image:
+    linear-gradient(90deg, rgba(20, 83, 45, 0.045) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(20, 83, 45, 0.035) 1px, transparent 1px),
+    radial-gradient(circle at 20% 12%, rgba(255, 255, 255, 0.75), transparent 28%),
+    linear-gradient(180deg, #fbf7ea, #f6efd9);
+  background-size: 24px 24px, 24px 24px, auto, auto;
+}
+
+.sticker-slot {
+  position: relative;
+}
+
+.sticker-slot::before,
+.sticker-slot::after {
+  content: "";
+  position: absolute;
+  width: 34px;
+  height: 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.62);
+  box-shadow: 0 1px 3px rgba(20, 83, 45, 0.1);
+  z-index: 2;
+}
+
+.sticker-slot::before {
+  left: 14px;
+  top: 30px;
+  transform: rotate(-8deg);
+}
+
+.sticker-slot::after {
+  bottom: 12px;
+  right: 16px;
+  transform: rotate(-8deg);
+}
+
 /* Reveal animations */
 @keyframes reveal-scale-in {
   from { opacity: 0; transform: scale(0.6); }

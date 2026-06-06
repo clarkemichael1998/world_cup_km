@@ -35,17 +35,25 @@ export default function CollectionPage() {
     .filter((item): item is Rarity => item !== "all")
     .map((item) => ({ rarity: item, count: owned.filter((player) => player.rarity === item).length }))
     .filter((item) => item.count > 0);
+  const albumCode = `KMXI-${String(owned.length).padStart(3, "0")}`;
+  const activeFilters = [rarity !== "all" ? rarity : null, position !== "all" ? position : null, club !== "all" ? club : null].filter(Boolean);
 
   return (
     <div>
       <PageTitle title="Sticker Album" subtitle={`${owned.length} official KMXI sticker${owned.length === 1 ? "" : "s"} placed in your World Cup 2026 album.`} />
 
-      <section className="mb-5 overflow-hidden rounded-lg border border-green-900/10 bg-[#fbf7ea] shadow-sm">
-        <div className="border-b border-green-900/10 bg-white/60 p-4">
+      <section className="album-paper relative mb-5 overflow-hidden rounded-lg border border-green-900/10 bg-[#fbf7ea] shadow-sm">
+        <div className="pointer-events-none absolute bottom-0 left-8 top-0 hidden w-px bg-green-950/10 sm:block" />
+        <div className="pointer-events-none absolute bottom-0 left-10 top-0 hidden w-px bg-white/70 sm:block" />
+
+        <div className="relative border-b border-green-900/10 bg-white/60 p-4 sm:pl-16">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <p className="text-xs font-black uppercase tracking-[0.24em] text-green-900/45">Album Page</p>
+              <p className="text-xs font-black uppercase tracking-[0.24em] text-green-900/45">Album Page {albumCode}</p>
               <h2 className="mt-1 text-2xl font-black text-green-950">Collected Stickers</h2>
+              <p className="mt-1 text-sm font-bold text-green-900/55">
+                {filtered.length} showing{activeFilters.length > 0 ? ` - filtered by ${activeFilters.join(", ")}` : " - full album view"}
+              </p>
             </div>
             {raritySummary.length > 0 ? (
               <div className="flex flex-wrap gap-2">
@@ -59,17 +67,31 @@ export default function CollectionPage() {
           </div>
         </div>
 
-        <div className="grid gap-3 p-4 md:grid-cols-3">
+        <div className="relative grid gap-3 p-4 sm:pl-16 md:grid-cols-3">
           <Filter label="Rarity" value={rarity} onChange={(value) => setRarity(value as Rarity | "all")} options={rarities} />
           <Filter label="Position" value={position} onChange={(value) => setPosition(value as Position | "all")} options={positions} />
           <Filter label="Club" value={club} onChange={setClub} options={clubs} />
         </div>
       </section>
 
-      <section className="rounded-lg border border-green-900/10 bg-[#fbf7ea] p-3 shadow-sm md:p-5">
+      <section className="album-paper relative rounded-lg border border-green-900/10 bg-[#fbf7ea] p-3 shadow-sm md:p-5">
+        <div className="mb-4 flex items-center justify-between gap-3 border-b border-green-900/10 pb-3">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.24em] text-green-900/40">Page Spread</p>
+            <p className="text-sm font-black text-green-950">Stick your best pulls here</p>
+          </div>
+          <div className="rounded-md border border-green-900/10 bg-white/60 px-2 py-1 text-[10px] font-black uppercase tracking-wide text-green-900/50">
+            World Cup 2026
+          </div>
+        </div>
+
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
           {filtered.map((player) => (
-            <div key={player.id} className="rounded-lg border border-dashed border-green-900/20 bg-white/45 p-2 shadow-inner">
+            <div key={player.id} className="sticker-slot rounded-lg border border-dashed border-green-900/20 bg-white/45 p-2 shadow-inner">
+              <div className="mb-2 flex items-center justify-between px-1 text-[9px] font-black uppercase tracking-wide text-green-900/35">
+                <span>{player.nation}</span>
+                <span>{player.pos}</span>
+              </div>
               <PlayerCard player={player} duplicateCount={state?.duplicateCounts[player.id] ?? 0} ratingBoost={state?.ratingBoosts?.[player.id] ?? 0} variant="album" />
             </div>
           ))}
