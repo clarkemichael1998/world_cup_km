@@ -128,9 +128,11 @@ export function getDb() {
     CREATE TABLE IF NOT EXISTS chat_messages (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER NOT NULL,
+      reply_to_message_id INTEGER,
       message TEXT NOT NULL,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (user_id) REFERENCES users(id)
+      FOREIGN KEY (user_id) REFERENCES users(id),
+      FOREIGN KEY (reply_to_message_id) REFERENCES chat_messages(id)
     );
     CREATE TABLE IF NOT EXISTS chat_reactions (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -242,6 +244,7 @@ export function getDb() {
     );
   `);
   migrateKmLogActivity(db);
+  migrateChatMessages(db);
   migrateFixtureResults(db);
   migrateUserState(db);
   migrateGoalScorers(db);
@@ -591,13 +594,26 @@ export function getCommunityStats() {
 export function getChatMessages() {
   return getDb()
     .prepare(
-      `SELECT chat_messages.id, chat_messages.message, chat_messages.created_at, users.username
+      `SELECT chat_messages.id, chat_messages.message, chat_messages.created_at, users.username,
+              chat_messages.reply_to_message_id,
+              reply_user.username AS reply_to_username,
+              reply.message AS reply_to_message
        FROM chat_messages
        JOIN users ON users.id = chat_messages.user_id
+       LEFT JOIN chat_messages reply ON reply.id = chat_messages.reply_to_message_id
+       LEFT JOIN users reply_user ON reply_user.id = reply.user_id
        ORDER BY chat_messages.created_at DESC, chat_messages.id DESC
        LIMIT 50`
     )
-    .all() as Array<{ id: number; message: string; created_at: string; username: string }>;
+    .all() as Array<{
+      id: number;
+      message: string;
+      created_at: string;
+      username: string;
+      reply_to_message_id: number | null;
+      reply_to_username: string | null;
+      reply_to_message: string | null;
+    }>;
 }
 
 export function toggleChatReaction(messageId: number, userId: number, reaction: string): 'added' | 'removed' {
@@ -611,25 +627,38 @@ export function toggleChatReaction(messageId: number, userId: number, reaction: 
   return 'added';
 }
 
-export function getChatReactionsForMessages(messageIds: number[], viewerUserId: number | null): Array<{ message_id: number; reaction: string; count: number; user_reacted: boolean }> {
+export function getChatReactionsForMessages(messageIds: number[], viewerUserId: number | null): Array<{ message_id: number; reaction: string; count: number; user_reacted: boolean; users: string[] }> {
   if (messageIds.length === 0) return [];
   const placeholders = messageIds.map(() => "?").join(",");
   const rows = getDb()
     .prepare(
-      `SELECT message_id, reaction, COUNT(*) AS count,
-              MAX(CASE WHEN user_id = ? THEN 1 ELSE 0 END) AS user_reacted
+      `SELECT chat_reactions.message_id, chat_reactions.reaction, chat_reactions.user_id, users.username
        FROM chat_reactions
-       WHERE message_id IN (${placeholders})
-       GROUP BY message_id, reaction`
+       JOIN users ON users.id = chat_reactions.user_id
+       WHERE chat_reactions.message_id IN (${placeholders})
+       ORDER BY users.username COLLATE NOCASE`
     )
-    .all(viewerUserId ?? 0, ...messageIds) as Array<{ message_id: number; reaction: string; count: number; user_reacted: number }>;
-  return rows.map((r) => ({ ...r, user_reacted: r.user_reacted === 1 }));
+    .all(...messageIds) as Array<{ message_id: number; reaction: string; user_id: number; username: string }>;
+
+  const grouped = new Map<string, { message_id: number; reaction: string; users: string[]; user_reacted: boolean }>();
+  for (const row of rows) {
+    const key = `${row.message_id}:${row.reaction}`;
+    const item = grouped.get(key) ?? { message_id: row.message_id, reaction: row.reaction, users: [], user_reacted: false };
+    item.users.push(row.username);
+    item.user_reacted ||= row.user_id === viewerUserId;
+    grouped.set(key, item);
+  }
+
+  return Array.from(grouped.values()).map((item) => ({
+    ...item,
+    count: item.users.length
+  }));
 }
 
-export function saveChatMessage(userId: number, message: string) {
+export function saveChatMessage(userId: number, message: string, replyToMessageId?: number | null) {
   const trimmed = message.trim().slice(0, 500);
   if (!trimmed) return;
-  createChatMessage(userId, trimmed);
+  createChatMessage(userId, trimmed, replyToMessageId);
 }
 
 export function getSuggestions(viewerUserId: number | null) {
@@ -722,10 +751,13 @@ export function getKmLogsToday(userId: number): number {
   return row.count;
 }
 
-export function createChatMessage(userId: number, message: string) {
+export function createChatMessage(userId: number, message: string, replyToMessageId?: number | null) {
   const trimmed = message.trim().slice(0, 1000);
   if (!trimmed) return null;
-  const result = getDb().prepare("INSERT INTO chat_messages (user_id, message) VALUES (?, ?)").run(userId, trimmed);
+  const replyId = replyToMessageId
+    ? ((getDb().prepare("SELECT id FROM chat_messages WHERE id = ?").get(replyToMessageId) as { id: number } | undefined)?.id ?? null)
+    : null;
+  const result = getDb().prepare("INSERT INTO chat_messages (user_id, message, reply_to_message_id) VALUES (?, ?, ?)").run(userId, trimmed, replyId);
   return Number(result.lastInsertRowid);
 }
 
@@ -1304,6 +1336,14 @@ function migrateUserState(database: DatabaseSync) {
   const colNames = new Set(cols.map((c) => c.name));
   if (!colNames.has("daily_credits_granted_date")) {
     database.exec("ALTER TABLE user_state ADD COLUMN daily_credits_granted_date TEXT");
+  }
+}
+
+function migrateChatMessages(database: DatabaseSync) {
+  const cols = database.prepare("PRAGMA table_info(chat_messages)").all() as Array<{ name: string }>;
+  const colNames = new Set(cols.map((c) => c.name));
+  if (colNames.size > 0 && !colNames.has("reply_to_message_id")) {
+    database.exec("ALTER TABLE chat_messages ADD COLUMN reply_to_message_id INTEGER");
   }
 }
 

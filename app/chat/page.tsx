@@ -7,19 +7,23 @@ import { formatDate } from "@/lib/formatDate";
 
 const REACTIONS = ["👍", "👎", "🔥", "❤️", "😂", "🤡", "💩", "🫪"];
 
-type ReactionCount = { reaction: string; count: number; user_reacted: boolean };
+type ReactionCount = { reaction: string; count: number; user_reacted: boolean; users: string[] };
 
 type ChatMessage = {
   id: number;
   username: string;
   message: string;
   created_at: string;
+  reply_to_message_id: number | null;
+  reply_to_username: string | null;
+  reply_to_message: string | null;
   reactions: ReactionCount[];
 };
 
 export default function ChatPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [message, setMessage] = useState("");
+  const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -45,7 +49,7 @@ export default function ChatPage() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify({ message })
+      body: JSON.stringify({ message, replyToMessageId: replyingTo?.id ?? null })
     });
     const payload = await response.json();
     setBusy(false);
@@ -54,6 +58,7 @@ export default function ChatPage() {
       return;
     }
     setMessage("");
+    setReplyingTo(null);
     setMessages(sortNewestFirst(payload.messages ?? []));
   }
 
@@ -81,6 +86,17 @@ export default function ChatPage() {
             <p className="text-xs font-bold text-green-900/45">Newest messages first</p>
           </div>
           <form onSubmit={submit} className="mt-3">
+            {replyingTo ? (
+              <div className="mb-2 flex items-start justify-between gap-3 rounded-md border border-green-900/10 bg-green-950/5 px-3 py-2">
+                <p className="min-w-0 text-[11px] font-bold leading-snug text-green-900/65">
+                  Replying to <span className="font-black text-green-950">{replyingTo.username}</span>:{" "}
+                  <span>{truncate(replyingTo.message, 90)}</span>
+                </p>
+                <button type="button" onClick={() => setReplyingTo(null)} className="shrink-0 text-[11px] font-black uppercase text-green-900/50 hover:text-green-950">
+                  Cancel
+                </button>
+              </div>
+            ) : null}
             <textarea
               className="min-h-20 w-full resize-none rounded-md border border-green-900/20 px-3 py-2 text-sm font-semibold"
               maxLength={500}
@@ -120,6 +136,12 @@ export default function ChatPage() {
                     <time className="text-xs font-bold text-green-900/50">{formatDate(item.created_at)}</time>
                   </div>
                   <p className={`mt-1 whitespace-pre-wrap break-words text-[13px] font-semibold leading-snug ${tone.text}`}>{item.message}</p>
+                  {item.reply_to_message ? (
+                    <div className="mt-1.5 rounded border-l-2 border-green-800/25 bg-white/45 px-2 py-1 text-[10px] font-semibold leading-snug text-green-900/55">
+                      <span className="font-black text-green-900/70">Reply to {item.reply_to_username ?? "someone"}:</span>{" "}
+                      {truncate(item.reply_to_message, 120)}
+                    </div>
+                  ) : null}
                   <div className="mt-1.5 flex flex-wrap items-center gap-1">
                     {REACTIONS.map((emoji) => {
                       const r = item.reactions.find((x) => x.reaction === emoji);
@@ -134,13 +156,21 @@ export default function ChatPage() {
                               ? "border-green-700 bg-green-100 text-green-900"
                               : "border-green-900/15 bg-white text-green-900/70 hover:border-green-700/40 hover:bg-green-50"
                           }`}
+                          title={r?.users.length ? `${emoji} ${r.users.join(", ")}` : emoji}
                         >
                           <span>{emoji}</span>
                           {count > 0 && <span className="tabular-nums">{count}</span>}
                         </button>
                       );
                     })}
+                    <button
+                      className="rounded-full border border-green-900/15 bg-white px-2 py-0.5 text-[11px] font-black text-green-900/55 hover:border-green-700/40 hover:bg-green-50 hover:text-green-900"
+                      onClick={() => setReplyingTo(item)}
+                    >
+                      Reply
+                    </button>
                   </div>
+                  <ReactionUsers reactions={item.reactions} />
                 </article>
               );
               })
@@ -154,11 +184,26 @@ export default function ChatPage() {
   );
 }
 
+function ReactionUsers({ reactions }: { reactions: ReactionCount[] }) {
+  const active = reactions.filter((reaction) => reaction.count > 0 && reaction.users.length > 0);
+  if (active.length === 0) return null;
+
+  return (
+    <p className="mt-1 break-words text-[10px] font-semibold leading-snug text-green-900/45">
+      {active.map((reaction) => `${reaction.reaction} ${reaction.users.join(", ")}`).join(" · ")}
+    </p>
+  );
+}
+
 function sortNewestFirst(messages: ChatMessage[]) {
   return [...messages].sort((a, b) => {
     const dateDiff = new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     return dateDiff || b.id - a.id;
   });
+}
+
+function truncate(value: string, maxLength: number) {
+  return value.length > maxLength ? `${value.slice(0, maxLength - 1)}…` : value;
 }
 
 function getMessageTone(item: ChatMessage) {
