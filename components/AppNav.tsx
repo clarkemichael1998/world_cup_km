@@ -86,13 +86,22 @@ function NewsBanner() {
 
   return (
     <div className="overflow-hidden border-y border-green-900/10 bg-pitch text-white">
-      <div className="news-ticker flex whitespace-nowrap py-2 text-xs font-black uppercase tracking-wide">
-        {Array.from({ length: 6 }).map((_, index) => (
-          <span key={index} className="mx-8">
-            {news.message}
-          </span>
-        ))}
+      <div className="news-ticker whitespace-nowrap py-2 text-xs font-black uppercase tracking-wide">
+        <NewsTickerSegment message={news.message} />
+        <NewsTickerSegment message={news.message} ariaHidden />
       </div>
+    </div>
+  );
+}
+
+function NewsTickerSegment({ message, ariaHidden = false }: { message: string; ariaHidden?: boolean }) {
+  return (
+    <div className="news-ticker-segment" aria-hidden={ariaHidden}>
+      {Array.from({ length: 4 }).map((_, index) => (
+        <span key={index} className="mx-8">
+          {message}
+        </span>
+      ))}
     </div>
   );
 }

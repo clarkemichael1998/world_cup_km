@@ -20,11 +20,11 @@ const rarityCardClasses: Record<Player["rarity"], string> = {
 };
 
 const rarityLabels: Record<Player["rarity"], string> = {
-  clowns: "Wild Card",
-  common: "Base",
-  rare: "Foil",
-  epic: "Prismatic",
-  legend: "Gold",
+  clowns: "Clowns",
+  common: "Common",
+  rare: "Rare",
+  epic: "Epic",
+  legend: "Legend",
   icon: "Icon"
 };
 

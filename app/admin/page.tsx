@@ -200,10 +200,9 @@ function NewsReelTab({ onForbidden }: { onForbidden: () => void }) {
       </div>
 
       <div className="mt-4 overflow-hidden rounded-md border border-green-900/10 bg-pitch text-white">
-        <div className="news-ticker flex whitespace-nowrap py-2 text-xs font-black uppercase tracking-wide">
-          {Array.from({ length: 4 }).map((_, index) => (
-            <span key={index} className="mx-8">{message || "News reel preview"}</span>
-          ))}
+        <div className="news-ticker whitespace-nowrap py-2 text-xs font-black uppercase tracking-wide">
+          <NewsTickerPreviewSegment message={message || "News reel preview"} />
+          <NewsTickerPreviewSegment message={message || "News reel preview"} ariaHidden />
         </div>
       </div>
 
@@ -227,6 +226,16 @@ function NewsReelTab({ onForbidden }: { onForbidden: () => void }) {
         </button>
       </div>
     </form>
+  );
+}
+
+function NewsTickerPreviewSegment({ message, ariaHidden = false }: { message: string; ariaHidden?: boolean }) {
+  return (
+    <div className="news-ticker-segment" aria-hidden={ariaHidden}>
+      {Array.from({ length: 4 }).map((_, index) => (
+        <span key={index} className="mx-8">{message}</span>
+      ))}
+    </div>
   );
 }
 

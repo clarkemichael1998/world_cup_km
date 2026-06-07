@@ -45,9 +45,19 @@ button {
 }
 
 .news-ticker {
+  display: flex;
   width: max-content;
-  animation: news-ticker 8s linear infinite;
+  min-width: 200%;
+  animation: news-ticker 24s linear infinite;
   will-change: transform;
+}
+
+.news-ticker-segment {
+  display: flex;
+  min-width: 50%;
+  flex: 0 0 50%;
+  align-items: center;
+  justify-content: space-around;
 }
 
 .card-sheen {
