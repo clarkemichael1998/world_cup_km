@@ -45,17 +45,16 @@ button {
 }
 
 .news-ticker {
-  display: flex;
+  display: inline-flex;
   width: max-content;
-  min-width: 200%;
-  animation: news-ticker 24s linear infinite;
+  animation: news-ticker 16s linear infinite;
   will-change: transform;
 }
 
 .news-ticker-segment {
-  display: flex;
-  min-width: 50%;
-  flex: 0 0 50%;
+  display: inline-flex;
+  min-width: 100vw;
+  flex: 0 0 auto;
   align-items: center;
   justify-content: space-around;
 }

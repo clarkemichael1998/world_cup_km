@@ -97,7 +97,7 @@ function NewsBanner() {
 function NewsTickerSegment({ message, ariaHidden = false }: { message: string; ariaHidden?: boolean }) {
   return (
     <div className="news-ticker-segment" aria-hidden={ariaHidden}>
-      {Array.from({ length: 4 }).map((_, index) => (
+      {Array.from({ length: 6 }).map((_, index) => (
         <span key={index} className="mx-8">
           {message}
         </span>
