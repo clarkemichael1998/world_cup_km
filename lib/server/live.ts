@@ -1,4 +1,4 @@
-import { getAllPlayers, getDb, getDraftSquad, awardGoalBoost, getMatchedGoalScorers, getMatchedAssistScorers } from "./db";
+import { getAllPlayers, getDb, awardGoalBoost, getMatchedGoalScorers, getMatchedAssistScorers } from "./db";
 import { getProviderStatus, type ProviderStatus } from "./fixtures";
 import { GOAL_BOOST_BY_RARITY, ASSIST_BOOST_BY_RARITY, getPlayerById } from "./goalScorers";
 import type { Player, SquadSlot } from "@/lib/types";
@@ -29,9 +29,7 @@ export function getLiveStatus(userId: number, now = new Date()): LiveStatus {
   const playerMap = new Map<number, Player>(getAllPlayers().map((p) => [p.id, p]));
   const tournamentActive = window.lockDate >= tournamentStart && window.lockDate <= tournamentEnd;
   if (tournamentActive) {
-    ensureLockedSquad(userId, window);
-    awardResultCredits(userId, window.lockDate);
-    awardGoalBoosts(userId, window);
+    settleUserLiveAwards(userId);
   }
 
   const locked = database.prepare("SELECT id FROM locked_squads WHERE user_id = ? AND lock_date = ?").get(userId, window.lockDate) as { id: number } | undefined;
@@ -95,6 +93,19 @@ export function getLiveStatus(userId: number, now = new Date()): LiveStatus {
   };
 }
 
+export function settleAllLiveAwards() {
+  const rows = getDb().prepare("SELECT id FROM users").all() as Array<{ id: number }>;
+  for (const row of rows) {
+    settleUserLiveAwards(row.id);
+  }
+  return { usersSettled: rows.length };
+}
+
+function settleUserLiveAwards(userId: number) {
+  awardResultCredits(userId);
+  awardGoalBoosts(userId);
+}
+
 function getBestOwnedSquadLeaderboard(playerMap: Map<number, Player>) {
   const rows = getDb()
     .prepare(
@@ -146,46 +157,32 @@ function pickBestFormation(playerIds: number[], playerMap: Map<number, Player>) 
   return picked;
 }
 
-function ensureLockedSquad(userId: number, window: ReturnType<typeof londonLockWindow>) {
+function awardResultCredits(userId: number) {
   const database = getDb();
-  const existing = database.prepare("SELECT id FROM locked_squads WHERE user_id = ? AND lock_date = ?").get(userId, window.lockDate);
-  if (existing) return;
-  const playerMap = new Map<number, Player>(getAllPlayers().map((p) => [p.id, p]));
+  const allLocked = database
+    .prepare("SELECT id, locked_at, unlock_at FROM locked_squads WHERE user_id = ?")
+    .all(userId) as Array<{ id: number; locked_at: string; unlock_at: string }>;
 
-  const draftSquad = getDraftSquad(userId);
-  const insertSquad = database.prepare("INSERT INTO locked_squads (user_id, lock_date, locked_at, unlock_at) VALUES (?, ?, ?, ?)");
-  const result = insertSquad.run(userId, window.lockDate, window.lockAt.toISOString(), window.unlockAt.toISOString());
-  const lockedSquadId = Number(result.lastInsertRowid);
-  const insertPlayer = database.prepare("INSERT INTO locked_squad_players (locked_squad_id, slot, player_id, nation) VALUES (?, ?, ?, ?)");
-
-  for (const [slot, playerId] of Object.entries(draftSquad)) {
-    const player = playerMap.get(playerId);
-    if (player) insertPlayer.run(lockedSquadId, slot, player.id, player.nation);
-  }
-}
-
-function awardResultCredits(userId: number, lockDate: string) {
-  const database = getDb();
-  const locked = database.prepare("SELECT id, locked_at, unlock_at FROM locked_squads WHERE user_id = ? AND lock_date = ?").get(userId, lockDate) as { id: number; locked_at: string; unlock_at: string } | undefined;
-  if (!locked) return;
-
-  const matches = database
-    .prepare("SELECT match_id, winner FROM fixture_results WHERE status = 'FINISHED' AND verified = 1 AND winner IS NOT NULL AND kickoff_at >= ? AND kickoff_at < ?")
-    .all(locked.locked_at, locked.unlock_at) as Array<{ match_id: string; winner: string }>;
-  const lockedPlayers = database.prepare("SELECT player_id, nation FROM locked_squad_players WHERE locked_squad_id = ?").all(locked.id) as Array<{ player_id: number; nation: string }>;
   const insertReward = database.prepare("INSERT OR IGNORE INTO reward_events (user_id, locked_squad_id, match_id, player_id, credits) VALUES (?, ?, ?, ?, ?)");
   const incrementUser = database.prepare("UPDATE users SET reward_credits = reward_credits + ? WHERE id = ?");
 
-  for (const match of matches) {
-    for (const player of lockedPlayers) {
-      if (player.nation !== match.winner) continue;
-      const result = insertReward.run(userId, locked.id, match.match_id, player.player_id, creditValue);
-      if (result.changes > 0) incrementUser.run(creditValue, userId);
+  for (const locked of allLocked) {
+    const matches = database
+      .prepare("SELECT match_id, winner FROM fixture_results WHERE status = 'FINISHED' AND verified = 1 AND winner IS NOT NULL AND kickoff_at >= ? AND kickoff_at < ?")
+      .all(locked.locked_at, locked.unlock_at) as Array<{ match_id: string; winner: string }>;
+    const lockedPlayers = database.prepare("SELECT player_id, nation FROM locked_squad_players WHERE locked_squad_id = ?").all(locked.id) as Array<{ player_id: number; nation: string }>;
+
+    for (const match of matches) {
+      for (const player of lockedPlayers) {
+        if (player.nation !== match.winner) continue;
+        const result = insertReward.run(userId, locked.id, match.match_id, player.player_id, creditValue);
+        if (result.changes > 0) incrementUser.run(creditValue, userId);
+      }
     }
   }
 }
 
-function awardGoalBoosts(userId: number, _window: ReturnType<typeof londonLockWindow>) {
+function awardGoalBoosts(userId: number) {
   const database = getDb();
 
   // Scan ALL past locked squads for this user so retroactive admin resolutions are applied

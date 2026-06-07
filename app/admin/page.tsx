@@ -89,7 +89,7 @@ const WC_TEAMS = [
 const today = new Date().toISOString().slice(0, 10);
 
 export default function AdminPage() {
-  const [tab, setTab] = useState<"results" | "goalscorers" | "activity" | "news" | "players" | "ratings">("results");
+  const [tab, setTab] = useState<"results" | "goalscorers" | "activity" | "news" | "players" | "ratings" | "settle">("results");
   const [forbidden, setForbidden] = useState(false);
 
   if (forbidden) {
@@ -108,13 +108,13 @@ export default function AdminPage() {
       <PageTitle title="Admin" subtitle="Tournament management" />
 
       <div className="mb-6 flex flex-wrap gap-2">
-        {(["results", "goalscorers", "activity", "news", "players", "ratings"] as const).map((t) => (
+        {(["results", "goalscorers", "activity", "news", "players", "ratings", "settle"] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
             className={`rounded-md px-4 py-2 text-sm font-black transition-colors ${tab === t ? "bg-green-950 text-white" : "bg-green-950/8 text-green-950 hover:bg-green-950/15"}`}
           >
-            {t === "results" ? "Match Results" : t === "goalscorers" ? "Goal Scorers" : t === "activity" ? "Activity Review" : t === "news" ? "News Reel" : t === "players" ? "Late Call-Ups" : "Viral Ratings"}
+            {t === "results" ? "Match Results" : t === "goalscorers" ? "Goal Scorers" : t === "activity" ? "Activity Review" : t === "news" ? "News Reel" : t === "players" ? "Late Call-Ups" : t === "ratings" ? "Viral Ratings" : "Live Settle"}
           </button>
         ))}
       </div>
@@ -125,7 +125,57 @@ export default function AdminPage() {
       {tab === "news" && <NewsReelTab onForbidden={() => setForbidden(true)} />}
       {tab === "players" && <LateCallupsTab onForbidden={() => setForbidden(true)} />}
       {tab === "ratings" && <ViralRatingsTab onForbidden={() => setForbidden(true)} />}
+      {tab === "settle" && <LiveSettleTab onForbidden={() => setForbidden(true)} />}
     </div>
+  );
+}
+
+function LiveSettleTab({ onForbidden }: { onForbidden: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState("");
+  const [error, setError] = useState("");
+
+  async function settle() {
+    if (busy) return;
+    setBusy(true);
+    setNotice("");
+    setError("");
+    try {
+      const res = await fetch("/api/admin/settle-live", { method: "POST", credentials: "include" });
+      if (res.status === 403) { onForbidden(); return; }
+      const data = (await res.json().catch(() => ({}))) as {
+        usersSettled?: number;
+        providerStatus?: { status: string; message: string };
+        error?: string;
+      };
+      if (!res.ok) {
+        setError(data.error ?? "Could not settle live awards.");
+        return;
+      }
+      setNotice(`Settled ${data.usersSettled ?? 0} users. Fixture sync: ${data.providerStatus?.status ?? "unknown"} - ${data.providerStatus?.message ?? "No provider message."}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="max-w-2xl rounded-lg border border-green-900/10 bg-white p-6 shadow-sm">
+      <p className="text-sm font-black uppercase tracking-wide text-green-900/60">Live Match Settlement</p>
+      <p className="mt-2 text-sm font-semibold text-green-900/65">
+        Sync fixtures, settle win credits for every locked squad, and apply goal/assist rating boosts for every user. Safe to run more than once.
+      </p>
+
+      <button
+        onClick={settle}
+        disabled={busy}
+        className="mt-5 rounded-md bg-pitch px-5 py-3 font-black text-white hover:bg-green-800 disabled:opacity-40"
+      >
+        {busy ? "Settling..." : "Sync Fixtures & Settle All Users"}
+      </button>
+
+      {notice ? <p className="mt-4 rounded-md bg-green-50 p-3 text-sm font-bold text-green-800">{notice}</p> : null}
+      {error ? <p className="mt-4 rounded-md bg-red-50 p-3 text-sm font-bold text-red-700">{error}</p> : null}
+    </section>
   );
 }
 

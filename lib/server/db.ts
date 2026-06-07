@@ -284,6 +284,7 @@ export function getDb() {
   migrateGoalScorers(db);
   migrateSuggestions(db);
   seedFixtureResults(db);
+  removeLegacySeedFixtures(db);
   return db;
 }
 
@@ -829,7 +830,12 @@ export function getMatchedGoalScorers(matchId: string): Array<{ playerId: number
 
 export function awardGoalBoost(userId: number, playerId: number, matchId: string, boostAmount: number): boolean {
   const result = getDb()
-    .prepare("INSERT OR IGNORE INTO goal_boosts (user_id, player_id, match_id, boost_amount) VALUES (?, ?, ?, ?)")
+    .prepare(
+      `INSERT INTO goal_boosts (user_id, player_id, match_id, boost_amount)
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT(user_id, player_id, match_id) DO UPDATE SET
+         boost_amount = excluded.boost_amount`
+    )
     .run(userId, playerId, matchId, boostAmount);
   return result.changes > 0;
 }
@@ -1674,7 +1680,8 @@ function migrateFixtureResults(database: DatabaseSync) {
 function seedFixtureResults(database: DatabaseSync) {
   const count = database.prepare("SELECT COUNT(*) AS count FROM fixture_results").get() as { count: number };
   if (count.count > 0) return;
-  const insert = database.prepare("INSERT INTO fixture_results (match_id, match_date, kickoff_at, home_team, away_team, winner, status, verified) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-  insert.run("seed-2026-06-11-mexico-win", "2026-06-11", "2026-06-11T20:00:00.000Z", "Mexico", "South Africa", "Mexico", "FINISHED", 1);
-  insert.run("seed-2026-06-12-czech-win", "2026-06-12", "2026-06-12T20:00:00.000Z", "Czech Republic", "South Korea", "Czech Republic", "FINISHED", 1);
+}
+
+function removeLegacySeedFixtures(database: DatabaseSync) {
+  database.prepare("DELETE FROM fixture_results WHERE match_id LIKE 'seed-%' OR source = 'seed'").run();
 }
