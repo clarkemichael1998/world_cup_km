@@ -57,7 +57,7 @@ button {
 .news-reel-track {
   display: flex;
   width: max-content;
-  animation: news-reel-scroll 40s linear infinite;
+  animation: news-reel-scroll 60s linear infinite;
   will-change: transform;
 }
 
