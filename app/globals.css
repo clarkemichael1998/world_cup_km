@@ -39,24 +39,45 @@ button {
   backdrop-filter: blur(12px);
 }
 
-@keyframes news-ticker {
-  from { transform: translateX(0); }
-  to   { transform: translateX(-50%); }
+.australia-mode {
+  min-height: 100svh;
+  transform: rotate(180deg);
+  transform-origin: center center;
 }
 
-.news-ticker {
-  display: inline-flex;
+.news-reel {
+  overflow: hidden;
+}
+
+@keyframes news-reel-scroll {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(-50%, 0, 0); }
+}
+
+.news-reel-track {
+  display: flex;
   width: max-content;
-  animation: news-ticker 16s linear infinite;
+  animation: news-reel-scroll 32s linear infinite;
   will-change: transform;
 }
 
-.news-ticker-segment {
-  display: inline-flex;
+.news-reel-group {
+  display: flex;
   min-width: 100vw;
   flex: 0 0 auto;
   align-items: center;
   justify-content: space-around;
+  padding-block: 0.5rem;
+}
+
+.news-reel-item {
+  margin-inline: 2rem;
+  white-space: nowrap;
+  font-size: 0.75rem;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  line-height: 1.35;
+  text-transform: uppercase;
 }
 
 .card-sheen {
