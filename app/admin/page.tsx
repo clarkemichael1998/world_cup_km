@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react";
 import { PageTitle } from "@/components/PageTitle";
 import players from "@/data/players.json";
+import { basePlayerPool, loadPlayerPool } from "@/lib/playerPool";
 import { activityDefinitions } from "@/lib/rewardEngine";
-import type { ActivityType, Player } from "@/lib/types";
+import type { ActivityType, Player, Position } from "@/lib/types";
 
 type MatchStatus = "SCHEDULED" | "LIVE" | "FINISHED";
 
@@ -53,6 +54,23 @@ type NewsReel = {
   updatedAt: string | null;
 };
 
+type LateCallupPlayer = Player;
+
+type RatingAdjustmentRow = {
+  id: number;
+  playerId: number;
+  playerName: string;
+  playerNation: string;
+  playerClub: string;
+  adjustment: number;
+  reason: string;
+  createdByUsername: string;
+  createdAt: string;
+  chatMessageId: number | null;
+  ratingBefore: number;
+  ratingAfter: number;
+};
+
 const playerMap = new Map((players as Player[]).map((player) => [player.id, player]));
 
 const WC_TEAMS = [
@@ -71,7 +89,7 @@ const WC_TEAMS = [
 const today = new Date().toISOString().slice(0, 10);
 
 export default function AdminPage() {
-  const [tab, setTab] = useState<"results" | "goalscorers" | "activity" | "news">("results");
+  const [tab, setTab] = useState<"results" | "goalscorers" | "activity" | "news" | "players" | "ratings">("results");
   const [forbidden, setForbidden] = useState(false);
 
   if (forbidden) {
@@ -89,14 +107,14 @@ export default function AdminPage() {
     <div>
       <PageTitle title="Admin" subtitle="Tournament management" />
 
-      <div className="mb-6 flex gap-2">
-        {(["results", "goalscorers", "activity", "news"] as const).map((t) => (
+      <div className="mb-6 flex flex-wrap gap-2">
+        {(["results", "goalscorers", "activity", "news", "players", "ratings"] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
             className={`rounded-md px-4 py-2 text-sm font-black transition-colors ${tab === t ? "bg-green-950 text-white" : "bg-green-950/8 text-green-950 hover:bg-green-950/15"}`}
           >
-            {t === "results" ? "Match Results" : t === "goalscorers" ? "Goal Scorers" : t === "activity" ? "Activity Review" : "News Reel"}
+            {t === "results" ? "Match Results" : t === "goalscorers" ? "Goal Scorers" : t === "activity" ? "Activity Review" : t === "news" ? "News Reel" : t === "players" ? "Late Call-Ups" : "Viral Ratings"}
           </button>
         ))}
       </div>
@@ -105,6 +123,353 @@ export default function AdminPage() {
       {tab === "goalscorers" && <GoalScorersTab onForbidden={() => setForbidden(true)} />}
       {tab === "activity" && <ActivityReviewTab onForbidden={() => setForbidden(true)} />}
       {tab === "news" && <NewsReelTab onForbidden={() => setForbidden(true)} />}
+      {tab === "players" && <LateCallupsTab onForbidden={() => setForbidden(true)} />}
+      {tab === "ratings" && <ViralRatingsTab onForbidden={() => setForbidden(true)} />}
+    </div>
+  );
+}
+
+function LateCallupsTab({ onForbidden }: { onForbidden: () => void }) {
+  const [form, setForm] = useState({
+    name: "",
+    nation: "England",
+    pos: "MF" as Position,
+    club: "",
+    rating: "68",
+    dob: "",
+    caps: "0",
+    goals: "0",
+    wiki: "",
+    clubWiki: "",
+    clubCountry: "ENG",
+    teamId: "england"
+  });
+  const [players, setPlayers] = useState<LateCallupPlayer[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [notice, setNotice] = useState("");
+  const [error, setError] = useState("");
+
+  async function load() {
+    const res = await fetch("/api/admin/players", { credentials: "include" });
+    if (res.status === 403) { onForbidden(); return; }
+    const data = (await res.json()) as { players?: LateCallupPlayer[]; error?: string };
+    if (res.ok) setPlayers(data.players ?? []);
+  }
+
+  useEffect(() => { load(); }, []);
+
+  function update<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
+    setForm((current) => ({ ...current, [key]: value }));
+    setNotice("");
+    setError("");
+  }
+
+  function updateNation(nation: string) {
+    setForm((current) => ({ ...current, nation, teamId: teamIdFromNation(nation) }));
+    setNotice("");
+    setError("");
+  }
+
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    setSaving(true);
+    setNotice("");
+    setError("");
+    try {
+      const res = await fetch("/api/admin/players", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          ...form,
+          rating: Number(form.rating),
+          caps: form.caps === "" ? null : Number(form.caps),
+          goals: form.goals === "" ? null : Number(form.goals)
+        })
+      });
+      if (res.status === 403) { onForbidden(); return; }
+      const data = (await res.json()) as { player?: LateCallupPlayer; players?: LateCallupPlayer[]; error?: string };
+      if (!res.ok || !data.player) {
+        setError(data.error ?? "Could not create player.");
+        return;
+      }
+      setPlayers(data.players ?? [data.player, ...players]);
+      setNotice(`${data.player.name} added as #${data.player.id} (${data.player.rating} ${data.player.rarity}).`);
+      setForm((current) => ({ ...current, name: "", club: "", rating: "68", dob: "", caps: "0", goals: "0", wiki: "", clubWiki: "" }));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="grid gap-6 lg:grid-cols-[minmax(0,520px)_1fr]">
+      <form onSubmit={submit} className="space-y-4 rounded-lg border border-green-900/10 bg-white p-5 shadow-sm">
+        <div>
+          <p className="text-sm font-black uppercase tracking-wide text-green-900/60">Late Call-Up</p>
+          <p className="mt-1 text-sm font-semibold text-green-900/60">Adds a player to the live app database. No code access needed.</p>
+        </div>
+
+        <Field label="Player Name">
+          <input value={form.name} onChange={(e) => update("name", e.target.value)} minLength={2} autoComplete="name"
+            className="w-full rounded-md border border-green-900/20 px-3 py-3 text-base font-semibold text-green-950 focus:outline-none focus:ring-2 focus:ring-green-800" required />
+        </Field>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Nation">
+            <select value={form.nation} onChange={(e) => updateNation(e.target.value)}
+              className="w-full rounded-md border border-green-900/20 bg-white px-3 py-3 text-base font-semibold text-green-950 focus:outline-none focus:ring-2 focus:ring-green-800" required>
+              {WC_TEAMS.map((team) => <option key={team} value={team}>{team}</option>)}
+            </select>
+          </Field>
+          <Field label="Position">
+            <select value={form.pos} onChange={(e) => update("pos", e.target.value as Position)}
+              className="w-full rounded-md border border-green-900/20 bg-white px-3 py-3 text-base font-semibold text-green-950 focus:outline-none focus:ring-2 focus:ring-green-800" required>
+              <option value="GK">GK</option>
+              <option value="DF">DF</option>
+              <option value="MF">MF</option>
+              <option value="FW">FW</option>
+            </select>
+          </Field>
+        </div>
+
+        <Field label="Club">
+          <input value={form.club} onChange={(e) => update("club", e.target.value)}
+            className="w-full rounded-md border border-green-900/20 px-3 py-3 text-base font-semibold text-green-950 focus:outline-none focus:ring-2 focus:ring-green-800" required />
+        </Field>
+
+        <div className="grid gap-4 sm:grid-cols-3">
+          <Field label="Rating">
+            <input type="number" min={1} max={99} step={1} value={form.rating} onChange={(e) => update("rating", e.target.value)}
+              className="w-full rounded-md border border-green-900/20 px-3 py-3 text-base font-semibold text-green-950 focus:outline-none focus:ring-2 focus:ring-green-800" required />
+          </Field>
+          <Field label="DOB">
+            <input type="date" value={form.dob} onChange={(e) => update("dob", e.target.value)}
+              className="w-full rounded-md border border-green-900/20 px-3 py-3 text-base font-semibold text-green-950 focus:outline-none focus:ring-2 focus:ring-green-800" required />
+          </Field>
+          <Field label="Club Country">
+            <input value={form.clubCountry} onChange={(e) => update("clubCountry", e.target.value.toUpperCase().slice(0, 3))} maxLength={3}
+              className="w-full rounded-md border border-green-900/20 px-3 py-3 text-base font-semibold uppercase text-green-950 focus:outline-none focus:ring-2 focus:ring-green-800" required />
+          </Field>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-3">
+          <Field label="Team ID">
+            <input value={form.teamId} onChange={(e) => update("teamId", e.target.value.toLowerCase())}
+              className="w-full rounded-md border border-green-900/20 px-3 py-3 text-base font-semibold text-green-950 focus:outline-none focus:ring-2 focus:ring-green-800" required />
+          </Field>
+          <Field label="Caps">
+            <input type="number" min={0} step={1} value={form.caps} onChange={(e) => update("caps", e.target.value)}
+              className="w-full rounded-md border border-green-900/20 px-3 py-3 text-base font-semibold text-green-950 focus:outline-none focus:ring-2 focus:ring-green-800" />
+          </Field>
+          <Field label="Goals">
+            <input type="number" min={0} step={1} value={form.goals} onChange={(e) => update("goals", e.target.value)}
+              className="w-full rounded-md border border-green-900/20 px-3 py-3 text-base font-semibold text-green-950 focus:outline-none focus:ring-2 focus:ring-green-800" />
+          </Field>
+        </div>
+
+        <Field label="Player Wiki URL">
+          <input type="url" value={form.wiki} onChange={(e) => update("wiki", e.target.value)} placeholder="https://..."
+            className="w-full rounded-md border border-green-900/20 px-3 py-3 text-base font-semibold text-green-950 focus:outline-none focus:ring-2 focus:ring-green-800" />
+        </Field>
+        <Field label="Club Wiki URL">
+          <input type="url" value={form.clubWiki} onChange={(e) => update("clubWiki", e.target.value)} placeholder="https://..."
+            className="w-full rounded-md border border-green-900/20 px-3 py-3 text-base font-semibold text-green-950 focus:outline-none focus:ring-2 focus:ring-green-800" />
+        </Field>
+
+        {notice ? <p className="rounded-md bg-green-50 p-3 text-sm font-bold text-green-800">{notice}</p> : null}
+        {error ? <p className="rounded-md bg-red-50 p-3 text-sm font-bold text-red-700">{error}</p> : null}
+
+        <button type="submit" disabled={saving}
+          className="w-full rounded-md bg-pitch px-5 py-3 font-black text-white hover:bg-green-800 disabled:opacity-40">
+          {saving ? "Adding..." : "Add Player"}
+        </button>
+      </form>
+
+      <section className="rounded-lg border border-green-900/10 bg-white p-5 shadow-sm">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-black uppercase tracking-wide text-green-900/60">Created This Way</p>
+            <p className="mt-1 text-sm font-semibold text-green-900/60">{players.length} late call-up{players.length === 1 ? "" : "s"} in the app database.</p>
+          </div>
+          <button onClick={load} className="rounded-md bg-green-950/8 px-3 py-2 text-xs font-black text-green-950 hover:bg-green-950/15">Refresh</button>
+        </div>
+        <div className="mt-4 space-y-2">
+          {players.length === 0 ? (
+            <p className="rounded-md bg-green-950/5 p-3 text-sm font-bold text-green-900/60">No late call-ups added yet.</p>
+          ) : players.map((player) => (
+            <div key={player.id} className="rounded-md border border-green-900/10 bg-green-950/5 p-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-black text-green-950">#{player.id} {player.name}</p>
+                  <p className="truncate text-xs font-semibold text-green-900/60">{player.nation} - {player.club} - {player.pos}</p>
+                </div>
+                <span className="rounded-md bg-gold px-2 py-1 text-xs font-black text-green-950">{player.rating}</span>
+              </div>
+              <p className="mt-2 text-[10px] font-black uppercase tracking-wide text-green-900/45">{player.rarity} - {player.teamId}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function ViralRatingsTab({ onForbidden }: { onForbidden: () => void }) {
+  const [players, setPlayers] = useState<Player[]>(basePlayerPool);
+  const [adjustments, setAdjustments] = useState<RatingAdjustmentRow[]>([]);
+  const [query, setQuery] = useState("");
+  const [playerId, setPlayerId] = useState<number | null>(null);
+  const [adjustment, setAdjustment] = useState("1");
+  const [reason, setReason] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [notice, setNotice] = useState("");
+  const [error, setError] = useState("");
+
+  async function load() {
+    const [playerPool, adjustmentRes] = await Promise.all([
+      loadPlayerPool(),
+      fetch("/api/admin/rating-adjustments", { credentials: "include" })
+    ]);
+    setPlayers(playerPool);
+    if (adjustmentRes.status === 403) { onForbidden(); return; }
+    const data = (await adjustmentRes.json()) as { adjustments?: RatingAdjustmentRow[]; error?: string };
+    if (adjustmentRes.ok) setAdjustments(data.adjustments ?? []);
+  }
+
+  useEffect(() => { load(); }, []);
+
+  const filteredPlayers = players
+    .filter((player) => {
+      const normalized = query.trim().toLowerCase();
+      return !normalized || `${player.name} ${player.nation} ${player.club} ${player.id}`.toLowerCase().includes(normalized);
+    })
+    .sort((a, b) => b.rating - a.rating || a.name.localeCompare(b.name))
+    .slice(0, 20);
+  const selectedPlayer = players.find((player) => player.id === playerId) ?? null;
+
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    setSaving(true);
+    setNotice("");
+    setError("");
+    try {
+      const res = await fetch("/api/admin/rating-adjustments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ playerId, adjustment: Number(adjustment), reason })
+      });
+      if (res.status === 403) { onForbidden(); return; }
+      const data = (await res.json()) as { adjustment?: RatingAdjustmentRow; adjustments?: RatingAdjustmentRow[]; error?: string };
+      if (!res.ok || !data.adjustment) {
+        setError(data.error ?? "Could not apply rating change.");
+        return;
+      }
+      setAdjustments(data.adjustments ?? [data.adjustment, ...adjustments]);
+      setNotice(`${data.adjustment.playerName} moved ${signedAdjustment(data.adjustment.adjustment)} to ${data.adjustment.ratingAfter}. Chat announcement posted.`);
+      setReason("");
+      setAdjustment("1");
+      const playerPool = await loadPlayerPool();
+      setPlayers(playerPool);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="grid gap-6 lg:grid-cols-[minmax(0,520px)_1fr]">
+      <form onSubmit={submit} className="space-y-4 rounded-lg border border-green-900/10 bg-white p-5 shadow-sm">
+        <div>
+          <p className="text-sm font-black uppercase tracking-wide text-green-900/60">Viral Rating Change</p>
+          <p className="mt-1 text-sm font-semibold text-green-900/60">Boost or downgrade a player for a World Cup moment. Every change is logged and posted to chat.</p>
+        </div>
+
+        <Field label="Find Player">
+          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by player, nation, club, or ID"
+            className="w-full rounded-md border border-green-900/20 px-3 py-3 text-base font-semibold text-green-950 focus:outline-none focus:ring-2 focus:ring-green-800" />
+        </Field>
+
+        <div className="max-h-72 space-y-2 overflow-y-auto rounded-md border border-green-900/10 bg-green-950/5 p-2">
+          {filteredPlayers.map((player) => (
+            <button
+              key={player.id}
+              type="button"
+              onClick={() => {
+                setPlayerId(player.id);
+                setQuery(player.name);
+                setNotice("");
+                setError("");
+              }}
+              className={`w-full rounded-md border px-3 py-2 text-left ${playerId === player.id ? "border-pitch bg-white ring-2 ring-green-700/20" : "border-transparent bg-white/70 hover:border-green-900/20"}`}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-black text-green-950">#{player.id} {player.name}</p>
+                  <p className="truncate text-xs font-semibold text-green-900/60">{player.nation} - {player.club} - {player.pos}</p>
+                </div>
+                <span className="rounded-md bg-gold px-2 py-1 text-xs font-black text-green-950">{player.rating}</span>
+              </div>
+            </button>
+          ))}
+        </div>
+
+        {selectedPlayer ? (
+          <div className="rounded-md bg-green-950/5 p-3 text-sm font-bold text-green-950">
+            Selected: {selectedPlayer.name} ({selectedPlayer.rating})
+          </div>
+        ) : null}
+
+        <div className="grid gap-4 sm:grid-cols-[140px_1fr]">
+          <Field label="Change">
+            <input type="number" min={-20} max={20} step={1} value={adjustment} onChange={(e) => setAdjustment(e.target.value)}
+              className="w-full rounded-md border border-green-900/20 px-3 py-3 text-base font-semibold text-green-950 focus:outline-none focus:ring-2 focus:ring-green-800" required />
+          </Field>
+          <Field label="Reason">
+            <input value={reason} onChange={(e) => setReason(e.target.value.slice(0, 180))} minLength={3} maxLength={180} placeholder="e.g. bicycle kick went viral"
+              className="w-full rounded-md border border-green-900/20 px-3 py-3 text-base font-semibold text-green-950 focus:outline-none focus:ring-2 focus:ring-green-800" required />
+          </Field>
+        </div>
+
+        {notice ? <p className="rounded-md bg-green-50 p-3 text-sm font-bold text-green-800">{notice}</p> : null}
+        {error ? <p className="rounded-md bg-red-50 p-3 text-sm font-bold text-red-700">{error}</p> : null}
+
+        <button type="submit" disabled={saving || !playerId || !reason.trim() || Number(adjustment) === 0}
+          className="w-full rounded-md bg-pitch px-5 py-3 font-black text-white hover:bg-green-800 disabled:opacity-40">
+          {saving ? "Applying..." : Number(adjustment) < 0 ? "Apply Downgrade" : "Apply Boost"}
+        </button>
+      </form>
+
+      <section className="rounded-lg border border-green-900/10 bg-white p-5 shadow-sm">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-black uppercase tracking-wide text-green-900/60">Admin Log</p>
+            <p className="mt-1 text-sm font-semibold text-green-900/60">{adjustments.length} recent rating change{adjustments.length === 1 ? "" : "s"}.</p>
+          </div>
+          <button onClick={load} className="rounded-md bg-green-950/8 px-3 py-2 text-xs font-black text-green-950 hover:bg-green-950/15">Refresh</button>
+        </div>
+        <div className="mt-4 space-y-2">
+          {adjustments.length === 0 ? (
+            <p className="rounded-md bg-green-950/5 p-3 text-sm font-bold text-green-900/60">No viral rating changes yet.</p>
+          ) : adjustments.map((item) => (
+            <div key={item.id} className="rounded-md border border-green-900/10 bg-green-950/5 p-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-black text-green-950">{item.playerName}</p>
+                  <p className="truncate text-xs font-semibold text-green-900/60">{item.playerNation} - {item.playerClub}</p>
+                </div>
+                <span className={`rounded-md px-2 py-1 text-xs font-black ${item.adjustment > 0 ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}>
+                  {signedAdjustment(item.adjustment)}
+                </span>
+              </div>
+              <p className="mt-2 text-sm font-bold text-green-950">{item.ratingBefore} to {item.ratingAfter}</p>
+              <p className="mt-1 text-xs font-semibold text-green-900/70">{item.reason}</p>
+              <p className="mt-2 text-[10px] font-black uppercase tracking-wide text-green-900/45">
+                {new Date(item.createdAt).toLocaleString("en-GB")} - {item.createdByUsername}
+              </p>
+            </div>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }
@@ -640,4 +1005,17 @@ function TeamSelect({ value, onChange, exclude }: { value: string; onChange: (v:
       ))}
     </select>
   );
+}
+
+function teamIdFromNation(nation: string) {
+  return nation
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function signedAdjustment(value: number) {
+  return value > 0 ? `+${value}` : String(value);
 }

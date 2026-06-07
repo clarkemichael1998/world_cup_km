@@ -10,26 +10,26 @@ export function slotAllowedPositions(slot: SquadSlot): Position[] {
   return ["GK"];
 }
 
-export function getPlayer(id?: number): Player | undefined {
-  return allPlayers.find((player) => player.id === id);
+export function getPlayer(id?: number, playerPool: Player[] = allPlayers): Player | undefined {
+  return playerPool.find((player) => player.id === id);
 }
 
-export function getOwnedPlayers(state: UserState): Player[] {
-  return state.ownedPlayerIds.map(getPlayer).filter((player): player is Player => Boolean(player));
+export function getOwnedPlayers(state: UserState, playerPool: Player[] = allPlayers): Player[] {
+  return state.ownedPlayerIds.map((id) => getPlayer(id, playerPool)).filter((player): player is Player => Boolean(player));
 }
 
 export function canPlaySlot(player: Player, slot: SquadSlot): boolean {
   return slotAllowedPositions(slot).includes(player.pos);
 }
 
-export function calculateSquadRating(state: UserState): number {
-  const selected = squadSlots.map((slot) => getPlayer(state.squad[slot])).filter((player): player is Player => Boolean(player));
+export function calculateSquadRating(state: UserState, playerPool: Player[] = allPlayers): number {
+  const selected = squadSlots.map((slot) => getPlayer(state.squad[slot], playerPool)).filter((player): player is Player => Boolean(player));
   if (selected.length === 0) return 0;
   return Math.round((selected.reduce((sum, player) => sum + player.rating, 0) / selected.length) * 10) / 10;
 }
 
-export function autoPickBestXI(state: UserState): UserState {
-  const owned = getOwnedPlayers(state);
+export function autoPickBestXI(state: UserState, playerPool: Player[] = allPlayers): UserState {
+  const owned = getOwnedPlayers(state, playerPool);
   const used = new Set<number>();
   const squad: UserState["squad"] = {};
 

@@ -5,6 +5,7 @@ import { PageTitle } from "@/components/PageTitle";
 import { autoPickBestXI, calculateSquadRating, canPlaySlot, getOwnedPlayers, getPlayer, slotAllowedPositions, squadSlots } from "@/lib/squadUtils";
 import { loadUserStateAsync, saveUserState } from "@/lib/storage";
 import { flagUrl } from "@/lib/flags";
+import { basePlayerPool, loadPlayerPool } from "@/lib/playerPool";
 import type { Player, Position, SquadSlot, UserState } from "@/lib/types";
 
 type LockStatus = {
@@ -33,12 +34,14 @@ export default function SquadPage() {
   const [lockStatus, setLockStatus] = useState<LockStatus | null>(null);
   const [lockBusy, setLockBusy] = useState(false);
   const [lockNotice, setLockNotice] = useState("");
+  const [playerPool, setPlayerPool] = useState<Player[]>(basePlayerPool);
 
   useEffect(() => {
     loadUserStateAsync().then((loaded) => {
       setState(loaded);
       syncDraftSquad(loaded.squad);
     });
+    loadPlayerPool().then(setPlayerPool);
     loadLockStatus();
   }, []);
 
@@ -81,7 +84,7 @@ export default function SquadPage() {
 
   function autoPick() {
     if (!state) return;
-    const updated = autoPickBestXI(state);
+    const updated = autoPickBestXI(state, playerPool);
     setState(updated);
     saveUserState(updated);
     syncDraftSquad(updated.squad);
@@ -95,7 +98,7 @@ export default function SquadPage() {
       return;
     }
 
-    const updated = autoPickBestXIFromNations(state, playingNations);
+    const updated = autoPickBestXIFromNations(state, playingNations, playerPool);
     setState(updated);
     saveUserState(updated);
     syncDraftSquad(updated.squad);
@@ -103,12 +106,18 @@ export default function SquadPage() {
     setLockNotice(`Auto-picked ${selectedCount}/11 players from nations playing on ${lockStatus.lockDate}.`);
   }
 
-  const owned = state ? getOwnedPlayers(state) : [];
-  const rating = state ? calculateSquadRating(state) : 0;
+  const owned = state ? getOwnedPlayers(state, playerPool) : [];
+  const rating = state ? calculateSquadRating(state, playerPool) : 0;
+  const playingNations = lockStatus ? getFixtureNations(lockStatus) : new Set<string>();
   const selectedIds = new Set(Object.values(state?.squad ?? {}));
-  const selectedPlayers = squadSlots.map((slot) => getPlayer(state?.squad[slot])).filter((player): player is Player => Boolean(player));
+  const selectedPlayers = squadSlots.map((slot) => getPlayer(state?.squad[slot], playerPool)).filter((player): player is Player => Boolean(player));
+  const selectedPlayingCount = selectedPlayers.filter((player) => playingNations.has(player.nation)).length;
+  const selectedBenchRisks = selectedPlayers.length - selectedPlayingCount;
+  const coveredFixtures = lockStatus
+    ? lockStatus.upcomingFixtures.filter((fixture) => selectedPlayers.some((player) => player.nation === fixture.homeTeam || player.nation === fixture.awayTeam)).length
+    : 0;
   const activePosition = activeSlot ? slotAllowedPositions(activeSlot)[0] : null;
-  const activePlayer = activeSlot ? getPlayer(state?.squad[activeSlot]) : undefined;
+  const activePlayer = activeSlot ? getPlayer(state?.squad[activeSlot], playerPool) : undefined;
   const positionCounts = positionOrder.map((position) => ({
     position,
     selected: selectedPlayers.filter((player) => player.pos === position).length,
@@ -181,6 +190,12 @@ export default function SquadPage() {
             </div>
           ) : null}
 
+          <div className="mt-4 grid gap-2 sm:grid-cols-3">
+            <LockSummary label="Playing Today" value={`${selectedPlayingCount}/${selectedPlayers.length || 11}`} />
+            <LockSummary label="Bench Risks" value={String(selectedBenchRisks)} />
+            <LockSummary label="Fixtures Covered" value={`${coveredFixtures}/${lockStatus.upcomingFixtures.length}`} />
+          </div>
+
           {lockStatus.isLocked && lockStatus.lockedPlayers.length > 0 && (
             <div className="mt-4">
               <p className="text-xs font-black uppercase tracking-wide text-green-900/50 mb-2">Locked XI</p>
@@ -231,7 +246,14 @@ export default function SquadPage() {
                   <p className="text-xs font-black uppercase tracking-wide text-green-100/70">{row.label}</p>
                   <div className={`grid gap-2 ${row.slots.length === 1 ? "mx-auto w-36" : row.slots.length === 4 ? "grid-cols-4" : "grid-cols-3"}`}>
                     {row.slots.map((slot) => (
-                      <SquadToken key={slot} slot={slot} selected={getPlayer(state?.squad[slot])} active={activeSlot === slot} onClick={() => setActiveSlot(slot)} />
+                      <SquadToken
+                        key={slot}
+                        slot={slot}
+                        selected={getPlayer(state?.squad[slot], playerPool)}
+                        active={activeSlot === slot}
+                        playingToday={Boolean(getPlayer(state?.squad[slot], playerPool) && playingNations.has(getPlayer(state?.squad[slot], playerPool)!.nation))}
+                        onClick={() => setActiveSlot(slot)}
+                      />
                     ))}
                   </div>
                 </div>
@@ -299,6 +321,7 @@ export default function SquadPage() {
                             {player.nation} - {player.club}
                           </p>
                         </div>
+                        {playingNations.has(player.nation) ? <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[9px] font-black uppercase text-emerald-800">Today</span> : null}
                       </div>
                       <span className="rounded-md bg-gold px-2 py-1 text-xs font-black text-green-950">{player.rating}</span>
                     </div>
@@ -316,7 +339,16 @@ export default function SquadPage() {
   );
 }
 
-function SquadToken({ slot, selected, active, onClick }: { slot: SquadSlot; selected?: Player; active: boolean; onClick: () => void }) {
+function LockSummary({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md bg-green-950/5 px-3 py-2">
+      <p className="text-[10px] font-black uppercase tracking-wide text-green-900/50">{label}</p>
+      <p className="mt-0.5 text-lg font-black text-green-950">{value}</p>
+    </div>
+  );
+}
+
+function SquadToken({ slot, selected, active, playingToday, onClick }: { slot: SquadSlot; selected?: Player; active: boolean; playingToday: boolean; onClick: () => void }) {
   const rating = selected?.rating ?? 0;
   const ratingTone = rating >= 90 ? "from-amber-200 to-yellow-500" : rating >= 82 ? "from-fuchsia-200 to-fuchsia-500" : rating >= 74 ? "from-sky-200 to-sky-500" : "from-slate-100 to-slate-300";
   const position = slotAllowedPositions(slot)[0];
@@ -329,6 +361,7 @@ function SquadToken({ slot, selected, active, onClick }: { slot: SquadSlot; sele
       </div>
       <p className="mt-1 break-words text-[10px] font-black leading-tight text-green-950">{selected?.name ?? slotLabel(slot)}</p>
       <p className="mt-0.5 truncate text-[9px] font-bold text-green-900/70">{selected ? selected.club : position}</p>
+      {playingToday ? <p className="mt-0.5 rounded-full bg-emerald-100 px-1 text-center text-[8px] font-black uppercase text-emerald-800">Playing today</p> : null}
       <div
         className="mt-1 h-1 overflow-hidden rounded-full bg-green-950/10"
         role="progressbar"
@@ -391,8 +424,8 @@ function getFixtureNations(lockStatus: LockStatus) {
   return new Set(lockStatus.upcomingFixtures.flatMap((fixture) => [fixture.homeTeam, fixture.awayTeam]));
 }
 
-function autoPickBestXIFromNations(state: UserState, nations: Set<string>): UserState {
-  const owned = getOwnedPlayers(state).filter((player) => nations.has(player.nation));
+function autoPickBestXIFromNations(state: UserState, nations: Set<string>, playerPool: Player[]): UserState {
+  const owned = getOwnedPlayers(state, playerPool).filter((player) => nations.has(player.nation));
   const used = new Set<number>();
   const squad: UserState["squad"] = {};
 

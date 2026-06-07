@@ -37,7 +37,9 @@ export default function SuggestionsPage() {
   async function loadSuggestions() {
     const response = await fetch("/api/suggestions");
     const payload = await response.json();
-    setSuggestions(payload.suggestions ?? []);
+    const loaded = payload.suggestions ?? [];
+    setSuggestions(loaded);
+    markImplementedSuggestionsSeen(loaded);
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -197,4 +199,13 @@ export default function SuggestionsPage() {
       </section>
     </div>
   );
+}
+
+function markImplementedSuggestionsSeen(suggestions: Suggestion[]) {
+  const implementedTimes = suggestions
+    .map((suggestion) => suggestion.implemented_at)
+    .filter((value): value is string => Boolean(value))
+    .map((value) => new Date(value).getTime());
+  if (implementedTimes.length === 0) return;
+  window.localStorage.setItem("kmxi-last-implemented-idea-seen", String(Math.max(...implementedTimes)));
 }

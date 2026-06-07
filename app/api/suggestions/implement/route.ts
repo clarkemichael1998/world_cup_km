@@ -1,14 +1,11 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser, getSuggestions, setSuggestionImplemented } from "@/lib/server/db";
-
-function isAdmin(username: string) {
-  return Boolean(process.env.ADMIN_USERNAME && username === process.env.ADMIN_USERNAME);
-}
+import { isAdminUsername } from "@/lib/server/admin";
 
 export async function POST(request: Request) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Login required" }, { status: 401 });
-  if (!isAdmin(user.username)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!isAdminUsername(user.username)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const body = (await request.json().catch(() => null)) as { suggestionId?: number; implemented?: boolean } | null;
   if (!body || typeof body.suggestionId !== "number" || !Number.isInteger(body.suggestionId)) {

@@ -9,6 +9,7 @@ import { NavActions } from "@/components/NavActions";
 export function AppShell({ children }: { children: React.ReactNode }) {
   const [isAdmin, setIsAdmin] = useState(false);
   const [username, setUsername] = useState<string | null>(null);
+  const [badges, setBadges] = useState({ credits: 0, unreadChat: 0, implementedIdeas: 0, squadNeedsLock: false });
 
   useEffect(() => {
     fetch("/api/auth/me", { credentials: "include" })
@@ -21,6 +22,34 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         setIsAdmin(false);
         setUsername(null);
       });
+
+    fetch("/api/credits", { credentials: "include" })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((payload) => setBadges((current) => ({ ...current, credits: payload?.credits ?? 0 })))
+      .catch(() => {});
+
+    fetch("/api/squad/lock", { credentials: "include" })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((payload) => setBadges((current) => ({ ...current, squadNeedsLock: Boolean(payload && !payload.isLocked) })))
+      .catch(() => {});
+
+    fetch("/api/chat")
+      .then((response) => response.json())
+      .then((payload) => {
+        const lastSeen = Number(window.localStorage.getItem("kmxi-last-chat-seen") ?? 0);
+        const unread = (payload.messages ?? []).filter((message: { created_at: string }) => new Date(message.created_at).getTime() > lastSeen).length;
+        setBadges((current) => ({ ...current, unreadChat: unread }));
+      })
+      .catch(() => {});
+
+    fetch("/api/suggestions")
+      .then((response) => response.json())
+      .then((payload) => {
+        const seen = Number(window.localStorage.getItem("kmxi-last-implemented-idea-seen") ?? 0);
+        const implemented = (payload.suggestions ?? []).filter((suggestion: { implemented_at?: string | null }) => suggestion.implemented_at && new Date(suggestion.implemented_at).getTime() > seen).length;
+        setBadges((current) => ({ ...current, implementedIdeas: implemented }));
+      })
+      .catch(() => {});
   }, []);
 
   const isDanielAustraliaDay = username?.toLowerCase() === "danielm" && getLondonDateString() === "2026-06-09";
@@ -36,16 +65,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             ⚽ KMXI
           </Link>
           <div className="flex gap-2 text-sm font-semibold text-green-950">
-            <Link className="rounded-md px-3 py-2 hover:bg-green-100" href="/add-km">Add Activity</Link>
-            <Link className="rounded-md px-3 py-2 hover:bg-green-100" href="/collection">Stickers</Link>
-            <Link className="rounded-md px-3 py-2 hover:bg-green-100" href="/squad">Squad</Link>
+            <NavLink href="/add-km" label="Add Activity" />
+            <NavLink href="/collection" label="Stickers" />
+            <NavLink href="/squad" label="Squad" badge={badges.squadNeedsLock ? "Lock" : undefined} />
             <Link className="rounded-md px-3 py-2 hover:bg-green-100" href="/squads">Squads</Link>
             <Link className="rounded-md px-3 py-2 hover:bg-green-100" href="/leaderboard">Leaderboard</Link>
-            <Link className="rounded-md px-3 py-2 hover:bg-green-100" href="/chat">Chat</Link>
-            <Link className="rounded-md px-3 py-2 hover:bg-green-100" href="/suggestions">Suggestions</Link>
+            <NavLink href="/chat" label="Chat" badge={badges.unreadChat > 0 ? String(Math.min(99, badges.unreadChat)) : undefined} />
+            <NavLink href="/suggestions" label="Suggestions" badge={badges.implementedIdeas > 0 ? String(Math.min(99, badges.implementedIdeas)) : undefined} />
             <Link className="rounded-md px-3 py-2 hover:bg-green-100" href="/rules">Rules</Link>
             {isAdmin ? <Link className="rounded-md bg-amber-100 px-3 py-2 font-black text-amber-900 hover:bg-amber-200" href="/admin">Admin</Link> : null}
             <Link className="rounded-md px-3 py-2 hover:bg-green-100" href="/login">Login</Link>
+            {badges.credits > 0 ? <span className="rounded-full bg-amber-100 px-2 py-1 text-xs font-black text-amber-900">{badges.credits} packs</span> : null}
             <NavActions />
           </div>
         </nav>
@@ -58,8 +88,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <Link href="/" className="shrink-0 text-lg font-black tracking-tight text-pitch">⚽ KMXI</Link>
         <div className="flex min-w-0 items-center gap-2">
           <Link href="/suggestions" className="whitespace-nowrap rounded-md bg-green-950/5 px-2 py-1 text-xs font-black uppercase tracking-wide text-green-900 hover:bg-green-950/10">
-            Ideas
+            Ideas{badges.implementedIdeas > 0 ? ` ${Math.min(99, badges.implementedIdeas)}` : ""}
           </Link>
+          {badges.unreadChat > 0 ? (
+            <Link href="/chat" className="whitespace-nowrap rounded-md bg-amber-100 px-2 py-1 text-xs font-black uppercase tracking-wide text-amber-900 hover:bg-amber-200">
+              Chat {Math.min(99, badges.unreadChat)}
+            </Link>
+          ) : null}
           <Link href="/rules" className="whitespace-nowrap rounded-md bg-green-950/5 px-2 py-1 text-xs font-black uppercase tracking-wide text-green-900 hover:bg-green-950/10">
             Rules
           </Link>
@@ -77,6 +112,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <main className="mx-auto max-w-6xl px-4 py-6 md:py-8">{children}</main>
       <MobileNav />
     </div>
+  );
+}
+
+function NavLink({ href, label, badge }: { href: string; label: string; badge?: string }) {
+  return (
+    <Link className="relative rounded-md px-3 py-2 hover:bg-green-100" href={href}>
+      {label}
+      {badge ? <span className="ml-1 rounded-full bg-amber-200 px-1.5 py-0.5 text-[10px] font-black text-amber-950">{badge}</span> : null}
+    </Link>
   );
 }
 

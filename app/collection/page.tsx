@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { PlayerCard } from "@/components/PlayerCard";
 import { PageTitle } from "@/components/PageTitle";
 import { flagUrl } from "@/lib/flags";
-import { allPlayers } from "@/lib/rewardEngine";
+import { basePlayerPool, loadPlayerPool } from "@/lib/playerPool";
 import { getOwnedPlayers } from "@/lib/squadUtils";
 import { loadUserStateAsync } from "@/lib/storage";
 import type { Player, Position, Rarity, UserState } from "@/lib/types";
@@ -16,18 +16,34 @@ export default function CollectionPage() {
   const [state, setState] = useState<UserState | null>(null);
   const [nation, setNation] = useState("Argentina");
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
+  const [nationSort, setNationSort] = useState<"alpha" | "closest">("closest");
+  const [playerPool, setPlayerPool] = useState<Player[]>(basePlayerPool);
 
   useEffect(() => {
     loadUserStateAsync().then(setState);
+    loadPlayerPool().then(setPlayerPool);
   }, []);
 
-  const nations = useMemo(() => Array.from(new Set(allPlayers.map((player) => player.nation))).sort(), []);
+  const nations = useMemo(() => Array.from(new Set(playerPool.map((player) => player.nation))).sort(), [playerPool]);
   const countryPlayers = useMemo(
-    () => allPlayers.filter((player) => player.nation === nation).sort((a, b) => positionRank(a.pos) - positionRank(b.pos) || b.rating - a.rating || a.name.localeCompare(b.name)),
-    [nation]
+    () => playerPool.filter((player) => player.nation === nation).sort((a, b) => positionRank(a.pos) - positionRank(b.pos) || b.rating - a.rating || a.name.localeCompare(b.name)),
+    [nation, playerPool]
   );
-  const owned = state ? getOwnedPlayers(state) : [];
+  const owned = state ? getOwnedPlayers(state, playerPool) : [];
   const ownedIds = new Set(owned.map((player) => player.id));
+  const nationProgress = nations.map((item) => {
+    const total = playerPool.filter((player) => player.nation === item).length;
+    const complete = playerPool.filter((player) => player.nation === item && ownedIds.has(player.id)).length;
+    return { nation: item, total, complete, percent: total ? Math.round((complete / total) * 100) : 0 };
+  });
+  const sortedNationProgress = [...nationProgress].sort((a, b) => {
+    if (nationSort === "alpha") return a.nation.localeCompare(b.nation);
+    const aDone = a.complete === a.total;
+    const bDone = b.complete === b.total;
+    if (aDone !== bDone) return aDone ? 1 : -1;
+    return b.percent - a.percent || a.total - a.complete - (b.total - b.complete) || a.nation.localeCompare(b.nation);
+  });
+  const closestIncomplete = sortedNationProgress.find((item) => item.complete > 0 && item.complete < item.total);
   const collectedOnPage = countryPlayers.filter((player) => ownedIds.has(player.id)).length;
   const raritySummary = (["clowns", "common", "rare", "epic", "legend", "icon"] as Rarity[])
     .map((item) => ({ rarity: item, count: countryPlayers.filter((player) => player.rarity === item && ownedIds.has(player.id)).length }))
@@ -43,28 +59,34 @@ export default function CollectionPage() {
         <div className="mb-3 flex items-center justify-between gap-3">
           <div>
             <p className="text-xs font-black uppercase tracking-wide text-green-900/45">Country Pages</p>
-            <p className="text-sm font-bold text-green-950">Pick a nation to browse its full sticker page.</p>
+            <p className="text-sm font-bold text-green-950">
+              {closestIncomplete ? `${closestIncomplete.nation} is closest: ${closestIncomplete.complete}/${closestIncomplete.total} (${closestIncomplete.percent}%).` : "Pick a nation to browse its full sticker page."}
+            </p>
           </div>
-          <p className="rounded-md bg-green-950/5 px-2 py-1 text-xs font-black text-green-950">{nations.length} nations</p>
+          <div className="flex shrink-0 gap-2">
+            <button onClick={() => setNationSort("closest")} className={`rounded-md px-2 py-1 text-xs font-black ${nationSort === "closest" ? "bg-pitch text-white" : "bg-green-950/5 text-green-950"}`}>Closest</button>
+            <button onClick={() => setNationSort("alpha")} className={`rounded-md px-2 py-1 text-xs font-black ${nationSort === "alpha" ? "bg-pitch text-white" : "bg-green-950/5 text-green-950"}`}>A-Z</button>
+          </div>
         </div>
         <div className="scrollbar-none flex gap-2 overflow-x-auto pb-1">
-          {nations.map((item) => {
-            const complete = allPlayers.filter((player) => player.nation === item && ownedIds.has(player.id)).length;
-            const total = allPlayers.filter((player) => player.nation === item).length;
+          {sortedNationProgress.map((item) => {
             return (
               <button
-                key={item}
+                key={item.nation}
                 type="button"
                 onClick={() => {
-                  setNation(item);
+                  setNation(item.nation);
                   setSelectedPlayer(null);
                 }}
                 className={`shrink-0 rounded-md border px-3 py-2 text-left transition ${
-                  nation === item ? "border-pitch bg-pitch text-white shadow-sm" : "border-green-900/10 bg-green-950/5 text-green-950 hover:bg-green-950/10"
+                  nation === item.nation ? "border-pitch bg-pitch text-white shadow-sm" : "border-green-900/10 bg-green-950/5 text-green-950 hover:bg-green-950/10"
                 }`}
               >
-                <span className="block text-xs font-black">{item}</span>
-                <span className={`mt-0.5 block text-[10px] font-bold ${nation === item ? "text-green-50/75" : "text-green-900/50"}`}>{complete}/{total}</span>
+                <span className="block text-xs font-black">{item.nation}</span>
+                <span className={`mt-0.5 block text-[10px] font-bold ${nation === item.nation ? "text-green-50/75" : "text-green-900/50"}`}>{item.complete}/{item.total} · {item.percent}%</span>
+                <span className={`mt-1 block h-1.5 w-full overflow-hidden rounded-full ${nation === item.nation ? "bg-white/25" : "bg-green-950/10"}`}>
+                  <span className={`block h-full rounded-full ${nation === item.nation ? "bg-white" : "bg-pitch"}`} style={{ width: `${item.percent}%` }} />
+                </span>
               </button>
             );
           })}

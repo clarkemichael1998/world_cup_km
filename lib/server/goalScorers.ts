@@ -1,8 +1,5 @@
-import playersJson from "@/data/players.json";
 import type { Player, Rarity } from "@/lib/types";
-import { upsertGoalScorer, upsertAssistScorer } from "./db";
-
-const allPlayers = playersJson as Player[];
+import { getAllPlayers, upsertAssistScorer, upsertGoalScorer } from "./db";
 
 export const GOAL_BOOST_BY_RARITY: Record<Rarity, number> = {
   icon: 2,
@@ -23,7 +20,7 @@ export const ASSIST_BOOST_BY_RARITY: Record<Rarity, number> = {
 };
 
 export function getPlayerById(id: number): Player | undefined {
-  return allPlayers.find((p) => p.id === id);
+  return getAllPlayers().find((p) => p.id === id);
 }
 
 // Strip diacritics, lowercase, remove non-alpha chars except spaces
@@ -88,7 +85,7 @@ function matchScore(raw: string, player: Player): number {
 export function findBestPlayerMatch(scorerName: string): { player: Player; score: number } | null {
   let best: { player: Player; score: number } | null = null;
 
-  for (const player of allPlayers) {
+  for (const player of getAllPlayers()) {
     const score = matchScore(scorerName, player);
     if (score > 0 && (!best || score > best.score)) {
       best = { player, score };

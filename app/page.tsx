@@ -5,10 +5,11 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PageTitle } from "@/components/PageTitle";
 import { formatDate } from "@/lib/formatDate";
+import { basePlayerPool, loadPlayerPool } from "@/lib/playerPool";
 import { activityDefinitions } from "@/lib/rewardEngine";
-import { calculateSquadRating } from "@/lib/squadUtils";
+import { calculateSquadRating, getPlayer, squadSlots } from "@/lib/squadUtils";
 import { loadUserStateAsync } from "@/lib/storage";
-import type { ActivityType, UserState } from "@/lib/types";
+import type { ActivityType, Player, UserState } from "@/lib/types";
 
 const WC_FINAL = new Date("2026-07-19T18:00:00Z");
 
@@ -38,18 +39,28 @@ type FeedEntry = {
   created_at: string;
 };
 
+type LockStatus = {
+  lockDate: string;
+  lockAt: string;
+  isLocked: boolean;
+  upcomingFixtures: Array<{ matchId: string; homeTeam: string; awayTeam: string; kickoffAt: string; status: string; winner: string | null }>;
+};
+
 export default function Home() {
   const [state, setState] = useState<UserState | null>(null);
   const [communityKm, setCommunityKm] = useState<number | null>(null);
   const [feed, setFeed] = useState<FeedEntry[]>([]);
   const [rewardCredits, setRewardCredits] = useState<number | null>(null);
+  const [matchday, setMatchday] = useState<LockStatus | null>(null);
   const [redeemAmount, setRedeemAmount] = useState(1);
   const [redeeming, setRedeeming] = useState(false);
+  const [playerPool, setPlayerPool] = useState<Player[]>(basePlayerPool);
   const router = useRouter();
   const countdown = useCountdown();
 
   useEffect(() => {
     loadUserStateAsync().then(setState);
+    loadPlayerPool().then(setPlayerPool);
     fetch("/api/community")
       .then((r) => r.json())
       .then((p) => setCommunityKm(p.community.totalKm))
@@ -62,10 +73,17 @@ export default function Home() {
       .then((r) => r.json())
       .then((p) => setFeed(p.feed ?? []))
       .catch(() => {});
+    fetch("/api/squad/lock", { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((p) => setMatchday(p))
+      .catch(() => {});
   }, []);
 
-  const squadRating = state ? calculateSquadRating(state) : 0;
+  const squadRating = state ? calculateSquadRating(state, playerPool) : 0;
   const nextRewardProgress = state ? Math.min(100, Math.round(state.kmBalance * 100)) : 0;
+  const matchdayNations = new Set(matchday?.upcomingFixtures.flatMap((fixture) => [fixture.homeTeam, fixture.awayTeam]) ?? []);
+  const selectedPlayers = state ? squadSlots.map((slot) => getPlayer(state.squad[slot], playerPool)).filter(Boolean) : [];
+  const selectedPlayingToday = selectedPlayers.filter((player) => player && matchdayNations.has(player.nation)).length;
 
   async function openPack() {
     if (redeeming || !rewardCredits || rewardCredits < redeemAmount) return;
@@ -135,6 +153,36 @@ export default function Home() {
         <Stat label="Stickers" value={state ? String(state.ownedPlayerIds.length) : "..."} />
         <Stat label="Squad Avg" value={state ? String(squadRating) : "..."} />
       </section>
+
+      {matchday ? (
+        <section className="mt-4 rounded-lg border border-green-900/10 bg-white p-5 shadow-sm">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <p className="text-sm font-black uppercase tracking-wide text-green-900/60">Daily Matchday</p>
+              <h2 className="mt-1 text-2xl font-black text-green-950">{matchday.lockDate}</h2>
+              <p className="mt-1 text-sm font-semibold text-green-900/60">
+                {matchday.isLocked ? "Squad locked" : "Squad not locked"} · Locks {new Date(matchday.lockAt).toLocaleString("en-GB", { timeStyle: "short", timeZone: "Europe/London" })} UK
+              </p>
+            </div>
+            <div className="grid min-w-0 gap-2 sm:grid-cols-3 lg:w-[420px]">
+              <MatchdayStat label="Locked Players Involved" value={`${selectedPlayingToday}/${selectedPlayers.length || 11}`} />
+              <MatchdayStat label="Fixtures" value={String(matchday.upcomingFixtures.length)} />
+              <MatchdayStat label="Possible Coverage" value={`${countCoveredFixtures(matchday, state, playerPool)}/${matchday.upcomingFixtures.length}`} />
+            </div>
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {matchday.upcomingFixtures.length > 0 ? (
+              matchday.upcomingFixtures.map((fixture) => (
+                <span key={fixture.matchId} className="rounded-md bg-green-950/5 px-3 py-2 text-xs font-black text-green-950">
+                  {fixture.homeTeam} vs {fixture.awayTeam}
+                </span>
+              ))
+            ) : (
+              <p className="text-sm font-semibold text-green-900/60">No fixtures listed for this lock date yet.</p>
+            )}
+          </div>
+        </section>
+      ) : null}
 
       {rewardCredits !== null && rewardCredits > 0 && (
         <section className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-5 shadow-sm">
@@ -265,6 +313,21 @@ function CountUnit({ value, label }: { value: number; label: string }) {
       <p className="text-[10px] font-black uppercase tracking-wide text-green-200/70">{label}</p>
     </div>
   );
+}
+
+function MatchdayStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md bg-green-950/5 px-3 py-2">
+      <p className="text-[10px] font-black uppercase tracking-wide text-green-900/50">{label}</p>
+      <p className="mt-0.5 text-lg font-black text-green-950">{value}</p>
+    </div>
+  );
+}
+
+function countCoveredFixtures(matchday: LockStatus, state: UserState | null, playerPool: Player[]) {
+  if (!state) return 0;
+  const selected = squadSlots.map((slot) => getPlayer(state.squad[slot], playerPool)).filter(Boolean);
+  return matchday.upcomingFixtures.filter((fixture) => selected.some((player) => player && (player.nation === fixture.homeTeam || player.nation === fixture.awayTeam))).length;
 }
 
 function HomeLink({ href, title, text }: { href: string; title: string; text: string }) {

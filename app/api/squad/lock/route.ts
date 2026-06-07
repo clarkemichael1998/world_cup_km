@@ -1,10 +1,6 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser, getLockedSquadForDate, getUpcomingFixtures, lockSquadForDate, unlockSquadForDate } from "@/lib/server/db";
-import players from "@/data/players.json";
+import { getAllPlayers, getCurrentUser, getLockedSquadForDate, getUpcomingFixtures, lockSquadForDate, unlockSquadForDate } from "@/lib/server/db";
 import type { Player } from "@/lib/types";
-
-const allPlayers = players as Player[];
-const playerMap = new Map(allPlayers.map((p) => [p.id, p]));
 
 // Returns the "next" lock window — always the next 11am London that hasn't passed yet
 function nextLockWindow(now = new Date()) {
@@ -41,6 +37,7 @@ export async function GET() {
   const window = nextLockWindow();
   const locked = getLockedSquadForDate(user.id, window.lockDate);
   const fixtures = getUpcomingFixtures(window.lockDate);
+  const playerMap = new Map((getAllPlayers() as Player[]).map((p) => [p.id, p]));
   const lockedPlayers = locked
     ? locked.players.map(({ slot, player_id }) => {
         const p = playerMap.get(player_id);

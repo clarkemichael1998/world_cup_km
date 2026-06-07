@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { createChatMessage, getCurrentUser, getKmFeed, getKmLogsToday, getPersistedUserState, logActivityWithServerAwards } from "@/lib/server/db";
-import { activityDefinitions, allPlayers, calculateActivityCredits, calculateRewards, getKmMultiplier, getRandomPlayerByRarity, isActivityType } from "@/lib/rewardEngine";
+import { createChatMessage, getAllPlayers, getCurrentUser, getKmFeed, getKmLogsToday, getPersistedUserState, logActivityWithServerAwards } from "@/lib/server/db";
+import { activityDefinitions, calculateActivityCredits, calculateRewards, getKmMultiplier, isActivityType, rollRarity } from "@/lib/rewardEngine";
+import type { Player, Rarity } from "@/lib/types";
 
 const MAX_LOGS_PER_DAY = 3;
 const WC_FINAL_LOCKOUT = new Date("2026-07-19T18:00:00Z");
@@ -49,7 +50,8 @@ export async function POST(request: Request) {
   const preview = calculateRewards(activityCredits, currentState.kmBalance, multiplier);
   const bonusCredits = Math.max(0, Math.floor(user.rewardCredits));
   const cardsEarned = preview.rewards + bonusCredits;
-  const awardedPlayers = Array.from({ length: cardsEarned }, () => getRandomPlayerByRarity());
+  const allPlayers = getAllPlayers();
+  const awardedPlayers = Array.from({ length: cardsEarned }, () => getRandomPlayerByRarity(allPlayers));
   const awardedPlayerIds = awardedPlayers.map((player) => player.id);
   const comment = typeof body.comment === "string" ? body.comment.trim().slice(0, 240) : "";
   const rewardCreditValue = Number((activityCredits * multiplier).toFixed(2));
@@ -90,6 +92,12 @@ export async function POST(request: Request) {
     players: awardedPlayerIds.map((id) => allPlayers.find((player) => player.id === id)).filter(Boolean),
     state: { ...nextState, totalKm: persisted.totalKm, kmBalance: persisted.kmBalance }
   });
+}
+
+function getRandomPlayerByRarity(allPlayers: Player[], rarity: Rarity = rollRarity()): Player {
+  const pool = allPlayers.filter((player) => player.rarity === rarity);
+  const fallbackPool = pool.length > 0 ? pool : allPlayers;
+  return fallbackPool[Math.floor(Math.random() * fallbackPool.length)];
 }
 
 function buildActivityChatMessage({

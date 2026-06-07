@@ -1,15 +1,13 @@
-import players from "@/data/players.json";
 import { NextResponse } from "next/server";
-import { getCurrentUser, getRevealPlayerIds, saveRevealPlayerIds } from "@/lib/server/db";
+import { getAllPlayers, getCurrentUser, getRevealPlayerIds, saveRevealPlayerIds } from "@/lib/server/db";
 import type { Player } from "@/lib/types";
-
-const allPlayers = players as Player[];
 
 export async function GET() {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Login required" }, { status: 401 });
 
   const ids = getRevealPlayerIds(user.id);
+  const allPlayers = getAllPlayers();
   return NextResponse.json({ players: ids.map((id) => allPlayers.find((player) => player.id === id)).filter((p): p is Player => p !== undefined) });
 }
 

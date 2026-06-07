@@ -4,11 +4,13 @@ import path from "path";
 import { cookies } from "next/headers";
 import { DatabaseSync } from "node:sqlite";
 import players from "@/data/players.json";
-import type { ActivityType, Rarity, SquadSlot } from "@/lib/types";
+import { getAdminUsernames } from "@/lib/server/admin";
+import type { ActivityType, Player, Position, Rarity, SquadSlot } from "@/lib/types";
 
 const dbDir = path.join(process.cwd(), "data");
 const dbPath = process.env.SQLITE_DB_PATH ?? path.join(dbDir, "km-footy.sqlite");
 const sessionCookie = "km_footy_session";
+const basePlayers = players as Player[];
 
 type UserRow = {
   id: number;
@@ -242,6 +244,38 @@ export function getDb() {
       UNIQUE(user_id, player_id, match_id),
       FOREIGN KEY (user_id) REFERENCES users(id)
     );
+    CREATE TABLE IF NOT EXISTS late_callup_players (
+      id INTEGER PRIMARY KEY,
+      slug TEXT NOT NULL UNIQUE,
+      name TEXT NOT NULL,
+      sort_name TEXT NOT NULL,
+      club TEXT NOT NULL,
+      nation TEXT NOT NULL,
+      pos TEXT NOT NULL,
+      rating INTEGER NOT NULL,
+      rarity TEXT NOT NULL,
+      wiki TEXT,
+      dob TEXT NOT NULL,
+      caps INTEGER,
+      goals INTEGER,
+      club_wiki TEXT,
+      club_country TEXT NOT NULL,
+      team_id TEXT NOT NULL,
+      created_by INTEGER,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (created_by) REFERENCES users(id)
+    );
+    CREATE TABLE IF NOT EXISTS player_rating_adjustments (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      player_id INTEGER NOT NULL,
+      adjustment INTEGER NOT NULL,
+      reason TEXT NOT NULL,
+      created_by INTEGER NOT NULL,
+      chat_message_id INTEGER,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (created_by) REFERENCES users(id),
+      FOREIGN KEY (chat_message_id) REFERENCES chat_messages(id)
+    );
   `);
   migrateKmLogActivity(db);
   migrateChatMessages(db);
@@ -276,6 +310,270 @@ export function updateNewsReel(message: string, isActive: boolean, updatedBy: nu
     )
     .run(cleanMessage, isActive ? 1 : 0, updatedBy);
   return getNewsReel();
+}
+
+type LateCallupRow = {
+  id: number;
+  slug: string;
+  name: string;
+  sort_name: string;
+  club: string;
+  nation: string;
+  pos: Position;
+  rating: number;
+  rarity: Rarity;
+  wiki: string | null;
+  dob: string;
+  caps: number | null;
+  goals: number | null;
+  club_wiki: string | null;
+  club_country: string;
+  team_id: string;
+};
+
+export type LateCallupInput = {
+  name: string;
+  club: string;
+  nation: string;
+  pos: Position;
+  rating: number;
+  wiki?: string | null;
+  dob: string;
+  caps?: number | null;
+  goals?: number | null;
+  clubWiki?: string | null;
+  clubCountry: string;
+  teamId: string;
+};
+
+export type PlayerRatingAdjustment = {
+  id: number;
+  playerId: number;
+  playerName: string;
+  playerNation: string;
+  playerClub: string;
+  adjustment: number;
+  reason: string;
+  createdByUsername: string;
+  createdAt: string;
+  chatMessageId: number | null;
+  ratingBefore: number;
+  ratingAfter: number;
+};
+
+export function getAllPlayers(): Player[] {
+  return applyGlobalRatingAdjustments([...basePlayers, ...getLateCallupPlayers()]);
+}
+
+export function getLateCallupPlayers(): Player[] {
+  const rows = getDb()
+    .prepare("SELECT id, slug, name, sort_name, club, nation, pos, rating, rarity, wiki, dob, caps, goals, club_wiki, club_country, team_id FROM late_callup_players ORDER BY id")
+    .all() as LateCallupRow[];
+  return rows.map(playerFromLateCallupRow);
+}
+
+export function createLateCallupPlayer(input: LateCallupInput, createdBy: number): Player {
+  const database = getDb();
+  const latestLate = database.prepare("SELECT MAX(id) AS maxId FROM late_callup_players").get() as { maxId: number | null };
+  const maxBaseId = basePlayers.reduce((max, player) => Math.max(max, player.id), 0);
+  const id = Math.max(maxBaseId, latestLate.maxId ?? 0) + 1;
+  const slug = uniquePlayerSlug(database, slugify(`${input.name}-${input.nation}`), id);
+  const player: Player = {
+    id,
+    slug,
+    name: input.name.trim(),
+    sortName: toSortName(input.name),
+    club: input.club.trim(),
+    nation: input.nation.trim(),
+    pos: input.pos,
+    rating: input.rating,
+    rarity: rarityFromRating(input.rating),
+    wiki: cleanOptional(input.wiki),
+    dob: input.dob,
+    caps: input.caps ?? null,
+    goals: input.goals ?? null,
+    clubWiki: cleanOptional(input.clubWiki),
+    clubCountry: input.clubCountry.trim().toUpperCase(),
+    teamId: input.teamId.trim().toLowerCase()
+  };
+
+  database
+    .prepare(
+      `INSERT INTO late_callup_players
+       (id, slug, name, sort_name, club, nation, pos, rating, rarity, wiki, dob, caps, goals, club_wiki, club_country, team_id, created_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    )
+    .run(
+      player.id,
+      player.slug,
+      player.name,
+      player.sortName,
+      player.club,
+      player.nation,
+      player.pos,
+      player.rating,
+      player.rarity,
+      player.wiki,
+      player.dob,
+      player.caps,
+      player.goals,
+      player.clubWiki,
+      player.clubCountry,
+      player.teamId,
+      createdBy
+    );
+
+  return player;
+}
+
+export function getPlayerRatingAdjustments(limit = 40): PlayerRatingAdjustment[] {
+  const rows = getDb()
+    .prepare(
+      `SELECT pra.id, pra.player_id, pra.adjustment, pra.reason, pra.created_at, pra.chat_message_id, users.username AS created_by_username
+       FROM player_rating_adjustments pra
+       JOIN users ON users.id = pra.created_by
+       ORDER BY pra.created_at DESC, pra.id DESC
+       LIMIT ?`
+    )
+    .all(limit) as Array<{ id: number; player_id: number; adjustment: number; reason: string; created_at: string; chat_message_id: number | null; created_by_username: string }>;
+  return rows.map((row) => toPlayerRatingAdjustment(row));
+}
+
+export function createPlayerRatingAdjustment(playerId: number, adjustment: number, reason: string, adminUserId: number): PlayerRatingAdjustment | null {
+  const rawPlayers = getRawPlayerPool();
+  const rawPlayer = rawPlayers.find((player) => player.id === playerId);
+  if (!rawPlayer) return null;
+
+  const currentPlayer = applyGlobalRatingAdjustments(rawPlayers).find((player) => player.id === playerId) ?? rawPlayer;
+  const ratingBefore = currentPlayer.rating;
+  const ratingAfter = clampRating(ratingBefore + adjustment);
+  const appliedAdjustment = ratingAfter - ratingBefore;
+  if (appliedAdjustment === 0) return null;
+
+  const action = appliedAdjustment > 0 ? "boosted" : "downgraded";
+  const signed = appliedAdjustment > 0 ? `+${appliedAdjustment}` : String(appliedAdjustment);
+  const cleanReason = reason.trim().slice(0, 180);
+  const chatMessageId = createAdminChatMessage(
+    `Viral moment: ${rawPlayer.name} has been ${action} ${signed} to ${ratingAfter}. Reason: ${cleanReason}`
+  );
+  const result = getDb()
+    .prepare("INSERT INTO player_rating_adjustments (player_id, adjustment, reason, created_by, chat_message_id) VALUES (?, ?, ?, ?, ?)")
+    .run(playerId, appliedAdjustment, cleanReason, adminUserId, chatMessageId);
+  const created = getDb()
+    .prepare(
+      `SELECT pra.id, pra.player_id, pra.adjustment, pra.reason, pra.created_at, pra.chat_message_id, users.username AS created_by_username
+       FROM player_rating_adjustments pra
+       JOIN users ON users.id = pra.created_by
+       WHERE pra.id = ?`
+    )
+    .get(Number(result.lastInsertRowid)) as { id: number; player_id: number; adjustment: number; reason: string; created_at: string; chat_message_id: number | null; created_by_username: string } | undefined;
+  return created ? toPlayerRatingAdjustment(created) : null;
+}
+
+function getRawPlayerPool(): Player[] {
+  return [...basePlayers, ...getLateCallupPlayers()];
+}
+
+function applyGlobalRatingAdjustments(playerPool: Player[]): Player[] {
+  const rows = getDb()
+    .prepare("SELECT player_id, SUM(adjustment) AS total FROM player_rating_adjustments GROUP BY player_id")
+    .all() as Array<{ player_id: number; total: number }>;
+  if (rows.length === 0) return playerPool;
+  const adjustmentMap = new Map(rows.map((row) => [row.player_id, row.total]));
+  return playerPool.map((player) => {
+    const adjustment = adjustmentMap.get(player.id) ?? 0;
+    return adjustment === 0 ? player : { ...player, rating: clampRating(player.rating + adjustment) };
+  });
+}
+
+function toPlayerRatingAdjustment(row: { id: number; player_id: number; adjustment: number; reason: string; created_at: string; chat_message_id: number | null; created_by_username: string }): PlayerRatingAdjustment {
+  const rawPlayer = getRawPlayerPool().find((player) => player.id === row.player_id);
+  const priorTotal = getRatingAdjustmentTotalBefore(row.player_id, row.id);
+  const rawRating = rawPlayer?.rating ?? 0;
+  return {
+    id: row.id,
+    playerId: row.player_id,
+    playerName: rawPlayer?.name ?? `Player #${row.player_id}`,
+    playerNation: rawPlayer?.nation ?? "Unknown",
+    playerClub: rawPlayer?.club ?? "Unknown",
+    adjustment: row.adjustment,
+    reason: row.reason,
+    createdByUsername: row.created_by_username,
+    createdAt: row.created_at,
+    chatMessageId: row.chat_message_id,
+    ratingBefore: clampRating(rawRating + priorTotal),
+    ratingAfter: clampRating(rawRating + priorTotal + row.adjustment)
+  };
+}
+
+function getRatingAdjustmentTotalBefore(playerId: number, adjustmentId: number) {
+  const row = getDb()
+    .prepare("SELECT COALESCE(SUM(adjustment), 0) AS total FROM player_rating_adjustments WHERE player_id = ? AND id < ?")
+    .get(playerId, adjustmentId) as { total: number };
+  return row.total ?? 0;
+}
+
+function clampRating(value: number) {
+  return Math.max(1, Math.min(99, value));
+}
+
+function playerFromLateCallupRow(row: LateCallupRow): Player {
+  return {
+    id: row.id,
+    slug: row.slug,
+    name: row.name,
+    sortName: row.sort_name,
+    club: row.club,
+    nation: row.nation,
+    pos: row.pos,
+    rating: row.rating,
+    rarity: row.rarity,
+    wiki: row.wiki,
+    dob: row.dob,
+    caps: row.caps,
+    goals: row.goals,
+    clubWiki: row.club_wiki,
+    clubCountry: row.club_country,
+    teamId: row.team_id
+  };
+}
+
+function cleanOptional(value?: string | null) {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
+}
+
+function toSortName(name: string) {
+  const parts = name.trim().split(/\s+/);
+  if (parts.length <= 1) return name.trim();
+  const last = parts.pop();
+  return `${last}, ${parts.join(" ")}`;
+}
+
+function slugify(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 70) || "late-callup";
+}
+
+function uniquePlayerSlug(database: DatabaseSync, baseSlug: string, id: number) {
+  const baseExists = basePlayers.some((player) => player.slug === baseSlug);
+  const lateExists = database.prepare("SELECT id FROM late_callup_players WHERE slug = ?").get(baseSlug);
+  if (!baseExists && !lateExists) return baseSlug;
+  return `${baseSlug}-${id}`;
+}
+
+function rarityFromRating(rating: number): Rarity {
+  if (rating >= 91) return "icon";
+  if (rating >= 87) return "legend";
+  if (rating >= 82) return "epic";
+  if (rating >= 74) return "rare";
+  if (rating < 50) return "clowns";
+  return "common";
 }
 
 function migrateKmLogActivity(database: DatabaseSync) {
@@ -477,14 +775,14 @@ function awardPlayersInTransaction(database: DatabaseSync, userId: number, playe
 }
 
 function getPlayerRarity(playerId: number): Rarity {
-  const player = (players as Array<{ id: number; rarity: Rarity }>).find((item) => item.id === playerId);
+  const player = getAllPlayers().find((item) => item.id === playerId);
   return player?.rarity ?? "common";
 }
 
 function announcePremiumPulls(userId: number, username: string, playerIds: number[], source: "pack" | "activity") {
   const premiumPlayers = playerIds
-    .map((playerId) => (players as Array<{ id: number; name: string; rarity: Rarity; rating: number; nation: string }>).find((player) => player.id === playerId))
-    .filter((player): player is { id: number; name: string; rarity: Rarity; rating: number; nation: string } => Boolean(player))
+    .map((playerId) => getAllPlayers().find((player) => player.id === playerId))
+    .filter((player): player is Player => Boolean(player))
     .filter((player) => player.rarity === "legend" || player.rarity === "icon");
 
   for (const player of premiumPlayers) {
@@ -916,7 +1214,7 @@ export function logActivityWithServerAwards({
 
 export function getKmLeaderboard() {
   const db = getDb();
-  const adminUsername = process.env.ADMIN_USERNAME?.trim().toLowerCase();
+  const adminUsernames = getAdminUsernames();
 
   const rows = db
     .prepare(
@@ -933,7 +1231,7 @@ export function getKmLeaderboard() {
        GROUP BY users.id`
     )
     .all() as Array<{ id: number; username: string; total_km: number; games_won: number }>;
-  const visibleRows = adminUsername ? rows.filter((row) => row.username.toLowerCase() !== adminUsername) : rows;
+  const visibleRows = rows.filter((row) => !adminUsernames.has(row.username.toLowerCase()));
   const visibleUserIds = new Set(visibleRows.map((row) => row.id));
 
   const ownedRows = db
@@ -1069,14 +1367,12 @@ function removeAwardedPlayer(userId: number, playerId: number) {
   }
 }
 
-import playerData from "@/data/players.json";
-const _allPlayersForRating = playerData as Array<{ id: number; rating: number; pos: string }>;
-const _allPlayersForSquads = playerData as Array<{ id: number; name: string; nation: string; club: string; rating: number; pos: string; rarity: string }>;
 const communitySquadSlots: SquadSlot[] = ["GK", "DF1", "DF2", "DF3", "DF4", "MF1", "MF2", "MF3", "FW1", "FW2", "FW3"];
 
 function computeBestSquadRating(playerIds: number[]): number {
   if (playerIds.length === 0) return 0;
-  const owned = playerIds.map((id) => _allPlayersForRating.find((p) => p.id === id)).filter(Boolean) as Array<{ id: number; rating: number; pos: string }>;
+  const allPlayersForRating = getAllPlayers();
+  const owned = playerIds.map((id) => allPlayersForRating.find((p) => p.id === id)).filter((player): player is Player => Boolean(player));
   const used = new Set<number>();
   const positions = ["GK", "DF", "DF", "DF", "DF", "MF", "MF", "MF", "FW", "FW", "FW"];
   const picked: number[] = [];
@@ -1092,11 +1388,11 @@ function computeBestSquadRating(playerIds: number[]): number {
 
 export function getCommunitySquads() {
   const db = getDb();
-  const adminUsername = process.env.ADMIN_USERNAME?.trim().toLowerCase();
+  const adminUsernames = getAdminUsernames();
   const users = db
     .prepare("SELECT id, username FROM users ORDER BY username")
     .all() as Array<{ id: number; username: string }>;
-  const visibleUsers = adminUsername ? users.filter((user) => user.username.toLowerCase() !== adminUsername) : users;
+  const visibleUsers = users.filter((user) => !adminUsernames.has(user.username.toLowerCase()));
   const ownedRows = db
     .prepare("SELECT user_id, player_id FROM user_players")
     .all() as Array<{ user_id: number; player_id: number }>;
@@ -1117,7 +1413,7 @@ export function getCommunitySquads() {
     )
     .all() as Array<{ user_id: number; lock_date: string; slot: SquadSlot; player_id: number }>;
 
-  const playerById = new Map(_allPlayersForSquads.map((player) => [player.id, player]));
+  const playerById = new Map(getAllPlayers().map((player) => [player.id, player]));
   const ownedByUser = new Map<number, number[]>();
   const boostsByUser = new Map<number, Map<number, number>>();
   const lockedByUser = new Map<number, { lockDate: string; players: Array<{ slot: SquadSlot; playerId: number }> }>();
@@ -1168,10 +1464,10 @@ export function getCommunitySquads() {
     .sort((a, b) => b.best.rating - a.best.rating || a.username.localeCompare(b.username));
 }
 
-function pickBestCommunitySquad(playerIds: number[], boosts: Map<number, number>, playerById: Map<number, (typeof _allPlayersForSquads)[number]>) {
+function pickBestCommunitySquad(playerIds: number[], boosts: Map<number, number>, playerById: Map<number, Player>) {
   const owned = playerIds
     .map((id) => playerById.get(id))
-    .filter((player): player is (typeof _allPlayersForSquads)[number] => Boolean(player));
+    .filter((player): player is Player => Boolean(player));
   const used = new Set<number>();
   const players: Array<NonNullable<ReturnType<typeof toCommunitySquadPlayer>>> = [];
 
@@ -1193,7 +1489,7 @@ function pickBestCommunitySquad(playerIds: number[], boosts: Map<number, number>
   };
 }
 
-function toCommunitySquadPlayer(slot: SquadSlot, playerId: number, boosts: Map<number, number>, playerById: Map<number, (typeof _allPlayersForSquads)[number]>) {
+function toCommunitySquadPlayer(slot: SquadSlot, playerId: number, boosts: Map<number, number>, playerById: Map<number, Player>) {
   const player = playerById.get(playerId);
   if (!player) return null;
   const boost = boosts.get(player.id) ?? 0;
@@ -1237,8 +1533,7 @@ export function lockSquadForDate(userId: number, lockDate: string, lockAt: strin
   const existing = database.prepare("SELECT id FROM locked_squads WHERE user_id = ? AND lock_date = ?").get(userId, lockDate);
   if (existing) return;
   const draftSquad = getDraftSquad(userId);
-  const allPlayerData = players as Array<{ id: number; nation: string }>;
-  const playerNationMap = new Map(allPlayerData.map((p) => [p.id, p]));
+  const playerNationMap = new Map(getAllPlayers().map((p) => [p.id, p]));
   const result = database.prepare("INSERT INTO locked_squads (user_id, lock_date, locked_at, unlock_at) VALUES (?, ?, ?, ?)").run(userId, lockDate, lockAt, unlockAt);
   const lockedSquadId = Number(result.lastInsertRowid);
   const insertPlayer = database.prepare("INSERT INTO locked_squad_players (locked_squad_id, slot, player_id, nation) VALUES (?, ?, ?, ?)");

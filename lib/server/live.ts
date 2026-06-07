@@ -1,5 +1,4 @@
-import players from "@/data/players.json";
-import { getDb, getDraftSquad, awardGoalBoost, getMatchedGoalScorers, getMatchedAssistScorers } from "./db";
+import { getAllPlayers, getDb, getDraftSquad, awardGoalBoost, getMatchedGoalScorers, getMatchedAssistScorers } from "./db";
 import { getProviderStatus, type ProviderStatus } from "./fixtures";
 import { GOAL_BOOST_BY_RARITY, ASSIST_BOOST_BY_RARITY, getPlayerById } from "./goalScorers";
 import type { Player, SquadSlot } from "@/lib/types";
@@ -7,9 +6,6 @@ import type { Player, SquadSlot } from "@/lib/types";
 const tournamentStart = "2026-06-11";
 const tournamentEnd = "2026-07-19";
 const creditValue = 3;
-
-const allPlayers = players as Player[];
-const playerMap = new Map<number, Player>(allPlayers.map((p) => [p.id, p]));
 
 export type LiveStatus = {
   tournamentActive: boolean;
@@ -30,6 +26,7 @@ export type LiveStatus = {
 export function getLiveStatus(userId: number, now = new Date()): LiveStatus {
   const window = londonLockWindow(now);
   const database = getDb();
+  const playerMap = new Map<number, Player>(getAllPlayers().map((p) => [p.id, p]));
   const tournamentActive = window.lockDate >= tournamentStart && window.lockDate <= tournamentEnd;
   if (tournamentActive) {
     ensureLockedSquad(userId, window);
@@ -94,11 +91,11 @@ export function getLiveStatus(userId: number, now = new Date()): LiveStatus {
         boostAmount: row.boost_amount
       };
     }),
-    leaderboard: getBestOwnedSquadLeaderboard()
+    leaderboard: getBestOwnedSquadLeaderboard(playerMap)
   };
 }
 
-function getBestOwnedSquadLeaderboard() {
+function getBestOwnedSquadLeaderboard(playerMap: Map<number, Player>) {
   const rows = getDb()
     .prepare(
       `SELECT users.username, user_players.player_id
@@ -116,7 +113,7 @@ function getBestOwnedSquadLeaderboard() {
 
   return Array.from(byUser.entries())
     .map(([username, ids]) => {
-      const bestXi = pickBestFormation(ids);
+      const bestXi = pickBestFormation(ids, playerMap);
       const ratings = bestXi.map((player) => player.rating);
       return {
         username,
@@ -128,7 +125,7 @@ function getBestOwnedSquadLeaderboard() {
     .slice(0, 20);
 }
 
-function pickBestFormation(playerIds: number[]) {
+function pickBestFormation(playerIds: number[], playerMap: Map<number, Player>) {
   const owned = playerIds
     .map((id) => playerMap.get(id))
     .filter((player): player is Player => Boolean(player));
@@ -153,6 +150,7 @@ function ensureLockedSquad(userId: number, window: ReturnType<typeof londonLockW
   const database = getDb();
   const existing = database.prepare("SELECT id FROM locked_squads WHERE user_id = ? AND lock_date = ?").get(userId, window.lockDate);
   if (existing) return;
+  const playerMap = new Map<number, Player>(getAllPlayers().map((p) => [p.id, p]));
 
   const draftSquad = getDraftSquad(userId);
   const insertSquad = database.prepare("INSERT INTO locked_squads (user_id, lock_date, locked_at, unlock_at) VALUES (?, ?, ?, ?)");

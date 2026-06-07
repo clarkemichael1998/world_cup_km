@@ -24,6 +24,7 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [message, setMessage] = useState("");
   const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
+  const [highlightedMessageId, setHighlightedMessageId] = useState<number | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -38,7 +39,9 @@ export default function ChatPage() {
   async function loadMessages() {
     const response = await fetch("/api/chat");
     const payload = await response.json();
-    setMessages(sortNewestFirst(payload.messages ?? []));
+    const sorted = sortNewestFirst(payload.messages ?? []);
+    setMessages(sorted);
+    markChatSeen(sorted);
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -59,7 +62,9 @@ export default function ChatPage() {
     }
     setMessage("");
     setReplyingTo(null);
-    setMessages(sortNewestFirst(payload.messages ?? []));
+    const sorted = sortNewestFirst(payload.messages ?? []);
+    setMessages(sorted);
+    markChatSeen(sorted);
   }
 
   async function react(messageId: number, reaction: string) {
@@ -73,6 +78,14 @@ export default function ChatPage() {
       // Optimistic: reload messages
       loadMessages();
     }
+  }
+
+  function jumpToMessage(messageId: number) {
+    const element = document.getElementById(`chat-message-${messageId}`);
+    if (!element) return;
+    element.scrollIntoView({ behavior: "smooth", block: "center" });
+    setHighlightedMessageId(messageId);
+    window.setTimeout(() => setHighlightedMessageId(null), 1800);
   }
 
   return (
@@ -127,7 +140,7 @@ export default function ChatPage() {
               messages.map((item) => {
                 const tone = getMessageTone(item);
                 return (
-                <article key={item.id} className={`rounded-md border px-3 py-2 shadow-sm ${tone.container}`}>
+                <article id={`chat-message-${item.id}`} key={item.id} className={`rounded-md border px-3 py-2 shadow-sm transition ${highlightedMessageId === item.id ? "ring-2 ring-amber-400" : ""} ${tone.container}`}>
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex min-w-0 items-center gap-2">
                       <p className={`truncate text-sm font-black ${tone.name}`}>{item.username}</p>
@@ -137,10 +150,10 @@ export default function ChatPage() {
                   </div>
                   <p className={`mt-1 whitespace-pre-wrap break-words text-[13px] font-semibold leading-snug ${tone.text}`}>{item.message}</p>
                   {item.reply_to_message ? (
-                    <div className="mt-1.5 rounded border-l-2 border-green-800/25 bg-white/45 px-2 py-1 text-[10px] font-semibold leading-snug text-green-900/55">
+                    <button type="button" onClick={() => item.reply_to_message_id && jumpToMessage(item.reply_to_message_id)} className="mt-1.5 block w-full rounded border-l-2 border-green-800/25 bg-white/45 px-2 py-1 text-left text-[10px] font-semibold leading-snug text-green-900/55 hover:bg-white/70">
                       <span className="font-black text-green-900/70">Reply to {item.reply_to_username ?? "someone"}:</span>{" "}
                       {truncate(item.reply_to_message, 120)}
-                    </div>
+                    </button>
                   ) : null}
                   <div className="mt-1.5 flex flex-wrap items-center gap-1">
                     {REACTIONS.map((emoji) => {
@@ -200,6 +213,12 @@ function sortNewestFirst(messages: ChatMessage[]) {
     const dateDiff = new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     return dateDiff || b.id - a.id;
   });
+}
+
+function markChatSeen(messages: ChatMessage[]) {
+  if (messages.length === 0) return;
+  const latest = Math.max(...messages.map((message) => new Date(message.created_at).getTime()));
+  window.localStorage.setItem("kmxi-last-chat-seen", String(latest));
 }
 
 function truncate(value: string, maxLength: number) {

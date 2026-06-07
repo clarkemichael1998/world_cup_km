@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/server/db";
+import { isAdminUsername } from "@/lib/server/admin";
 
 export async function GET() {
   const user = await getCurrentUser();
@@ -9,7 +10,7 @@ export async function GET() {
     user: {
       id: user.id,
       username: user.username,
-      isAdmin: Boolean(process.env.ADMIN_USERNAME && user.username === process.env.ADMIN_USERNAME)
+      isAdmin: isAdminUsername(user.username)
     }
   });
 }
