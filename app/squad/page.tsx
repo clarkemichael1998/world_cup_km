@@ -87,6 +87,22 @@ export default function SquadPage() {
     syncDraftSquad(updated.squad);
   }
 
+  function autoPickPlayingToday() {
+    if (!state || !lockStatus) return;
+    const playingNations = getFixtureNations(lockStatus);
+    if (playingNations.size === 0) {
+      setLockNotice(`No fixtures listed for ${lockStatus.lockDate}, so there are no playing nations to auto-pick from.`);
+      return;
+    }
+
+    const updated = autoPickBestXIFromNations(state, playingNations);
+    setState(updated);
+    saveUserState(updated);
+    syncDraftSquad(updated.squad);
+    const selectedCount = Object.keys(updated.squad).length;
+    setLockNotice(`Auto-picked ${selectedCount}/11 players from nations playing on ${lockStatus.lockDate}.`);
+  }
+
   const owned = state ? getOwnedPlayers(state) : [];
   const rating = state ? calculateSquadRating(state) : 0;
   const selectedIds = new Set(Object.values(state?.squad ?? {}));
@@ -116,9 +132,19 @@ export default function SquadPage() {
     <div>
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
         <PageTitle title="Squad" subtitle={`${selectedPlayers.length}/11 selected${rating ? ` - Average ${rating.toFixed(1)}` : ""}`} />
-        <button className="mb-4 self-start rounded-md bg-boot px-4 py-2 text-sm font-black text-white hover:bg-red-700 md:mb-8" onClick={autoPick}>
-          Auto-pick Best XI
-        </button>
+        <div className="mb-4 flex flex-wrap gap-2 self-start md:mb-8 md:justify-end">
+          <button className="rounded-md bg-boot px-4 py-2 text-sm font-black text-white hover:bg-red-700" onClick={autoPick}>
+            Auto-pick Best XI
+          </button>
+          <button
+            className="rounded-md bg-pitch px-4 py-2 text-sm font-black text-white hover:bg-green-800 disabled:cursor-not-allowed disabled:opacity-45"
+            onClick={autoPickPlayingToday}
+            disabled={!lockStatus || lockStatus.upcomingFixtures.length === 0}
+            title={!lockStatus || lockStatus.upcomingFixtures.length === 0 ? "No fixtures loaded for the lock date." : "Pick the best XI from nations playing on the lock date."}
+          >
+            Auto-pick Playing Today
+          </button>
+        </div>
       </div>
 
       {lockStatus && (
@@ -359,4 +385,27 @@ function syncDraftSquad(squad: Partial<Record<SquadSlot, number>>) {
   }).catch(() => {
     // Login is optional while browsing locally; the Live page will prompt for it.
   });
+}
+
+function getFixtureNations(lockStatus: LockStatus) {
+  return new Set(lockStatus.upcomingFixtures.flatMap((fixture) => [fixture.homeTeam, fixture.awayTeam]));
+}
+
+function autoPickBestXIFromNations(state: UserState, nations: Set<string>): UserState {
+  const owned = getOwnedPlayers(state).filter((player) => nations.has(player.nation));
+  const used = new Set<number>();
+  const squad: UserState["squad"] = {};
+
+  for (const slot of squadSlots) {
+    const pick = owned
+      .filter((player) => canPlaySlot(player, slot) && !used.has(player.id))
+      .sort((a, b) => b.rating - a.rating || a.name.localeCompare(b.name))[0];
+
+    if (pick) {
+      used.add(pick.id);
+      squad[slot] = pick.id;
+    }
+  }
+
+  return { ...state, squad };
 }
