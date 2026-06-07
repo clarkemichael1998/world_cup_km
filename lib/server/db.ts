@@ -1405,6 +1405,18 @@ export function getCommunitySquads() {
   const boostRows = db
     .prepare("SELECT user_id, player_id, SUM(boost_amount) AS boost FROM goal_boosts GROUP BY user_id, player_id")
     .all() as Array<{ user_id: number; player_id: number; boost: number }>;
+  const bonusRows = db
+    .prepare(
+      `SELECT user_id, player_id,
+              SUM(CASE WHEN match_id LIKE '%:assist' THEN 0 ELSE boost_amount END) AS goal_boost,
+              SUM(CASE WHEN match_id LIKE '%:assist' THEN boost_amount ELSE 0 END) AS assist_boost
+       FROM goal_boosts
+       GROUP BY user_id, player_id`
+    )
+    .all() as Array<{ user_id: number; player_id: number; goal_boost: number | null; assist_boost: number | null }>;
+  const winRows = db
+    .prepare("SELECT user_id, player_id, SUM(credits) AS win_credits FROM reward_events GROUP BY user_id, player_id")
+    .all() as Array<{ user_id: number; player_id: number; win_credits: number | null }>;
   const lockedRows = db
     .prepare(
       `SELECT locked_squads.user_id, locked_squads.lock_date, locked_squad_players.slot, locked_squad_players.player_id
@@ -1422,6 +1434,7 @@ export function getCommunitySquads() {
   const playerById = new Map(getAllPlayers().map((player) => [player.id, player]));
   const ownedByUser = new Map<number, number[]>();
   const boostsByUser = new Map<number, Map<number, number>>();
+  const bonusByUser = new Map<number, Map<number, { goalBoost: number; assistBoost: number; winCredits: number }>>();
   const lockedByUser = new Map<number, { lockDate: string; players: Array<{ slot: SquadSlot; playerId: number }> }>();
 
   for (const row of ownedRows) {
@@ -1436,6 +1449,20 @@ export function getCommunitySquads() {
     boostsByUser.set(row.user_id, boosts);
   }
 
+  for (const row of bonusRows) {
+    const bonuses = bonusByUser.get(row.user_id) ?? new Map<number, { goalBoost: number; assistBoost: number; winCredits: number }>();
+    const current = bonuses.get(row.player_id) ?? { goalBoost: 0, assistBoost: 0, winCredits: 0 };
+    bonuses.set(row.player_id, { ...current, goalBoost: row.goal_boost ?? 0, assistBoost: row.assist_boost ?? 0 });
+    bonusByUser.set(row.user_id, bonuses);
+  }
+
+  for (const row of winRows) {
+    const bonuses = bonusByUser.get(row.user_id) ?? new Map<number, { goalBoost: number; assistBoost: number; winCredits: number }>();
+    const current = bonuses.get(row.player_id) ?? { goalBoost: 0, assistBoost: 0, winCredits: 0 };
+    bonuses.set(row.player_id, { ...current, winCredits: row.win_credits ?? 0 });
+    bonusByUser.set(row.user_id, bonuses);
+  }
+
   for (const row of lockedRows) {
     const locked = lockedByUser.get(row.user_id) ?? { lockDate: row.lock_date, players: [] };
     locked.players.push({ slot: row.slot, playerId: row.player_id });
@@ -1445,13 +1472,14 @@ export function getCommunitySquads() {
   return visibleUsers
     .map((user) => {
       const boosts = boostsByUser.get(user.id) ?? new Map<number, number>();
-      const best = pickBestCommunitySquad(ownedByUser.get(user.id) ?? [], boosts, playerById);
+      const bonuses = bonusByUser.get(user.id) ?? new Map<number, { goalBoost: number; assistBoost: number; winCredits: number }>();
+      const best = pickBestCommunitySquad(ownedByUser.get(user.id) ?? [], boosts, bonuses, playerById);
       const locked = lockedByUser.get(user.id);
       const lockedPlayers = locked
         ? communitySquadSlots
             .map((slot) => locked.players.find((player) => player.slot === slot))
             .filter((player): player is { slot: SquadSlot; playerId: number } => Boolean(player))
-            .map((player) => toCommunitySquadPlayer(player.slot, player.playerId, boosts, playerById))
+            .map((player) => toCommunitySquadPlayer(player.slot, player.playerId, boosts, bonuses, playerById))
             .filter((player): player is NonNullable<ReturnType<typeof toCommunitySquadPlayer>> => Boolean(player))
         : [];
 
@@ -1470,7 +1498,7 @@ export function getCommunitySquads() {
     .sort((a, b) => b.best.rating - a.best.rating || a.username.localeCompare(b.username));
 }
 
-function pickBestCommunitySquad(playerIds: number[], boosts: Map<number, number>, playerById: Map<number, Player>) {
+function pickBestCommunitySquad(playerIds: number[], boosts: Map<number, number>, bonuses: Map<number, { goalBoost: number; assistBoost: number; winCredits: number }>, playerById: Map<number, Player>) {
   const owned = playerIds
     .map((id) => playerById.get(id))
     .filter((player): player is Player => Boolean(player));
@@ -1484,7 +1512,7 @@ function pickBestCommunitySquad(playerIds: number[], boosts: Map<number, number>
       .sort((a, b) => b.rating + (boosts.get(b.id) ?? 0) - (a.rating + (boosts.get(a.id) ?? 0)) || a.name.localeCompare(b.name))[0];
     if (player) {
       used.add(player.id);
-      const squadPlayer = toCommunitySquadPlayer(slot, player.id, boosts, playerById);
+      const squadPlayer = toCommunitySquadPlayer(slot, player.id, boosts, bonuses, playerById);
       if (squadPlayer) players.push(squadPlayer);
     }
   }
@@ -1495,10 +1523,11 @@ function pickBestCommunitySquad(playerIds: number[], boosts: Map<number, number>
   };
 }
 
-function toCommunitySquadPlayer(slot: SquadSlot, playerId: number, boosts: Map<number, number>, playerById: Map<number, Player>) {
+function toCommunitySquadPlayer(slot: SquadSlot, playerId: number, boosts: Map<number, number>, bonuses: Map<number, { goalBoost: number; assistBoost: number; winCredits: number }>, playerById: Map<number, Player>) {
   const player = playerById.get(playerId);
   if (!player) return null;
   const boost = boosts.get(player.id) ?? 0;
+  const bonus = bonuses.get(player.id) ?? { goalBoost: 0, assistBoost: 0, winCredits: 0 };
   return {
     slot,
     id: player.id,
@@ -1509,7 +1538,92 @@ function toCommunitySquadPlayer(slot: SquadSlot, playerId: number, boosts: Map<n
     rarity: player.rarity,
     rating: player.rating,
     boost,
+    goalBoost: bonus.goalBoost,
+    assistBoost: bonus.assistBoost,
+    winCredits: bonus.winCredits,
     effectiveRating: player.rating + boost
+  };
+}
+
+export function getAdminMatchMonitor(limit = 80) {
+  const fixtures = getDb()
+    .prepare(
+      `SELECT fixture_results.match_id, fixture_results.match_date, fixture_results.kickoff_at,
+              fixture_results.home_team, fixture_results.away_team, fixture_results.winner,
+              fixture_results.status, fixture_results.source, fixture_results.verified,
+              fixture_results.updated_at,
+              COALESCE(rewards.reward_count, 0) AS reward_count,
+              COALESCE(rewards.credit_total, 0) AS credit_total,
+              COALESCE(goals.goal_records, 0) AS goal_records,
+              COALESCE(goals.matched_goal_records, 0) AS matched_goal_records,
+              COALESCE(assists.assist_records, 0) AS assist_records,
+              COALESCE(assists.matched_assist_records, 0) AS matched_assist_records
+       FROM fixture_results
+       LEFT JOIN (
+         SELECT match_id, COUNT(*) AS reward_count, SUM(credits) AS credit_total
+         FROM reward_events
+         GROUP BY match_id
+       ) rewards ON rewards.match_id = fixture_results.match_id
+       LEFT JOIN (
+         SELECT match_id, COUNT(*) AS goal_records,
+                SUM(CASE WHEN status = 'matched' THEN 1 ELSE 0 END) AS matched_goal_records
+         FROM goal_scorers
+         GROUP BY match_id
+       ) goals ON goals.match_id = fixture_results.match_id
+       LEFT JOIN (
+         SELECT match_id, COUNT(*) AS assist_records,
+                SUM(CASE WHEN status = 'matched' THEN 1 ELSE 0 END) AS matched_assist_records
+         FROM assist_scorers
+         GROUP BY match_id
+       ) assists ON assists.match_id = fixture_results.match_id
+       ORDER BY fixture_results.kickoff_at
+       LIMIT ?`
+    )
+    .all(limit) as Array<{
+      match_id: string;
+      match_date: string;
+      kickoff_at: string;
+      home_team: string;
+      away_team: string;
+      winner: string | null;
+      status: string;
+      source: string;
+      verified: number;
+      updated_at: string | null;
+      reward_count: number;
+      credit_total: number;
+      goal_records: number;
+      matched_goal_records: number;
+      assist_records: number;
+      matched_assist_records: number;
+    }>;
+
+  const provider = getDb()
+    .prepare("SELECT provider, status, message, checked_at FROM fixture_provider_runs ORDER BY checked_at DESC, id DESC LIMIT 1")
+    .get() as { provider: string; status: string; message: string | null; checked_at: string } | undefined;
+
+  return {
+    providerStatus: provider
+      ? { provider: provider.provider, status: provider.status, message: provider.message ?? "", checkedAt: provider.checked_at }
+      : null,
+    fixtures: fixtures.map((fixture) => ({
+      matchId: fixture.match_id,
+      matchDate: fixture.match_date,
+      kickoffAt: fixture.kickoff_at,
+      homeTeam: fixture.home_team,
+      awayTeam: fixture.away_team,
+      winner: fixture.winner,
+      status: fixture.status,
+      source: fixture.source,
+      verified: fixture.verified === 1,
+      updatedAt: fixture.updated_at,
+      rewardCount: fixture.reward_count,
+      creditTotal: fixture.credit_total,
+      goalRecords: fixture.goal_records,
+      matchedGoalRecords: fixture.matched_goal_records,
+      assistRecords: fixture.assist_records,
+      matchedAssistRecords: fixture.matched_assist_records
+    }))
   };
 }
 

@@ -13,6 +13,9 @@ type SquadPlayer = {
   rarity: string;
   rating: number;
   boost: number;
+  goalBoost: number;
+  assistBoost: number;
+  winCredits: number;
   effectiveRating: number;
 };
 
@@ -48,7 +51,7 @@ export default function CommunitySquadsPage() {
 
   return (
     <div>
-      <PageTitle title="Community Squads" subtitle="Compare everyone’s strongest available XI and their latest locked matchday squad." />
+      <PageTitle title="Community Squads" subtitle="Compare everyone's strongest XI, locked squads, and player-level win, goal, and assist awards." />
 
       {squads === null ? (
         <p className="rounded-lg bg-white p-6 text-sm font-bold text-green-900/60 shadow-sm">Loading squads...</p>
@@ -63,7 +66,7 @@ export default function CommunitySquadsPage() {
                   <h2 className="text-2xl font-black text-green-950">{entry.username}</h2>
                   <p className="text-xs font-bold uppercase tracking-wide text-green-900/50">
                     Best XI {entry.best.rating > 0 ? entry.best.rating.toFixed(1) : "--"} avg
-                    {entry.locked ? ` · Locked ${entry.locked.rating.toFixed(1)} avg` : ""}
+                    {entry.locked ? ` / Locked ${entry.locked.rating.toFixed(1)} avg` : ""}
                   </p>
                 </div>
               </div>
@@ -71,7 +74,7 @@ export default function CommunitySquadsPage() {
               <div className="mt-4 grid gap-4 lg:grid-cols-2">
                 <SquadPanel title="Best XI" rating={entry.best.rating} players={entry.best.players} empty="No players collected yet." />
                 <SquadPanel
-                  title={entry.locked ? `Locked XI · ${entry.locked.lockDate}` : "Locked XI"}
+                  title={entry.locked ? `Locked XI / ${entry.locked.lockDate}` : "Locked XI"}
                   rating={entry.locked?.rating ?? 0}
                   players={entry.locked?.players ?? []}
                   empty="No locked squad yet."
@@ -123,6 +126,11 @@ function MiniCard({ slot, player }: { slot: string; player?: SquadPlayer }) {
     );
   }
 
+  const hasSplitBoost = player.goalBoost !== 0 || player.assistBoost !== 0;
+  const boostLabel = player.boost > 0 ? `+${player.boost}` : `${player.boost}`;
+  const goalLabel = player.goalBoost > 0 ? `+${player.goalBoost}` : `${player.goalBoost}`;
+  const assistLabel = player.assistBoost > 0 ? `+${player.assistBoost}` : `${player.assistBoost}`;
+
   return (
     <div className="min-h-20 rounded-md bg-white p-2 shadow-sm">
       <div className="flex items-start justify-between gap-1">
@@ -133,7 +141,21 @@ function MiniCard({ slot, player }: { slot: string; player?: SquadPlayer }) {
       </div>
       <p className="mt-1 break-words text-[11px] font-black leading-tight text-green-950">{player.name}</p>
       <p className="mt-0.5 truncate text-[9px] font-bold text-green-900/60">{player.nation}</p>
-      {player.boost !== 0 ? <p className="mt-1 text-[9px] font-black text-green-700">Boost {player.boost > 0 ? `+${player.boost}` : player.boost}</p> : null}
+      <div className="mt-1 flex flex-wrap gap-1">
+        {player.winCredits > 0 ? <AwardPill label={`Win +${player.winCredits}`} tone="gold" /> : null}
+        {player.goalBoost !== 0 ? <AwardPill label={`Goal ${goalLabel}`} tone="green" /> : null}
+        {player.assistBoost !== 0 ? <AwardPill label={`Assist ${assistLabel}`} tone="green" /> : null}
+        {!hasSplitBoost && player.boost !== 0 ? <AwardPill label={`Boost ${boostLabel}`} tone="green" /> : null}
+      </div>
     </div>
   );
+}
+
+function AwardPill({ label, tone }: { label: string; tone: "gold" | "green" }) {
+  const className =
+    tone === "gold"
+      ? "bg-gold/30 text-green-950 ring-gold/40"
+      : "bg-green-100 text-green-800 ring-green-700/10";
+
+  return <span className={`rounded px-1 py-0.5 text-[8px] font-black leading-none ring-1 ${className}`}>{label}</span>;
 }
