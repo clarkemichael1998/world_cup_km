@@ -147,8 +147,11 @@ export function getDb() {
       user_id INTEGER NOT NULL,
       title TEXT NOT NULL,
       details TEXT,
+      implemented_at TEXT,
+      implemented_by INTEGER,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (user_id) REFERENCES users(id)
+      FOREIGN KEY (user_id) REFERENCES users(id),
+      FOREIGN KEY (implemented_by) REFERENCES users(id)
     );
     CREATE TABLE IF NOT EXISTS suggestion_votes (
       suggestion_id INTEGER NOT NULL,
@@ -242,6 +245,7 @@ export function getDb() {
   migrateFixtureResults(db);
   migrateUserState(db);
   migrateGoalScorers(db);
+  migrateSuggestions(db);
   seedFixtureResults(db);
   return db;
 }
@@ -631,21 +635,25 @@ export function saveChatMessage(userId: number, message: string) {
 export function getSuggestions(viewerUserId: number | null) {
   return getDb()
     .prepare(
-      `SELECT suggestions.id, suggestions.title, suggestions.details, suggestions.created_at, users.username,
+      `SELECT suggestions.id, suggestions.title, suggestions.details, suggestions.created_at,
+              suggestions.implemented_at, implementer.username AS implemented_by_username, users.username,
               COALESCE(SUM(CASE WHEN suggestion_votes.vote = 1 THEN 1 ELSE 0 END), 0) AS upvotes,
               COALESCE(SUM(CASE WHEN suggestion_votes.vote = -1 THEN 1 ELSE 0 END), 0) AS downvotes,
               COALESCE(MAX(CASE WHEN suggestion_votes.user_id = ? THEN suggestion_votes.vote ELSE 0 END), 0) AS user_vote
        FROM suggestions
        JOIN users ON users.id = suggestions.user_id
+       LEFT JOIN users implementer ON implementer.id = suggestions.implemented_by
        LEFT JOIN suggestion_votes ON suggestion_votes.suggestion_id = suggestions.id
        GROUP BY suggestions.id
-       ORDER BY (upvotes - downvotes) DESC, upvotes DESC, suggestions.created_at DESC`
+       ORDER BY suggestions.implemented_at IS NOT NULL ASC, (upvotes - downvotes) DESC, upvotes DESC, suggestions.created_at DESC`
     )
     .all(viewerUserId ?? 0) as Array<{
       id: number;
       title: string;
       details: string | null;
       created_at: string;
+      implemented_at: string | null;
+      implemented_by_username: string | null;
       username: string;
       upvotes: number;
       downvotes: number;
@@ -685,6 +693,23 @@ export function toggleSuggestionVote(suggestionId: number, userId: number, vote:
     .prepare("INSERT INTO suggestion_votes (suggestion_id, user_id, vote) VALUES (?, ?, ?)")
     .run(suggestionId, userId, vote);
   return "added";
+}
+
+export function setSuggestionImplemented(suggestionId: number, adminUserId: number, implemented: boolean) {
+  const database = getDb();
+  const existing = database.prepare("SELECT id FROM suggestions WHERE id = ?").get(suggestionId) as { id: number } | undefined;
+  if (!existing) return false;
+
+  if (implemented) {
+    database
+      .prepare("UPDATE suggestions SET implemented_at = CURRENT_TIMESTAMP, implemented_by = ? WHERE id = ?")
+      .run(adminUserId, suggestionId);
+  } else {
+    database
+      .prepare("UPDATE suggestions SET implemented_at = NULL, implemented_by = NULL WHERE id = ?")
+      .run(suggestionId);
+  }
+  return true;
 }
 
 export function getKmLogsToday(userId: number): number {
@@ -1287,6 +1312,17 @@ function migrateGoalScorers(database: DatabaseSync) {
   const colNames = new Set(cols.map((c) => c.name));
   if (colNames.size > 0 && !colNames.has("goal_count")) {
     database.exec("ALTER TABLE goal_scorers ADD COLUMN goal_count INTEGER NOT NULL DEFAULT 1");
+  }
+}
+
+function migrateSuggestions(database: DatabaseSync) {
+  const cols = database.prepare("PRAGMA table_info(suggestions)").all() as Array<{ name: string }>;
+  const colNames = new Set(cols.map((c) => c.name));
+  if (colNames.size > 0 && !colNames.has("implemented_at")) {
+    database.exec("ALTER TABLE suggestions ADD COLUMN implemented_at TEXT");
+  }
+  if (colNames.size > 0 && !colNames.has("implemented_by")) {
+    database.exec("ALTER TABLE suggestions ADD COLUMN implemented_by INTEGER");
   }
 }
 

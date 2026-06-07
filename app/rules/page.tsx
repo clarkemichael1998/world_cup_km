@@ -68,8 +68,8 @@ function SimpleRules() {
         <ul className="list-disc space-y-1 pl-5">
           <li>Walk/run: <strong>1 km = 1 activity credit</strong>.</li>
           <li>Cycle: <strong>3 km = 1 activity credit</strong>.</li>
-          <li>Strength: <strong>20 minutes = 1 activity credit</strong>.</li>
-          <li>Sport: <strong>15 minutes = 1 activity credit</strong>.</li>
+          <li>Strength: <strong>10 minutes = 1 activity credit</strong>.</li>
+          <li>Sport: <strong>10 minutes = 1 activity credit</strong>.</li>
           <li>Yoga/mobility: <strong>30 minutes = 1 activity credit</strong>.</li>
           <li>Whole credits earn stickers. Fractions carry over.</li>
           <li>You can submit up to <strong>3 activity logs per day</strong>.</li>
@@ -161,8 +161,8 @@ function DetailedRules() {
               <tbody className="divide-y divide-green-900/10">
                 <Row left="Walk or run" right="1 km = 1 activity credit" />
                 <Row left="Cycle" right="3 km = 1 activity credit" />
-                <Row left="Strength" right="20 minutes = 1 activity credit" />
-                <Row left="Sport" right="15 minutes = 1 activity credit" />
+                <Row left="Strength" right="10 minutes = 1 activity credit" />
+                <Row left="Sport" right="10 minutes = 1 activity credit" />
                 <Row left="Yoga or mobility" right="30 minutes = 1 activity credit" />
               </tbody>
             </table>

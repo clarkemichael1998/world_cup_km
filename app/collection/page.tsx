@@ -155,19 +155,25 @@ export default function CollectionPage() {
 function CompactSticker({ player, ratingBoost, duplicateCount }: { player: Player; ratingBoost: number; duplicateCount: number }) {
   const flag = flagUrl(player.nation);
   const effectiveRating = player.rating + ratingBoost;
+  const rarityLabel = rarityLabels[player.rarity];
+  const rarityMark = rarityMarks[player.rarity];
 
   return (
-    <div className="flex aspect-[3/4] min-h-32 flex-col rounded-md border-2 border-white bg-white p-2 shadow-sm ring-1 ring-green-950/10">
+    <div className={`compact-sticker ${rarityCardClasses[player.rarity]} flex aspect-[3/4] min-h-32 flex-col rounded-md border-2 p-2 shadow-sm ring-1 ring-green-950/10`}>
       <div className="mb-1 flex items-center justify-between gap-1">
-        <span className="rounded bg-green-950/10 px-1 text-[9px] font-black text-green-950">{player.pos}</span>
-        <span className="rounded bg-gold px-1.5 py-0.5 text-[10px] font-black text-green-950">{effectiveRating}</span>
+        <span className="rounded bg-black/10 px-1 text-[9px] font-black uppercase">{player.pos}</span>
+        <span className="compact-sticker-rating rounded px-1.5 py-0.5 text-[10px] font-black">{effectiveRating}</span>
+      </div>
+      <div className="mb-1 flex items-center justify-between gap-1 text-[7px] font-black uppercase tracking-wide opacity-70">
+        <span>{rarityLabel}</span>
+        <span className="compact-sticker-mark inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[8px]">{rarityMark}</span>
       </div>
       <div className="flex flex-1 flex-col items-center justify-center text-center">
         {flag ? <img src={flag} alt="" className="mb-1 h-4 w-6 rounded-sm object-cover shadow-sm" /> : null}
-        <p className="line-clamp-3 text-[11px] font-black leading-tight text-green-950">{player.name}</p>
-        <p className="mt-1 line-clamp-1 text-[9px] font-bold text-green-900/55">{player.club}</p>
+        <p className="line-clamp-3 text-[11px] font-black leading-tight">{player.name}</p>
+        <p className="mt-1 line-clamp-1 text-[9px] font-bold opacity-65">{player.club}</p>
       </div>
-      <div className="mt-1 flex items-center justify-between border-t border-green-900/10 pt-1 text-[8px] font-black uppercase tracking-wide text-green-900/40">
+      <div className="mt-1 flex items-center justify-between border-t border-current/15 pt-1 text-[8px] font-black uppercase tracking-wide opacity-55">
         <span>{player.rarity}</span>
         <span>{duplicateCount > 0 ? `x${duplicateCount + 1}` : `#${player.id}`}</span>
       </div>
@@ -253,3 +259,30 @@ function StickerDetails({
 function positionRank(position: Position) {
   return positions.indexOf(position);
 }
+
+const rarityCardClasses: Record<Player["rarity"], string> = {
+  clowns: "sticker-clowns",
+  common: "sticker-common",
+  rare: "sticker-rare",
+  epic: "sticker-epic",
+  legend: "sticker-legend",
+  icon: "sticker-icon"
+};
+
+const rarityLabels: Record<Player["rarity"], string> = {
+  clowns: "Wild",
+  common: "Base",
+  rare: "Foil",
+  epic: "Prism",
+  legend: "Gold",
+  icon: "Icon"
+};
+
+const rarityMarks: Record<Player["rarity"], string> = {
+  clowns: "!",
+  common: "K",
+  rare: "*",
+  epic: "◆",
+  legend: "★",
+  icon: "XI"
+};

@@ -10,6 +10,33 @@ const rarityStyles: Record<Player["rarity"], string> = {
   icon: "border-zinc-300 bg-zinc-950 text-zinc-50 shadow-zinc-400/40"
 };
 
+const rarityCardClasses: Record<Player["rarity"], string> = {
+  clowns: "sticker-clowns",
+  common: "sticker-common",
+  rare: "sticker-rare",
+  epic: "sticker-epic",
+  legend: "sticker-legend",
+  icon: "sticker-icon"
+};
+
+const rarityLabels: Record<Player["rarity"], string> = {
+  clowns: "Wild Card",
+  common: "Base",
+  rare: "Foil",
+  epic: "Prismatic",
+  legend: "Gold",
+  icon: "Icon"
+};
+
+const rarityMarks: Record<Player["rarity"], string> = {
+  clowns: "!",
+  common: "K",
+  rare: "*",
+  epic: "◆",
+  legend: "★",
+  icon: "XI"
+};
+
 function formatNumber(value: number | null) {
   return value === null ? "Unknown" : value.toLocaleString();
 }
@@ -35,7 +62,7 @@ export function PlayerCard({
 
   return (
     <article
-      className={`card-sheen relative rounded-lg border-2 p-4 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-md ${
+      className={`card-sheen ${album ? rarityCardClasses[player.rarity] : ""} relative rounded-lg border-2 p-4 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-md ${
         rarityStyles[player.rarity]
       } ${player.rarity === "icon" ? "card-icon" : player.rarity === "legend" ? "card-legend" : ""} ${
         large ? "min-h-72" : "min-h-64"
@@ -44,7 +71,7 @@ export function PlayerCard({
       {album ? (
         <div className="mb-3 flex items-center justify-between gap-2 border-b border-black/10 pb-2">
           <span className="text-[9px] font-black uppercase tracking-[0.22em] opacity-60">Official Tournament Sticker</span>
-          <span className="rounded-sm bg-black/10 px-1.5 py-0.5 text-[9px] font-black tabular-nums opacity-70">#{player.id}</span>
+          <span className="rounded-sm bg-black/10 px-1.5 py-0.5 text-[9px] font-black uppercase tabular-nums opacity-70">{rarityLabels[player.rarity]} #{player.id}</span>
         </div>
       ) : null}
       <div className="flex items-start justify-between gap-3">

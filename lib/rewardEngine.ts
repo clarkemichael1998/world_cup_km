@@ -44,8 +44,8 @@ export const activityDefinitions: Record<ActivityType, { label: string; unit: "k
   walk: { label: "Walk", unit: "km", creditsPerUnit: 1, maxPerLog: 50 },
   run: { label: "Run", unit: "km", creditsPerUnit: 1, maxPerLog: 50 },
   cycle: { label: "Cycle", unit: "km", creditsPerUnit: 1 / 3, maxPerLog: 150 },
-  strength: { label: "Strength workout", unit: "minutes", creditsPerUnit: 1 / 20, maxPerLog: 180 },
-  sport: { label: "Sport session", unit: "minutes", creditsPerUnit: 1 / 15, maxPerLog: 240 },
+  strength: { label: "Strength workout", unit: "minutes", creditsPerUnit: 1 / 10, maxPerLog: 180 },
+  sport: { label: "Sport session", unit: "minutes", creditsPerUnit: 1 / 10, maxPerLog: 240 },
   mobility: { label: "Yoga / mobility", unit: "minutes", creditsPerUnit: 1 / 30, maxPerLog: 240 }
 };
 

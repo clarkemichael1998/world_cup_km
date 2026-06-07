@@ -11,6 +11,8 @@ type Suggestion = {
   details: string | null;
   username: string;
   created_at: string;
+  implemented_at: string | null;
+  implemented_by_username: string | null;
   upvotes: number;
   downvotes: number;
   user_vote: -1 | 0 | 1;
@@ -22,9 +24,14 @@ export default function SuggestionsPage() {
   const [details, setDetails] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     loadSuggestions();
+    fetch("/api/auth/me", { credentials: "include" })
+      .then((response) => response.json())
+      .then((payload) => setIsAdmin(Boolean(payload.user?.isAdmin)))
+      .catch(() => setIsAdmin(false));
   }, []);
 
   async function loadSuggestions() {
@@ -73,6 +80,22 @@ export default function SuggestionsPage() {
     setSuggestions(payload.suggestions ?? []);
   }
 
+  async function toggleImplemented(suggestion: Suggestion) {
+    const response = await fetch("/api/suggestions/implement", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ suggestionId: suggestion.id, implemented: !suggestion.implemented_at })
+    });
+    const payload = await response.json();
+    if (!response.ok) {
+      setError(payload.error ?? "Could not update suggestion.");
+      return;
+    }
+    setError("");
+    setSuggestions(payload.suggestions ?? []);
+  }
+
   return (
     <div>
       <PageTitle title="Suggestions" subtitle="Pitch improvements, vote ideas up or down, and help shape what gets built next." />
@@ -115,13 +138,24 @@ export default function SuggestionsPage() {
             <p className="rounded-lg bg-white p-6 text-sm font-bold text-green-900/60 shadow-sm">No suggestions yet.</p>
           ) : (
             suggestions.map((suggestion) => (
-              <article key={suggestion.id} className="rounded-lg border border-green-900/10 bg-white p-4 shadow-sm">
+              <article key={suggestion.id} className={`rounded-lg border p-4 shadow-sm ${suggestion.implemented_at ? "border-green-700/25 bg-green-50/80" : "border-green-900/10 bg-white"}`}>
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
-                    <h2 className="break-words text-lg font-black text-green-950">{suggestion.title}</h2>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h2 className="break-words text-lg font-black text-green-950">{suggestion.title}</h2>
+                      {suggestion.implemented_at ? (
+                        <span className="rounded-full bg-green-700 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-white">Implemented</span>
+                      ) : null}
+                    </div>
                     <p className="mt-1 text-xs font-bold text-green-900/50">
                       {suggestion.username} · {formatDate(suggestion.created_at)}
                     </p>
+                    {suggestion.implemented_at ? (
+                      <p className="mt-1 text-xs font-bold text-green-800">
+                        Marked implemented {formatDate(suggestion.implemented_at)}
+                        {suggestion.implemented_by_username ? ` by ${suggestion.implemented_by_username}` : ""}
+                      </p>
+                    ) : null}
                   </div>
                   <p className="rounded-md bg-green-950/5 px-3 py-2 text-center text-sm font-black text-pitch">
                     {suggestion.upvotes - suggestion.downvotes}
@@ -143,6 +177,18 @@ export default function SuggestionsPage() {
                   >
                     Downvote {suggestion.downvotes}
                   </button>
+                  {isAdmin ? (
+                    <button
+                      className={`rounded-md border px-3 py-1.5 text-sm font-black ${
+                        suggestion.implemented_at
+                          ? "border-amber-700 bg-amber-50 text-amber-900 hover:bg-amber-100"
+                          : "border-green-700 bg-green-100 text-green-900 hover:bg-green-200"
+                      }`}
+                      onClick={() => toggleImplemented(suggestion)}
+                    >
+                      {suggestion.implemented_at ? "Mark Not Implemented" : "Mark Implemented"}
+                    </button>
+                  ) : null}
                 </div>
               </article>
             ))
