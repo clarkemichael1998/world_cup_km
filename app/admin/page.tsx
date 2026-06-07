@@ -232,7 +232,7 @@ function NewsReelTab({ onForbidden }: { onForbidden: () => void }) {
 function NewsReelPreviewGroup({ message, ariaHidden = false }: { message: string; ariaHidden?: boolean }) {
   return (
     <div className="news-reel-group" aria-hidden={ariaHidden}>
-      {Array.from({ length: 6 }).map((_, index) => (
+      {Array.from({ length: 10 }).map((_, index) => (
         <span key={index} className="news-reel-item">{message}</span>
       ))}
     </div>

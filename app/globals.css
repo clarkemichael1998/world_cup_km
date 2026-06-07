@@ -57,7 +57,7 @@ button {
 .news-reel-track {
   display: flex;
   width: max-content;
-  animation: news-reel-scroll 32s linear infinite;
+  animation: news-reel-scroll 40s linear infinite;
   will-change: transform;
 }
 
@@ -66,12 +66,13 @@ button {
   min-width: 100vw;
   flex: 0 0 auto;
   align-items: center;
-  justify-content: space-around;
+  gap: 4rem;
   padding-block: 0.5rem;
+  padding-inline: 2rem;
 }
 
 .news-reel-item {
-  margin-inline: 2rem;
+  flex: 0 0 auto;
   white-space: nowrap;
   font-size: 0.75rem;
   font-weight: 900;
