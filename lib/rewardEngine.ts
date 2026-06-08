@@ -5,10 +5,10 @@ export const allPlayers = players as Player[];
 
 const odds: Array<{ rarity: Rarity; ceiling: number }> = [
   { rarity: "clowns", ceiling: 0.01 },
-  { rarity: "common", ceiling: 0.64 },
-  { rarity: "rare", ceiling: 0.89 },
-  { rarity: "epic", ceiling: 0.97 },
-  { rarity: "legend", ceiling: 0.995 },
+  { rarity: "common", ceiling: 0.70 },
+  { rarity: "rare", ceiling: 0.95 },
+  { rarity: "epic", ceiling: 0.988 },
+  { rarity: "legend", ceiling: 0.998 },
   { rarity: "icon", ceiling: 1 }
 ];
 
@@ -32,7 +32,11 @@ export function rollRarity(): Rarity {
 }
 
 export function getRandomPlayerByRarity(rarity = rollRarity()): Player {
-  const pool = allPlayers.filter((player) => player.rarity === rarity);
+  return getRandomPlayerFromPool(allPlayers, rarity);
+}
+
+export function getRandomPlayerFromPool(playerPool: Player[], rarity = rollRarity()): Player {
+  const pool = playerPool.filter((player) => player.rarity === rarity);
   const fallbackPool = pool.length > 0 ? pool : allPlayers;
   return fallbackPool[Math.floor(Math.random() * fallbackPool.length)];
 }

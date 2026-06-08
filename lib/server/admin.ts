@@ -1,4 +1,4 @@
-const extraAdminUsernames = ["admin1998", "admin 1999"];
+const extraAdminUsernames = ["admin1998", "admin 1999", "admin1999"];
 
 export function isAdminUsername(username: string) {
   const normalized = username.trim().toLowerCase();

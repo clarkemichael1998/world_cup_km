@@ -4,11 +4,11 @@ import { useState } from "react";
 import { PageTitle } from "@/components/PageTitle";
 
 const rarityRows = [
-  { rarity: "Icon", rating: "93+", chance: "0.5%", colour: "text-zinc-950 font-black" },
-  { rarity: "Legend", rating: "86-92", chance: "2.5%", colour: "text-amber-700 font-black" },
-  { rarity: "Epic", rating: "78-85", chance: "8%", colour: "text-fuchsia-700 font-black" },
+  { rarity: "Icon", rating: "93+", chance: "0.2%", colour: "text-zinc-950 font-black" },
+  { rarity: "Legend", rating: "86-92", chance: "1%", colour: "text-amber-700 font-black" },
+  { rarity: "Epic", rating: "78-85", chance: "3.8%", colour: "text-fuchsia-700 font-black" },
   { rarity: "Rare", rating: "70-77", chance: "25%", colour: "text-sky-700 font-black" },
-  { rarity: "Common", rating: "58-69", chance: "63%", colour: "text-slate-600 font-black" },
+  { rarity: "Common", rating: "58-69", chance: "69%", colour: "text-slate-600 font-black" },
   { rarity: "Clowns", rating: "< 58", chance: "1%", colour: "text-red-600 font-black" }
 ];
 
