@@ -112,6 +112,11 @@ export function settleUserLive(userId: number, now = new Date()) {
   settleUserLiveAwards(userId);
 }
 
+// The matchday that finished most recently — its winner gets the news-reel prize.
+export function getPreviousMatchday(now = new Date()): string {
+  return addDays(londonLockWindow(now).lockDate, -1);
+}
+
 function ensureCurrentWindowLock(userId: number, now: Date) {
   const window = londonLockWindow(now);
   const database = getDb();

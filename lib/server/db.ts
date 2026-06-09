@@ -288,6 +288,16 @@ export function getDb() {
       FOREIGN KEY (user_id) REFERENCES users(id),
       FOREIGN KEY (accepted_by) REFERENCES users(id)
     );
+    CREATE TABLE IF NOT EXISTS trade_proposals (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      offer_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL,
+      player_id INTEGER NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (offer_id) REFERENCES trade_offers(id),
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
     CREATE TABLE IF NOT EXISTS boost_announcements (
       match_id TEXT NOT NULL,
       player_id INTEGER NOT NULL,
@@ -1545,51 +1555,105 @@ export function cancelTradeOffer(userId: number, offerId: number): string | null
   return result.changes > 0 ? null : "Offer not found or no longer open.";
 }
 
-export function acceptTradeOffer(offerId: number, acceptorId: number, offeredPlayerId: number): string | null {
+export function getPendingProposalsForOpenOffers() {
+  return getDb()
+    .prepare(
+      `SELECT p.id, p.offer_id, p.user_id, p.player_id, p.created_at, users.username
+       FROM trade_proposals p
+       JOIN trade_offers t ON t.id = p.offer_id AND t.status = 'open'
+       JOIN users ON users.id = p.user_id
+       WHERE p.status = 'pending'
+       ORDER BY p.created_at`
+    )
+    .all() as Array<{ id: number; offer_id: number; user_id: number; player_id: number; created_at: string; username: string }>;
+}
+
+export function proposeTrade(offerId: number, userId: number, playerId: number): string | null {
+  const db = getDb();
+  const offer = db.prepare("SELECT id, user_id, player_id FROM trade_offers WHERE id = ? AND status = 'open'").get(offerId) as
+    | { id: number; user_id: number; player_id: number }
+    | undefined;
+  if (!offer) return "That offer is no longer open.";
+  if (offer.user_id === userId) return "You can't propose on your own offer.";
+  if (offer.player_id === playerId) return "Offering the same player back would be pointless, even by clown standards.";
+
+  const dupe = db.prepare("SELECT duplicate_count FROM user_players WHERE user_id = ? AND player_id = ?").get(userId, playerId) as { duplicate_count: number } | undefined;
+  if (!dupe || dupe.duplicate_count < 1) return "You can only propose a player you hold a duplicate of.";
+
+  const existing = db.prepare("SELECT id FROM trade_proposals WHERE offer_id = ? AND user_id = ? AND status = 'pending'").get(offerId, userId) as { id: number } | undefined;
+  if (existing) {
+    db.prepare("UPDATE trade_proposals SET player_id = ?, created_at = CURRENT_TIMESTAMP WHERE id = ?").run(playerId, existing.id);
+  } else {
+    db.prepare("INSERT INTO trade_proposals (offer_id, user_id, player_id) VALUES (?, ?, ?)").run(offerId, userId, playerId);
+  }
+  return null;
+}
+
+export function withdrawTradeProposal(userId: number, proposalId: number): string | null {
+  const result = getDb()
+    .prepare("UPDATE trade_proposals SET status = 'withdrawn' WHERE id = ? AND user_id = ? AND status = 'pending'")
+    .run(proposalId, userId);
+  return result.changes > 0 ? null : "Proposal not found or no longer pending.";
+}
+
+export function declineTradeProposal(offererId: number, proposalId: number): string | null {
+  const result = getDb()
+    .prepare(
+      `UPDATE trade_proposals SET status = 'rejected'
+       WHERE id = ? AND status = 'pending'
+         AND offer_id IN (SELECT id FROM trade_offers WHERE user_id = ? AND status = 'open')`
+    )
+    .run(proposalId, offererId);
+  return result.changes > 0 ? null : "Proposal not found or no longer pending.";
+}
+
+export function confirmTradeProposal(offererId: number, proposalId: number): string | null {
   const db = getDb();
   db.exec("BEGIN IMMEDIATE");
   try {
-    const offer = db
-      .prepare("SELECT id, user_id, player_id FROM trade_offers WHERE id = ? AND status = 'open'")
-      .get(offerId) as { id: number; user_id: number; player_id: number } | undefined;
-    if (!offer) {
+    const proposal = db
+      .prepare(
+        `SELECT p.id, p.user_id, p.player_id, p.offer_id, t.user_id AS offerer_id, t.player_id AS offer_player_id
+         FROM trade_proposals p
+         JOIN trade_offers t ON t.id = p.offer_id
+         WHERE p.id = ? AND p.status = 'pending' AND t.status = 'open'`
+      )
+      .get(proposalId) as
+      | { id: number; user_id: number; player_id: number; offer_id: number; offerer_id: number; offer_player_id: number }
+      | undefined;
+    if (!proposal || proposal.offerer_id !== offererId) {
       db.exec("ROLLBACK");
-      return "That offer is no longer open.";
-    }
-    if (offer.user_id === acceptorId) {
-      db.exec("ROLLBACK");
-      return "You can't accept your own offer.";
-    }
-    if (offer.player_id === offeredPlayerId) {
-      db.exec("ROLLBACK");
-      return "Swapping a player for the same player would be pointless, even by clown standards.";
+      return "Proposal not found or no longer pending.";
     }
 
-    const offererDupe = db.prepare("SELECT duplicate_count FROM user_players WHERE user_id = ? AND player_id = ?").get(offer.user_id, offer.player_id) as { duplicate_count: number } | undefined;
+    const offererDupe = db.prepare("SELECT duplicate_count FROM user_players WHERE user_id = ? AND player_id = ?").get(offererId, proposal.offer_player_id) as { duplicate_count: number } | undefined;
     if (!offererDupe || offererDupe.duplicate_count < 1) {
-      db.prepare("UPDATE trade_offers SET status = 'cancelled' WHERE id = ?").run(offer.id);
+      db.prepare("UPDATE trade_offers SET status = 'cancelled' WHERE id = ?").run(proposal.offer_id);
       db.exec("COMMIT");
-      return "The offerer no longer has a spare copy — offer withdrawn.";
+      return "You no longer hold a spare copy of your offered player — offer withdrawn.";
     }
-    const acceptorDupe = db.prepare("SELECT duplicate_count FROM user_players WHERE user_id = ? AND player_id = ?").get(acceptorId, offeredPlayerId) as { duplicate_count: number } | undefined;
-    if (!acceptorDupe || acceptorDupe.duplicate_count < 1) {
-      db.exec("ROLLBACK");
-      return "You can only trade a player you hold a duplicate of.";
+    const proposerDupe = db.prepare("SELECT duplicate_count FROM user_players WHERE user_id = ? AND player_id = ?").get(proposal.user_id, proposal.player_id) as { duplicate_count: number } | undefined;
+    if (!proposerDupe || proposerDupe.duplicate_count < 1) {
+      db.prepare("UPDATE trade_proposals SET status = 'rejected' WHERE id = ?").run(proposal.id);
+      db.exec("COMMIT");
+      return "The proposer no longer holds a spare copy — proposal rejected.";
     }
 
-    transferTradedPlayer(db, offer.user_id, acceptorId, offer.player_id);
-    transferTradedPlayer(db, acceptorId, offer.user_id, offeredPlayerId);
+    transferTradedPlayer(db, offererId, proposal.user_id, proposal.offer_player_id);
+    transferTradedPlayer(db, proposal.user_id, offererId, proposal.player_id);
 
     db.prepare("UPDATE trade_offers SET status = 'completed', accepted_by = ?, accepted_player_id = ?, completed_at = CURRENT_TIMESTAMP WHERE id = ?")
-      .run(acceptorId, offeredPlayerId, offer.id);
+      .run(proposal.user_id, proposal.player_id, proposal.offer_id);
+    db.prepare("UPDATE trade_proposals SET status = 'accepted' WHERE id = ?").run(proposal.id);
+    db.prepare("UPDATE trade_proposals SET status = 'rejected' WHERE offer_id = ? AND status = 'pending'").run(proposal.offer_id);
     db.exec("COMMIT");
 
     const playerMap = new Map(getAllPlayers().map((p) => [p.id, p]));
-    const offererName = (db.prepare("SELECT username FROM users WHERE id = ?").get(offer.user_id) as { username: string } | undefined)?.username ?? "Someone";
-    const acceptorName = (db.prepare("SELECT username FROM users WHERE id = ?").get(acceptorId) as { username: string } | undefined)?.username ?? "Someone";
-    const gave = playerMap.get(offer.player_id)?.name ?? `Player ${offer.player_id}`;
-    const got = playerMap.get(offeredPlayerId)?.name ?? `Player ${offeredPlayerId}`;
-    createAdminChatMessage(`🔁 Trade complete: ${offererName} swapped ${gave} to ${acceptorName} for ${got}.`);
+    const offererName = (db.prepare("SELECT username FROM users WHERE id = ?").get(offererId) as { username: string } | undefined)?.username ?? "Someone";
+    const proposerName = (db.prepare("SELECT username FROM users WHERE id = ?").get(proposal.user_id) as { username: string } | undefined)?.username ?? "Someone";
+    const gave = playerMap.get(proposal.offer_player_id)?.name ?? `Player ${proposal.offer_player_id}`;
+    const got = playerMap.get(proposal.player_id)?.name ?? `Player ${proposal.player_id}`;
+    createAdminChatMessage(`🔁 Trade complete: ${offererName} swapped ${gave} to ${proposerName} for ${got}.`);
     return null;
   } catch (error) {
     db.exec("ROLLBACK");

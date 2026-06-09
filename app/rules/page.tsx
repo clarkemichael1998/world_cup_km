@@ -103,7 +103,7 @@ function SimpleRules() {
         <ul className="list-disc space-y-1 pl-5">
           <li>Your main score is your <strong>Best Squad Rating</strong>.</li>
           <li>Activity credits, games won, goal boosts, and assist boosts also show on the leaderboard.</li>
-          <li>Each matchday has a <strong>head-to-head</strong>: the player earning the most match credits that day takes the daily crown.</li>
+          <li>Each matchday has a <strong>head-to-head</strong>: the player earning the most match credits that day takes the daily crown — and gets to <strong>set the news reel</strong> for the next day.</li>
           <li>Everything locks at <strong>World Cup Final kick-off on 19 July 2026</strong>.</li>
         </ul>
       </Section>
@@ -195,7 +195,7 @@ function DetailedRules() {
             <li><strong>2 free credits</strong> are added to your balance every day you log in.</li>
             <li><strong>Activity streaks:</strong> log activity 7 days in a row and the daily grant becomes <strong>3 credits</strong> for as long as the streak holds. Miss a day and the streak resets.</li>
             <li><strong>Album milestones:</strong> collect every sticker on a nation&apos;s page and earn <strong>5 bonus credits</strong>, once per nation.</li>
-            <li><strong>Sticker trading:</strong> offer a duplicate up for trade on the Sticker Album page. Another player accepts by giving one of their own duplicates back — one for one. You only ever trade spares, so your placed stickers are safe.</li>
+            <li><strong>Sticker trading:</strong> offer a duplicate up for trade on the Sticker Album page. Other players propose one of their duplicates in return, and the original offerer confirms the swap they like — one for one. You only ever trade spares, so your placed stickers are safe.</li>
             <li><strong>Match credits</strong> are earned when players in your locked squad represent a winning nation.</li>
             <li>A match win gives <strong>3 credits per eligible locked player</strong>.</li>
             <li>Credits can be spent on the home page. <strong>1 credit = 1 sticker pull</strong>, up to 20 at a time.</li>

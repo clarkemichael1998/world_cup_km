@@ -12,7 +12,8 @@ import type { Player, Position, Rarity, UserState } from "@/lib/types";
 
 const positions: Array<Position | "all"> = ["all", "GK", "DF", "MF", "FW"];
 
-type TradeOffer = { id: number; username: string; playerId: number; createdAt: string; isMine: boolean };
+type TradeProposal = { id: number; username: string; playerId: number; isMine: boolean };
+type TradeOffer = { id: number; username: string; playerId: number; createdAt: string; isMine: boolean; proposals: TradeProposal[] };
 type RecentTrade = { offererUsername: string; acceptorUsername: string; playerId: number; acceptedPlayerId: number; completedAt: string };
 
 export default function CollectionPage() {
@@ -129,7 +130,7 @@ export default function CollectionPage() {
         <section className="mb-5 rounded-lg border border-amber-300 bg-amber-50 p-4 shadow-sm">
           <p className="text-sm font-black uppercase tracking-wide text-amber-800">Sticker Trading</p>
           <p className="mt-1 text-xs font-semibold text-amber-700">
-            Offer a duplicate up for trade. Anyone can accept by giving one of their own duplicates back — one for one. You always keep your placed sticker.
+            Offer a duplicate up for trade. Others propose one of their duplicates in return, and you confirm the swap you like — one for one. You always keep your placed sticker.
           </p>
           {tradeNotice ? <p className="mt-2 rounded-md bg-amber-100 px-3 py-1.5 text-xs font-black text-amber-900">{tradeNotice}</p> : null}
 
@@ -142,7 +143,7 @@ export default function CollectionPage() {
               <option value="">{myDuplicates.length > 0 ? "Choose a duplicate to offer..." : "No duplicates to offer"}</option>
               {myDuplicates.map((player) => (
                 <option key={player.id} value={player.id}>
-                  {player.name} ({player.rating} {player.rarity}) x{(state?.duplicateCounts[player.id] ?? 0) + 1}
+                  {player.name} ({player.rating} {player.rarity}, {player.nation}) x{(state?.duplicateCounts[player.id] ?? 0) + 1}
                 </option>
               ))}
             </select>
@@ -159,44 +160,88 @@ export default function CollectionPage() {
             <div className="mt-4 space-y-2">
               <p className="text-xs font-black uppercase tracking-wide text-amber-800/80">Open Offers</p>
               {offers.map((offer) => {
-                const player = playerById.get(offer.playerId);
+                const myProposal = offer.proposals.find((proposal) => proposal.isMine);
                 return (
-                  <div key={offer.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-amber-200 bg-white/70 px-3 py-2">
-                    <p className="min-w-0 text-sm font-bold text-amber-950">
-                      <span className="font-black">{offer.username}</span> offers{" "}
-                      <span className="font-black">{player ? `${player.name} (${player.rating} ${player.rarity})` : `Player ${offer.playerId}`}</span>
-                    </p>
-                    {offer.isMine ? (
-                      <button
-                        onClick={() => tradeAction({ action: "cancel", offerId: offer.id }, "Offer withdrawn.")}
-                        disabled={tradeBusy}
-                        className="rounded-md bg-amber-200 px-3 py-1.5 text-xs font-black text-amber-900 hover:bg-amber-300 disabled:opacity-40"
-                      >
-                        Cancel
-                      </button>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <select
-                          className="rounded-md border border-amber-300 bg-white px-2 py-1.5 text-xs font-bold text-amber-950"
-                          value={acceptSelections[offer.id] ?? ""}
-                          onChange={(event) => setAcceptSelections((prev) => ({ ...prev, [offer.id]: Number(event.target.value) }))}
-                        >
-                          <option value="">Give in return...</option>
-                          {myDuplicates.map((player) => (
-                            <option key={player.id} value={player.id}>
-                              {player.name} ({player.rating})
-                            </option>
-                          ))}
-                        </select>
+                  <div key={offer.id} className="rounded-md border border-amber-200 bg-white/70 px-3 py-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="min-w-0 text-sm font-bold text-amber-950">
+                        <span className="font-black">{offer.username}</span> offers <span className="font-black">{describePlayer(playerById.get(offer.playerId), offer.playerId)}</span>
+                        {offer.proposals.length > 0 ? <span className="ml-2 text-xs font-black text-amber-700">· {offer.proposals.length} proposal{offer.proposals.length === 1 ? "" : "s"}</span> : null}
+                      </p>
+                      {offer.isMine ? (
                         <button
-                          onClick={() => acceptSelections[offer.id] && tradeAction({ action: "accept", offerId: offer.id, playerId: acceptSelections[offer.id] }, "Trade complete!")}
-                          disabled={tradeBusy || !acceptSelections[offer.id]}
-                          className="rounded-md bg-pitch px-3 py-1.5 text-xs font-black text-white hover:bg-green-800 disabled:opacity-40"
+                          onClick={() => tradeAction({ action: "cancel", offerId: offer.id }, "Offer withdrawn.")}
+                          disabled={tradeBusy}
+                          className="rounded-md bg-amber-200 px-3 py-1.5 text-xs font-black text-amber-900 hover:bg-amber-300 disabled:opacity-40"
                         >
-                          Accept
+                          Cancel Offer
                         </button>
+                      ) : myProposal ? (
+                        <div className="flex items-center gap-2">
+                          <p className="text-xs font-bold text-amber-800">You proposed {describePlayer(playerById.get(myProposal.playerId), myProposal.playerId)} — waiting on {offer.username}</p>
+                          <button
+                            onClick={() => tradeAction({ action: "withdraw", proposalId: myProposal.id }, "Proposal withdrawn.")}
+                            disabled={tradeBusy}
+                            className="rounded-md bg-amber-200 px-3 py-1.5 text-xs font-black text-amber-900 hover:bg-amber-300 disabled:opacity-40"
+                          >
+                            Withdraw
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <select
+                            className="rounded-md border border-amber-300 bg-white px-2 py-1.5 text-xs font-bold text-amber-950"
+                            value={acceptSelections[offer.id] ?? ""}
+                            onChange={(event) => setAcceptSelections((prev) => ({ ...prev, [offer.id]: Number(event.target.value) }))}
+                          >
+                            <option value="">Offer in return...</option>
+                            {myDuplicates.map((player) => (
+                              <option key={player.id} value={player.id}>
+                                {player.name} ({player.rating} {player.rarity}, {player.nation})
+                              </option>
+                            ))}
+                          </select>
+                          <button
+                            onClick={() => acceptSelections[offer.id] && tradeAction({ action: "propose", offerId: offer.id, playerId: acceptSelections[offer.id] }, "Proposal sent — the offerer decides.")}
+                            disabled={tradeBusy || !acceptSelections[offer.id]}
+                            className="rounded-md bg-pitch px-3 py-1.5 text-xs font-black text-white hover:bg-green-800 disabled:opacity-40"
+                          >
+                            Propose Swap
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {offer.isMine && offer.proposals.length > 0 ? (
+                      <div className="mt-2 space-y-1.5 border-t border-amber-200 pt-2">
+                        {offer.proposals.map((proposal) => (
+                          <div key={proposal.id} className="flex flex-wrap items-center justify-between gap-2">
+                            <p className="text-xs font-bold text-amber-900">
+                              <span className="font-black">{proposal.username}</span> offers {describePlayer(playerById.get(proposal.playerId), proposal.playerId)} in return
+                            </p>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => tradeAction({ action: "confirm", proposalId: proposal.id }, "Trade complete!")}
+                                disabled={tradeBusy}
+                                className="rounded-md bg-pitch px-3 py-1 text-xs font-black text-white hover:bg-green-800 disabled:opacity-40"
+                              >
+                                Confirm Trade
+                              </button>
+                              <button
+                                onClick={() => tradeAction({ action: "decline", proposalId: proposal.id }, "Proposal declined.")}
+                                disabled={tradeBusy}
+                                className="rounded-md bg-amber-200 px-3 py-1 text-xs font-black text-amber-900 hover:bg-amber-300 disabled:opacity-40"
+                              >
+                                Decline
+                              </button>
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                    )}
+                    ) : null}
+                    {offer.isMine && offer.proposals.length === 0 ? (
+                      <p className="mt-1 text-xs font-semibold text-amber-700/75">No proposals yet — hold tight.</p>
+                    ) : null}
                   </div>
                 );
               })}
@@ -442,6 +487,10 @@ function StickerDetails({
       </div>
     </div>
   );
+}
+
+function describePlayer(player: Player | undefined, fallbackId: number) {
+  return player ? `${player.name} (${player.rating} ${player.rarity}, ${player.nation})` : `Player ${fallbackId}`;
 }
 
 function positionRank(position: Position) {

@@ -52,6 +52,11 @@ export default function Home() {
   const [feed, setFeed] = useState<FeedEntry[]>([]);
   const [rewardCredits, setRewardCredits] = useState<number | null>(null);
   const [streak, setStreak] = useState(0);
+  const [canSetNews, setCanSetNews] = useState(false);
+  const [wonMatchday, setWonMatchday] = useState<string | null>(null);
+  const [newsMessage, setNewsMessage] = useState("");
+  const [newsNotice, setNewsNotice] = useState("");
+  const [newsBusy, setNewsBusy] = useState(false);
   const [matchday, setMatchday] = useState<LockStatus | null>(null);
   const [redeemAmount, setRedeemAmount] = useState(1);
   const [redeeming, setRedeeming] = useState(false);
@@ -81,7 +86,33 @@ export default function Home() {
       .then((r) => (r.ok ? r.json() : null))
       .then((p) => setMatchday(p))
       .catch(() => {});
+    fetch("/api/news", { credentials: "include" })
+      .then((r) => r.json())
+      .then((p) => {
+        setCanSetNews(Boolean(p.canSetNews) && Boolean(p.wonMatchday));
+        setWonMatchday(p.wonMatchday ?? null);
+        setNewsMessage(p.news?.message ?? "");
+      })
+      .catch(() => {});
   }, []);
+
+  async function submitNews() {
+    if (newsBusy || !newsMessage.trim()) return;
+    setNewsBusy(true);
+    setNewsNotice("");
+    try {
+      const response = await fetch("/api/news", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ message: newsMessage })
+      });
+      const payload = await response.json();
+      setNewsNotice(response.ok ? "Headline live — it's on the reel now." : payload.error ?? "Could not set the news.");
+    } finally {
+      setNewsBusy(false);
+    }
+  }
 
   const squadRating = state ? calculateSquadRating(state, playerPool) : 0;
   const nextRewardProgress = state ? Math.min(100, Math.round(state.kmBalance * 100)) : 0;
@@ -128,6 +159,30 @@ export default function Home() {
           <p className="text-sm font-black text-amber-900">The World Cup Final has kicked off — activity logging is now locked. Thanks for playing!</p>
         </section>
       )}
+
+      {canSetNews ? (
+        <section className="mb-4 rounded-lg border border-amber-400 bg-gradient-to-r from-amber-50 to-yellow-50 p-4 shadow-sm">
+          <p className="text-sm font-black uppercase tracking-wide text-amber-800">👑 Matchday Champion{wonMatchday ? ` — ${wonMatchday}` : ""}</p>
+          <p className="mt-1 text-sm font-bold text-amber-900">You won yesterday's head-to-head. Your prize: you set today's news reel. Use it wisely. Or don't.</p>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <input
+              className="min-w-0 flex-1 rounded-md border border-amber-300 bg-white px-3 py-2 text-sm font-semibold text-amber-950"
+              maxLength={180}
+              placeholder="Write today's headline..."
+              value={newsMessage}
+              onChange={(event) => setNewsMessage(event.target.value)}
+            />
+            <button
+              onClick={submitNews}
+              disabled={newsBusy || !newsMessage.trim()}
+              className="rounded-md bg-amber-600 px-5 py-2 text-sm font-black text-white hover:bg-amber-700 disabled:opacity-40"
+            >
+              {newsBusy ? "Publishing..." : "Publish"}
+            </button>
+          </div>
+          {newsNotice ? <p className="mt-2 text-xs font-black text-amber-800">{newsNotice}</p> : null}
+        </section>
+      ) : null}
 
       <section className="mb-4 rounded-lg border border-green-900/10 bg-white p-4 shadow-sm">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
