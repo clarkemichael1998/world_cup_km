@@ -1301,6 +1301,105 @@ export function getKmLeaderboard() {
     .sort((a, b) => b.best_squad_rating - a.best_squad_rating || b.total_km - a.total_km);
 }
 
+export function getMatchdayHeadToHead(limit = 10) {
+  const db = getDb();
+  const adminUsernames = getAdminUsernames();
+
+  const creditRows = db
+    .prepare(
+      `SELECT ls.lock_date AS date, users.username, SUM(re.credits) AS credits
+       FROM reward_events re
+       JOIN locked_squads ls ON ls.id = re.locked_squad_id
+       JOIN users ON users.id = re.user_id
+       GROUP BY ls.lock_date, re.user_id`
+    )
+    .all() as Array<{ date: string; username: string; credits: number }>;
+
+  const boostRows = db
+    .prepare(
+      `SELECT users.username, fr.match_date AS date, SUM(gb.boost_amount) AS boost
+       FROM goal_boosts gb
+       JOIN users ON users.id = gb.user_id
+       JOIN fixture_results fr ON fr.match_id = CASE
+         WHEN gb.match_id LIKE '%:assist' THEN substr(gb.match_id, 1, length(gb.match_id) - 7)
+         ELSE gb.match_id END
+       GROUP BY gb.user_id, fr.match_date`
+    )
+    .all() as Array<{ username: string; date: string; boost: number }>;
+
+  const byDate = new Map<string, Map<string, { credits: number; boost: number }>>();
+  const entryFor = (date: string, username: string) => {
+    if (adminUsernames.has(username.toLowerCase())) return null;
+    const users = byDate.get(date) ?? new Map<string, { credits: number; boost: number }>();
+    byDate.set(date, users);
+    const entry = users.get(username) ?? { credits: 0, boost: 0 };
+    users.set(username, entry);
+    return entry;
+  };
+  for (const row of creditRows) {
+    const entry = entryFor(row.date, row.username);
+    if (entry) entry.credits += row.credits;
+  }
+  for (const row of boostRows) {
+    const entry = entryFor(row.date, row.username);
+    if (entry) entry.boost += row.boost;
+  }
+
+  return Array.from(byDate.entries())
+    .sort((a, b) => b[0].localeCompare(a[0]))
+    .slice(0, limit)
+    .map(([date, users]) => ({
+      date,
+      entries: Array.from(users.entries())
+        .map(([username, totals]) => ({ username, credits: totals.credits, boost: totals.boost }))
+        .sort((a, b) => b.credits - a.credits || b.boost - a.boost || a.username.localeCompare(b.username))
+    }));
+}
+
+const DUPLICATES_PER_CREDIT = 3;
+
+export function exchangeDuplicates(userId: number): { creditsGained: number; duplicatesSpent: number } {
+  const db = getDb();
+  const rarityRank: Record<string, number> = { clowns: 0, common: 1, rare: 2, epic: 3, legend: 4, icon: 5 };
+  const playerMap = new Map(getAllPlayers().map((p) => [p.id, p]));
+
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    const rows = db
+      .prepare("SELECT player_id, duplicate_count FROM user_players WHERE user_id = ? AND duplicate_count > 0")
+      .all(userId) as Array<{ player_id: number; duplicate_count: number }>;
+    const totalDuplicates = rows.reduce((sum, row) => sum + row.duplicate_count, 0);
+    const creditsGained = Math.floor(totalDuplicates / DUPLICATES_PER_CREDIT);
+    if (creditsGained === 0) {
+      db.exec("ROLLBACK");
+      return { creditsGained: 0, duplicatesSpent: 0 };
+    }
+
+    // Spend lowest-value duplicates first so the exchange never eats a
+    // prized Icon dupe before a clown.
+    const ordered = rows.sort((a, b) => {
+      const pa = playerMap.get(a.player_id);
+      const pb = playerMap.get(b.player_id);
+      return (rarityRank[pa?.rarity ?? "common"] - rarityRank[pb?.rarity ?? "common"]) || ((pa?.rating ?? 0) - (pb?.rating ?? 0));
+    });
+    let toSpend = creditsGained * DUPLICATES_PER_CREDIT;
+    const updateDuplicate = db.prepare("UPDATE user_players SET duplicate_count = ? WHERE user_id = ? AND player_id = ?");
+    for (const row of ordered) {
+      if (toSpend === 0) break;
+      const spend = Math.min(row.duplicate_count, toSpend);
+      updateDuplicate.run(row.duplicate_count - spend, userId, row.player_id);
+      toSpend -= spend;
+    }
+
+    db.prepare("UPDATE users SET reward_credits = reward_credits + ? WHERE id = ?").run(creditsGained, userId);
+    db.exec("COMMIT");
+    return { creditsGained, duplicatesSpent: creditsGained * DUPLICATES_PER_CREDIT };
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
+}
+
 export function getAdminActivityLogs(limit = 50) {
   const logs = getDb()
     .prepare(

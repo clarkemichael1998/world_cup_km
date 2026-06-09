@@ -18,11 +18,32 @@ export default function CollectionPage() {
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
   const [nationSort, setNationSort] = useState<"alpha" | "closest">("closest");
   const [playerPool, setPlayerPool] = useState<Player[]>(basePlayerPool);
+  const [exchanging, setExchanging] = useState(false);
+  const [exchangeNotice, setExchangeNotice] = useState("");
 
   useEffect(() => {
     loadUserStateAsync().then(setState);
     loadPlayerPool().then(setPlayerPool);
   }, []);
+
+  async function exchangeDuplicates() {
+    if (exchanging) return;
+    setExchanging(true);
+    setExchangeNotice("");
+    try {
+      const response = await fetch("/api/exchange", { method: "POST", credentials: "include" });
+      const payload = await response.json();
+      if (!response.ok) {
+        setExchangeNotice(payload.error ?? "Exchange failed.");
+        return;
+      }
+      setExchangeNotice(`Swapped ${payload.duplicatesSpent} duplicates for ${payload.creditsGained} pack credit${payload.creditsGained === 1 ? "" : "s"}!`);
+      const refreshed = await loadUserStateAsync();
+      setState(refreshed);
+    } finally {
+      setExchanging(false);
+    }
+  }
 
   const nations = useMemo(() => Array.from(new Set(playerPool.map((player) => player.nation))).sort(), [playerPool]);
   const countryPlayers = useMemo(
@@ -50,10 +71,35 @@ export default function CollectionPage() {
     .filter((item) => item.count > 0);
   const albumCode = `KMXI-${nation.slice(0, 3).toUpperCase()}-${String(collectedOnPage).padStart(2, "0")}`;
   const selectedFlag = flagUrl(nation);
+  const totalDuplicates = state ? Object.values(state.duplicateCounts).reduce((sum, count) => sum + (count ?? 0), 0) : 0;
+  const exchangeableCredits = Math.floor(totalDuplicates / 3);
 
   return (
     <div>
       <PageTitle title="Sticker Album" subtitle={`${owned.length} official KMXI sticker${owned.length === 1 ? "" : "s"} placed in your World Cup 2026 album.`} />
+
+      {totalDuplicates > 0 ? (
+        <section className="mb-5 rounded-lg border border-amber-300 bg-amber-50 p-4 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-black uppercase tracking-wide text-amber-800">Duplicate Exchange</p>
+              <p className="mt-1 text-sm font-bold text-amber-900">
+                You have {totalDuplicates} duplicate{totalDuplicates === 1 ? "" : "s"}. 3 duplicates = 1 pack credit.
+                {exchangeableCredits === 0 ? ` ${3 - totalDuplicates} more to your first swap.` : ""}
+              </p>
+              {exchangeNotice ? <p className="mt-1 text-xs font-black text-amber-800">{exchangeNotice}</p> : null}
+            </div>
+            <button
+              onClick={exchangeDuplicates}
+              disabled={exchanging || exchangeableCredits === 0}
+              className="rounded-md bg-amber-600 px-5 py-2.5 text-sm font-black text-white hover:bg-amber-700 disabled:opacity-40"
+            >
+              {exchanging ? "Swapping..." : exchangeableCredits > 0 ? `Swap ${exchangeableCredits * 3} dupes → ${exchangeableCredits} credit${exchangeableCredits === 1 ? "" : "s"}` : "Not enough dupes yet"}
+            </button>
+          </div>
+          <p className="mt-2 text-xs font-semibold text-amber-700">Lowest-rarity duplicates are spent first — your Icon dupes are safe until the end.</p>
+        </section>
+      ) : null}
 
       <section className="mb-5 rounded-lg border border-green-900/10 bg-white p-3 shadow-sm">
         <div className="mb-3 flex items-center justify-between gap-3">

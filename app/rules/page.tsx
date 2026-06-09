@@ -85,7 +85,7 @@ function SimpleRules() {
           rows={rarityRows.map((row) => [<span key={row.rarity} className={row.colour}>{row.rarity}</span>, row.rating, row.chance])}
         />
         <p className="mt-3 text-green-900/70">
-          Log in during the tournament to receive <strong>2 free pack credits per day</strong>. Match wins can also earn pack credits from your locked squad.
+          Log in to receive <strong>2 free pack credits per day</strong>. Match wins earn more from your locked squad, and you can swap <strong>3 duplicate stickers for 1 pack credit</strong> on the Sticker Album page.
         </p>
       </Section>
 
@@ -103,6 +103,7 @@ function SimpleRules() {
         <ul className="list-disc space-y-1 pl-5">
           <li>Your main score is your <strong>Best Squad Rating</strong>.</li>
           <li>Activity credits, games won, goal boosts, and assist boosts also show on the leaderboard.</li>
+          <li>Each matchday has a <strong>head-to-head</strong>: the player earning the most match credits that day takes the daily crown.</li>
           <li>Everything locks at <strong>World Cup Final kick-off on 19 July 2026</strong>.</li>
         </ul>
       </Section>
@@ -191,7 +192,8 @@ function DetailedRules() {
             Activity earns stickers directly, but pack credits give you extra shots at the sticker pile.
           </p>
           <ul className="mt-3 list-disc space-y-1 pl-5 text-green-900/70">
-            <li><strong>2 free credits</strong> are added to your balance every day you log in during the tournament.</li>
+            <li><strong>2 free credits</strong> are added to your balance every day you log in.</li>
+            <li><strong>Duplicate exchange:</strong> swap 3 duplicate stickers for 1 pack credit on the Sticker Album page. Lowest-rarity duplicates are spent first.</li>
             <li><strong>Match credits</strong> are earned when players in your locked squad represent a winning nation.</li>
             <li>A match win gives <strong>3 credits per eligible locked player</strong>.</li>
             <li>Credits can be spent on the home page. <strong>1 credit = 1 sticker pull</strong>, up to 20 at a time.</li>

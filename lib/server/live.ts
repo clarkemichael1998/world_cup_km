@@ -1,4 +1,4 @@
-import { getAllPlayers, getDb, awardGoalBoost, getMatchedGoalScorers, getMatchedAssistScorers, lockSquadForDate } from "./db";
+import { getAllPlayers, getDb, awardGoalBoost, getMatchedGoalScorers, getMatchedAssistScorers, lockSquadForDate, createChatMessage } from "./db";
 import { getProviderStatus, type ProviderStatus } from "./fixtures";
 import { GOAL_BOOST_BY_RARITY, ASSIST_BOOST_BY_RARITY, getPlayerById } from "./goalScorers";
 import type { Player, SquadSlot } from "@/lib/types";
@@ -260,7 +260,9 @@ function awardGoalBoosts(userId: number) {
         const player = getPlayerById(playerId);
         if (!player) continue;
         const boostPerGoal = GOAL_BOOST_BY_RARITY[player.rarity] ?? 0;
-        if (boostPerGoal !== 0) awardGoalBoost(userId, playerId, match.match_id, boostPerGoal * goalCount);
+        if (boostPerGoal !== 0 && awardGoalBoost(userId, playerId, match.match_id, boostPerGoal * goalCount)) {
+          announceBoost(userId, player.name, boostPerGoal * goalCount, goalCount, "goal");
+        }
       }
 
       const assisters = getMatchedAssistScorers(match.match_id);
@@ -269,10 +271,21 @@ function awardGoalBoosts(userId: number) {
         const player = getPlayerById(playerId);
         if (!player) continue;
         const boostPerAssist = ASSIST_BOOST_BY_RARITY[player.rarity] ?? 0;
-        if (boostPerAssist !== 0) awardGoalBoost(userId, playerId, `${match.match_id}:assist`, boostPerAssist * assistCount);
+        if (boostPerAssist !== 0 && awardGoalBoost(userId, playerId, `${match.match_id}:assist`, boostPerAssist * assistCount)) {
+          announceBoost(userId, player.name, boostPerAssist * assistCount, assistCount, "assist");
+        }
       }
     }
   }
+}
+
+function announceBoost(userId: number, playerName: string, boost: number, count: number, type: "goal" | "assist") {
+  const username = (getDb().prepare("SELECT username FROM users WHERE id = ?").get(userId) as { username: string } | undefined)?.username ?? "Someone";
+  const icon = type === "goal" ? "⚽" : "🅰️";
+  const action = type === "goal" ? "scored" : "assisted";
+  const times = count > 1 ? ` x${count}` : "";
+  const swing = boost > 0 ? `jumps +${boost}` : `drops ${boost}`;
+  createChatMessage(userId, `${icon} ${playerName} ${action}${times} — ${username}'s sticker ${swing}!`);
 }
 
 function londonLockWindow(now: Date) {

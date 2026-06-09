@@ -163,6 +163,7 @@ export default function Home() {
               <p className="mt-1 text-sm font-semibold text-green-900/60">
                 {matchday.isLocked ? "Squad locked" : "Squad not locked"} · Locks {new Date(matchday.lockAt).toLocaleString("en-GB", { timeStyle: "short", timeZone: "Europe/London" })} UK
               </p>
+              <LockCountdown lockAt={matchday.lockAt} isLocked={matchday.isLocked} />
             </div>
             <div className="grid min-w-0 gap-2 sm:grid-cols-3 lg:w-[420px]">
               <MatchdayStat label="Locked Players Involved" value={`${selectedPlayingToday}/${selectedPlayers.length || 11}`} />
@@ -312,6 +313,25 @@ function CountUnit({ value, label }: { value: number; label: string }) {
       <p className="text-3xl font-black leading-none tabular-nums">{String(value).padStart(2, "0")}</p>
       <p className="text-[10px] font-black uppercase tracking-wide text-green-200/70">{label}</p>
     </div>
+  );
+}
+
+function LockCountdown({ lockAt, isLocked }: { lockAt: string; isLocked: boolean }) {
+  const remaining = new Date(lockAt).getTime() - Date.now();
+  if (remaining <= 0) {
+    return (
+      <p className="mt-2 inline-flex rounded-full bg-green-100 px-3 py-1 text-xs font-black text-green-800">
+        🔒 Window live — squads are locked in for this matchday
+      </p>
+    );
+  }
+  const hours = Math.floor(remaining / 3600000);
+  const mins = Math.floor((remaining % 3600000) / 60000);
+  const urgent = remaining < 2 * 3600000;
+  return (
+    <p className={`mt-2 inline-flex rounded-full px-3 py-1 text-xs font-black ${urgent ? "bg-amber-100 text-amber-900" : "bg-green-950/5 text-green-900/70"}`}>
+      {urgent ? "⚠️ " : "⏱️ "}Locks in {hours > 0 ? `${hours}h ` : ""}{mins}m{isLocked ? " — your XI is set" : " — draft auto-locks if you don't"}
+    </p>
   );
 }
 
