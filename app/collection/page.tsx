@@ -103,9 +103,27 @@ export default function CollectionPage() {
   );
   const showTradePanel = myDuplicates.length > 0 || offers.length > 0;
 
+  const albumPercent = playerPool.length > 0 ? Math.round((owned.length / playerPool.length) * 100) : 0;
+
   return (
     <div>
       <PageTitle title="Sticker Album" subtitle={`${owned.length} official KMXI sticker${owned.length === 1 ? "" : "s"} placed in your World Cup 2026 album.`} />
+
+      <section className="mb-5 rounded-lg border border-green-900/10 bg-white p-4 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-black uppercase tracking-wide text-green-900/45">Album Completion</p>
+            <p className="text-sm font-bold text-green-950">{owned.length}/{playerPool.length} stickers placed</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <p className="text-xs font-bold text-amber-700">📖 Complete a nation&apos;s page → +5 pack credits</p>
+            <p className="text-2xl font-black text-pitch">{albumPercent}%</p>
+          </div>
+        </div>
+        <div className="mt-3 h-3 overflow-hidden rounded-full bg-green-100" role="progressbar" aria-valuenow={albumPercent} aria-valuemin={0} aria-valuemax={100} aria-label="Album completion">
+          <div className="h-full rounded-full bg-pitch transition-all" style={{ width: `${albumPercent}%` }} />
+        </div>
+      </section>
 
       {showTradePanel ? (
         <section className="mb-5 rounded-lg border border-amber-300 bg-amber-50 p-4 shadow-sm">

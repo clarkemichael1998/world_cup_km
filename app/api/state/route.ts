@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser, getPersistedUserState, saveClientDraftState, getRatingBoosts, awardDailyCredits } from "@/lib/server/db";
+import { getCurrentUser, getPersistedUserState, saveClientDraftState, getRatingBoosts, awardDailyCredits, awardNationCompletionRewards } from "@/lib/server/db";
 import { settleUserLive } from "@/lib/server/live";
 
 export async function GET() {
@@ -8,6 +8,7 @@ export async function GET() {
 
   awardDailyCredits(user.id);
   settleUserLive(user.id);
+  awardNationCompletionRewards(user.id);
   const state = getPersistedUserState(user.id);
   const ratingBoosts = getRatingBoosts(user.id);
   return NextResponse.json({ state: { ...state, ratingBoosts } });

@@ -85,7 +85,7 @@ function SimpleRules() {
           rows={rarityRows.map((row) => [<span key={row.rarity} className={row.colour}>{row.rarity}</span>, row.rating, row.chance])}
         />
         <p className="mt-3 text-green-900/70">
-          Log in to receive <strong>2 free pack credits per day</strong>. Match wins earn more from your locked squad, and you can trade <strong>duplicate stickers one-for-one</strong> with other players on the Sticker Album page.
+          Log in to receive <strong>2 free pack credits per day</strong> — a <strong>7-day activity streak</strong> makes it 3. Match wins earn more from your locked squad, completing a nation&apos;s album page earns <strong>5 bonus credits</strong>, and you can trade <strong>duplicate stickers one-for-one</strong> on the Sticker Album page.
         </p>
       </Section>
 
@@ -193,6 +193,8 @@ function DetailedRules() {
           </p>
           <ul className="mt-3 list-disc space-y-1 pl-5 text-green-900/70">
             <li><strong>2 free credits</strong> are added to your balance every day you log in.</li>
+            <li><strong>Activity streaks:</strong> log activity 7 days in a row and the daily grant becomes <strong>3 credits</strong> for as long as the streak holds. Miss a day and the streak resets.</li>
+            <li><strong>Album milestones:</strong> collect every sticker on a nation&apos;s page and earn <strong>5 bonus credits</strong>, once per nation.</li>
             <li><strong>Sticker trading:</strong> offer a duplicate up for trade on the Sticker Album page. Another player accepts by giving one of their own duplicates back — one for one. You only ever trade spares, so your placed stickers are safe.</li>
             <li><strong>Match credits</strong> are earned when players in your locked squad represent a winning nation.</li>
             <li>A match win gives <strong>3 credits per eligible locked player</strong>.</li>

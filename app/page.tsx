@@ -51,6 +51,7 @@ export default function Home() {
   const [communityKm, setCommunityKm] = useState<number | null>(null);
   const [feed, setFeed] = useState<FeedEntry[]>([]);
   const [rewardCredits, setRewardCredits] = useState<number | null>(null);
+  const [streak, setStreak] = useState(0);
   const [matchday, setMatchday] = useState<LockStatus | null>(null);
   const [redeemAmount, setRedeemAmount] = useState(1);
   const [redeeming, setRedeeming] = useState(false);
@@ -67,7 +68,10 @@ export default function Home() {
       .catch(() => {});
     fetch("/api/credits", { credentials: "include" })
       .then((r) => r.json())
-      .then((p) => setRewardCredits(p.credits ?? 0))
+      .then((p) => {
+        setRewardCredits(p.credits ?? 0);
+        setStreak(p.streak ?? 0);
+      })
       .catch(() => {});
     fetch("/api/km-log")
       .then((r) => r.json())
@@ -128,7 +132,14 @@ export default function Home() {
       <section className="mb-4 rounded-lg border border-green-900/10 bg-white p-4 shadow-sm">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-xs font-black uppercase tracking-wide text-green-900/50">Next best move</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-xs font-black uppercase tracking-wide text-green-900/50">Next best move</p>
+              {streak > 0 ? (
+                <span className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wide ${streak >= 7 ? "bg-orange-100 text-orange-800" : "bg-green-950/5 text-green-900/60"}`}>
+                  🔥 {streak}-day streak{streak >= 7 ? " · +1 daily credit" : streak >= 4 ? ` · ${7 - streak} to bonus` : ""}
+                </span>
+              ) : null}
+            </div>
             <h2 className="mt-1 text-2xl font-black text-green-950">{rewardCredits && rewardCredits > 0 ? "Open your available packs" : "Log activity to earn your next sticker"}</h2>
             <p className="mt-1 text-sm font-semibold text-green-900/65">
               {state ? `${state.kmBalance.toFixed(2)} activity credits banked. ${(1 - state.kmBalance).toFixed(2)} to the next pull.` : "Loading your progress..."}
@@ -250,7 +261,7 @@ export default function Home() {
                 <div key={i} className="flex items-start justify-between gap-3 rounded-md bg-green-950/5 px-3 py-2">
                   <div className="min-w-0">
                     <div className="flex min-w-0 flex-wrap items-center gap-2">
-                      <p className="truncate text-sm font-black text-green-950">{entry.username}</p>
+                      <Link className="truncate text-sm font-black text-green-950 hover:underline" href={`/profile/${encodeURIComponent(entry.username)}`}>{entry.username}</Link>
                       <ActivityBadge type={entry.activity_type} />
                     </div>
                     <p className="mt-1 text-xs font-semibold text-green-900/60">{formatActivity(entry)} · {formatDate(entry.created_at)}</p>

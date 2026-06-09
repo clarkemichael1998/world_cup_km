@@ -54,7 +54,9 @@ export default function LeaderboardPage() {
                 return (
                   <tr key={entry.username} className={`border-b border-green-900/10 last:border-0 ${i === 0 ? "bg-amber-50" : "hover:bg-green-950/[0.03]"}`}>
                     <td className="px-4 py-3 text-center font-black text-green-900/40">{medal ?? i + 1}</td>
-                    <td className="px-4 py-3 font-black text-green-950">{entry.username}</td>
+                    <td className="px-4 py-3 font-black text-green-950">
+                      <Link className="hover:underline" href={`/profile/${encodeURIComponent(entry.username)}`}>{entry.username}</Link>
+                    </td>
                     <td className="px-4 py-3 text-right text-lg font-black text-pitch">
                       {entry.best_squad_rating > 0 ? entry.best_squad_rating.toFixed(1) : "—"}
                     </td>
@@ -87,7 +89,7 @@ export default function LeaderboardPage() {
                   {day.entries.slice(0, 5).map((entry, i) => (
                     <div key={entry.username} className="grid grid-cols-[24px_1fr_auto_auto] items-center gap-2 text-sm">
                       <span className="font-black text-green-900/40">{i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : i + 1}</span>
-                      <span className="truncate font-bold text-green-950">{entry.username}</span>
+                      <Link className="truncate font-bold text-green-950 hover:underline" href={`/profile/${encodeURIComponent(entry.username)}`}>{entry.username}</Link>
                       <span className="font-black text-amber-700">{entry.credits > 0 ? `+${entry.credits}cr` : "—"}</span>
                       <span className={`w-12 text-right font-black ${entry.boost > 0 ? "text-green-700" : entry.boost < 0 ? "text-red-600" : "text-green-900/30"}`}>
                         {entry.boost !== 0 ? (entry.boost > 0 ? `+${entry.boost}` : entry.boost) : "—"}

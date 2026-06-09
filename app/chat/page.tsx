@@ -143,7 +143,7 @@ export default function ChatPage() {
                 <article id={`chat-message-${item.id}`} key={item.id} className={`rounded-md border px-3 py-2 shadow-sm transition ${highlightedMessageId === item.id ? "ring-2 ring-amber-400" : ""} ${tone.container}`}>
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex min-w-0 items-center gap-2">
-                      <p className={`truncate text-sm font-black ${tone.name}`}>{item.username}</p>
+                      <Link className={`truncate text-sm font-black hover:underline ${tone.name}`} href={`/profile/${encodeURIComponent(item.username)}`}>{item.username}</Link>
                       {tone.badge ? <span className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wide ${tone.badgeClass}`}>{tone.badge}</span> : null}
                     </div>
                     <time className="text-xs font-bold text-green-900/50">{formatDate(item.created_at)}</time>

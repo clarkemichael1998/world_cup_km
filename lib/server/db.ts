@@ -295,6 +295,14 @@ export function getDb() {
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       PRIMARY KEY (match_id, player_id, event_type)
     );
+    CREATE TABLE IF NOT EXISTS nation_completion_rewards (
+      user_id INTEGER NOT NULL,
+      nation TEXT NOT NULL,
+      credits INTEGER NOT NULL,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (user_id, nation),
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
   `);
   migrateKmLogActivity(db);
   migrateChatMessages(db);
@@ -751,6 +759,8 @@ export function getRatingBoosts(userId: number): Record<number, number> {
 }
 
 const DAILY_FREE_CREDITS = 2;
+const STREAK_THRESHOLD_DAYS = 7;
+const STREAK_BONUS_CREDITS = 1;
 
 export function awardDailyCredits(userId: number): number {
   const db = getDb();
@@ -761,8 +771,61 @@ export function awardDailyCredits(userId: number): number {
     .prepare("UPDATE user_state SET daily_credits_granted_date = ? WHERE user_id = ? AND (daily_credits_granted_date IS NULL OR daily_credits_granted_date <> ?)")
     .run(todayUTC, userId, todayUTC);
   if (result.changes === 0) return 0;
-  db.prepare("UPDATE users SET reward_credits = reward_credits + ? WHERE id = ?").run(DAILY_FREE_CREDITS, userId);
-  return DAILY_FREE_CREDITS;
+  const streakBonus = getActivityStreak(userId) >= STREAK_THRESHOLD_DAYS ? STREAK_BONUS_CREDITS : 0;
+  db.prepare("UPDATE users SET reward_credits = reward_credits + ? WHERE id = ?").run(DAILY_FREE_CREDITS + streakBonus, userId);
+  return DAILY_FREE_CREDITS + streakBonus;
+}
+
+// Consecutive days with at least one valid activity log, counting a run that
+// ends today or yesterday (so the streak isn't broken before today's workout).
+export function getActivityStreak(userId: number): number {
+  const rows = getDb()
+    .prepare("SELECT DISTINCT date(created_at) AS day FROM km_log WHERE user_id = ? AND voided_at IS NULL ORDER BY day DESC")
+    .all(userId) as Array<{ day: string }>;
+  if (rows.length === 0) return 0;
+
+  const dayMs = 86400000;
+  const today = new Date().toISOString().slice(0, 10);
+  const yesterday = new Date(Date.now() - dayMs).toISOString().slice(0, 10);
+  if (rows[0].day !== today && rows[0].day !== yesterday) return 0;
+
+  let streak = 1;
+  for (let i = 1; i < rows.length; i++) {
+    const expected = new Date(new Date(`${rows[i - 1].day}T12:00:00Z`).getTime() - dayMs).toISOString().slice(0, 10);
+    if (rows[i].day !== expected) break;
+    streak++;
+  }
+  return streak;
+}
+
+const NATION_COMPLETION_CREDITS = 5;
+
+export function awardNationCompletionRewards(userId: number): string[] {
+  const db = getDb();
+  const ownedIds = new Set(
+    (db.prepare("SELECT player_id FROM user_players WHERE user_id = ?").all(userId) as Array<{ player_id: number }>).map((r) => r.player_id)
+  );
+  if (ownedIds.size === 0) return [];
+
+  const byNation = new Map<string, number[]>();
+  for (const player of getAllPlayers()) {
+    const list = byNation.get(player.nation) ?? [];
+    list.push(player.id);
+    byNation.set(player.nation, list);
+  }
+
+  const claim = db.prepare("INSERT OR IGNORE INTO nation_completion_rewards (user_id, nation, credits) VALUES (?, ?, ?)");
+  const awarded: string[] = [];
+  for (const [nation, playerIds] of byNation) {
+    if (!playerIds.every((id) => ownedIds.has(id))) continue;
+    const result = claim.run(userId, nation, NATION_COMPLETION_CREDITS);
+    if (result.changes === 0) continue;
+    db.prepare("UPDATE users SET reward_credits = reward_credits + ? WHERE id = ?").run(NATION_COMPLETION_CREDITS, userId);
+    awarded.push(nation);
+    const username = (db.prepare("SELECT username FROM users WHERE id = ?").get(userId) as { username: string } | undefined)?.username ?? "Someone";
+    createAdminChatMessage(`📖 Album milestone: ${username} completed the ${nation} page and earned ${NATION_COMPLETION_CREDITS} pack credits!`);
+  }
+  return awarded;
 }
 
 export function spendCreditsForPlayers(userId: number, amount: number, playerIds: number[]): boolean {
@@ -1382,6 +1445,56 @@ export function claimBoostAnnouncement(matchId: string, playerId: number, eventT
     .prepare("INSERT OR IGNORE INTO boost_announcements (match_id, player_id, event_type) VALUES (?, ?, ?)")
     .run(matchId, playerId, eventType);
   return result.changes > 0;
+}
+
+export function getProfileData(username: string) {
+  const db = getDb();
+  const user = db.prepare("SELECT id, username, created_at FROM users WHERE username = ?").get(username.trim().toLowerCase()) as
+    | { id: number; username: string; created_at: string }
+    | undefined;
+  if (!user) return null;
+
+  const ownedRows = db
+    .prepare("SELECT player_id, duplicate_count FROM user_players WHERE user_id = ?")
+    .all(user.id) as Array<{ player_id: number; duplicate_count: number }>;
+  const state = db.prepare("SELECT total_km FROM user_state WHERE user_id = ?").get(user.id) as { total_km: number } | undefined;
+  const wins = db
+    .prepare("SELECT COUNT(DISTINCT match_id) AS games, COALESCE(SUM(credits), 0) AS credits FROM reward_events WHERE user_id = ?")
+    .get(user.id) as { games: number; credits: number };
+  const boosts = db
+    .prepare("SELECT player_id, match_id, boost_amount, created_at FROM goal_boosts WHERE user_id = ? ORDER BY created_at DESC")
+    .all(user.id) as Array<{ player_id: number; match_id: string; boost_amount: number; created_at: string }>;
+  const completedNations = db
+    .prepare("SELECT nation FROM nation_completion_rewards WHERE user_id = ? ORDER BY created_at")
+    .all(user.id) as Array<{ nation: string }>;
+
+  const locks = db
+    .prepare("SELECT id, lock_date FROM locked_squads WHERE user_id = ? ORDER BY lock_date DESC LIMIT 14")
+    .all(user.id) as Array<{ id: number; lock_date: string }>;
+  const lockPlayers = db.prepare("SELECT slot, player_id FROM locked_squad_players WHERE locked_squad_id = ? ORDER BY slot");
+
+  return {
+    username: user.username,
+    joinedAt: user.created_at,
+    totalKm: state?.total_km ?? 0,
+    gamesWon: wins.games,
+    winCredits: wins.credits,
+    streak: getActivityStreak(user.id),
+    ownedPlayerIds: ownedRows.map((row) => row.player_id),
+    duplicateCounts: Object.fromEntries(ownedRows.map((row) => [row.player_id, row.duplicate_count])),
+    completedNations: completedNations.map((row) => row.nation),
+    boosts: boosts.map((row) => ({
+      playerId: row.player_id,
+      matchId: row.match_id.endsWith(":assist") ? row.match_id.slice(0, -7) : row.match_id,
+      type: row.match_id.endsWith(":assist") ? ("assist" as const) : ("goal" as const),
+      amount: row.boost_amount,
+      createdAt: row.created_at
+    })),
+    lockedHistory: locks.map((lock) => ({
+      lockDate: lock.lock_date,
+      players: (lockPlayers.all(lock.id) as Array<{ slot: string; player_id: number }>).map((row) => ({ slot: row.slot, playerId: row.player_id }))
+    }))
+  };
 }
 
 export function getOpenTradeOffers() {
