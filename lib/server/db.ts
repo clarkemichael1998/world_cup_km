@@ -664,6 +664,29 @@ export function saveDraftSquad(userId: number, squad: Partial<Record<SquadSlot, 
   for (const [slot, playerId] of Object.entries(squad)) {
     if (playerId) insert.run(userId, slot, playerId);
   }
+  refreshFutureLockedSquads(userId, squad);
+}
+
+// Squad edits made before a lock window starts must count ("changed freely
+// until the daily lock"), so re-snapshot any lock whose window hasn't begun.
+function refreshFutureLockedSquads(userId: number, squad: Partial<Record<SquadSlot, number>>) {
+  const database = getDb();
+  const nowIso = new Date().toISOString();
+  const futureLocks = database
+    .prepare("SELECT id FROM locked_squads WHERE user_id = ? AND locked_at > ?")
+    .all(userId, nowIso) as Array<{ id: number }>;
+  if (futureLocks.length === 0) return;
+
+  const playerNationMap = new Map(getAllPlayers().map((p) => [p.id, p]));
+  const deletePlayers = database.prepare("DELETE FROM locked_squad_players WHERE locked_squad_id = ?");
+  const insertPlayer = database.prepare("INSERT INTO locked_squad_players (locked_squad_id, slot, player_id, nation) VALUES (?, ?, ?, ?)");
+  for (const lock of futureLocks) {
+    deletePlayers.run(lock.id);
+    for (const [slot, playerId] of Object.entries(squad)) {
+      const p = playerId ? playerNationMap.get(playerId) : undefined;
+      if (p) insertPlayer.run(lock.id, slot, p.id, p.nation);
+    }
+  }
 }
 
 export function getDraftSquad(userId: number) {

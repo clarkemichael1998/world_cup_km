@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAllPlayers, getCurrentUser, getLockedSquadForDate, getUpcomingFixtures, lockSquadForDate, unlockSquadForDate } from "@/lib/server/db";
 import { syncFixtureResults } from "@/lib/server/fixtures";
+import { settleUserLive } from "@/lib/server/live";
 import type { Player } from "@/lib/types";
 
 // Returns the "next" lock window — always the next 11am London that hasn't passed yet
@@ -36,6 +37,7 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: "Login required" }, { status: 401 });
 
   await syncFixtureResults();
+  settleUserLive(user.id);
   const window = nextLockWindow();
   const locked = getLockedSquadForDate(user.id, window.lockDate);
   const fixtures = getUpcomingFixtures(window.lockDate);

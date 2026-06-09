@@ -1,4 +1,4 @@
-import { getAllPlayers, getDb, awardGoalBoost, getMatchedGoalScorers, getMatchedAssistScorers } from "./db";
+import { getAllPlayers, getDb, awardGoalBoost, getMatchedGoalScorers, getMatchedAssistScorers, lockSquadForDate } from "./db";
 import { getProviderStatus, type ProviderStatus } from "./fixtures";
 import { GOAL_BOOST_BY_RARITY, ASSIST_BOOST_BY_RARITY, getPlayerById } from "./goalScorers";
 import type { Player, SquadSlot } from "@/lib/types";
@@ -29,6 +29,7 @@ export function getLiveStatus(userId: number, now = new Date()): LiveStatus {
   const playerMap = new Map<number, Player>(getAllPlayers().map((p) => [p.id, p]));
   const tournamentActive = window.lockDate >= tournamentStart && window.lockDate <= tournamentEnd;
   if (tournamentActive) {
+    ensureCurrentWindowLock(userId, now);
     settleUserLiveAwards(userId);
   }
 
@@ -96,9 +97,31 @@ export function getLiveStatus(userId: number, now = new Date()): LiveStatus {
 export function settleAllLiveAwards() {
   const rows = getDb().prepare("SELECT id FROM users").all() as Array<{ id: number }>;
   for (const row of rows) {
-    settleUserLiveAwards(row.id);
+    settleUserLive(row.id);
   }
   return { usersSettled: rows.length };
+}
+
+// Settle entry point for any authenticated request: auto-locks the current
+// window from the draft squad if the user never pressed Lock, then settles.
+export function settleUserLive(userId: number, now = new Date()) {
+  const window = londonLockWindow(now);
+  const tournamentActive = window.lockDate >= tournamentStart && window.lockDate <= tournamentEnd;
+  if (!tournamentActive) return;
+  ensureCurrentWindowLock(userId, now);
+  settleUserLiveAwards(userId);
+}
+
+function ensureCurrentWindowLock(userId: number, now: Date) {
+  const window = londonLockWindow(now);
+  const database = getDb();
+  const existing = database.prepare("SELECT id FROM locked_squads WHERE user_id = ? AND lock_date = ?").get(userId, window.lockDate);
+  if (existing) return;
+  // Auto-lock from the draft squad. locked_at is the auto-lock creation time
+  // (not the 11:00 window start), so matches that kicked off before the user
+  // first showed up today cannot be claimed by editing the draft afterwards.
+  const lockedAt = now > window.lockAt ? now : window.lockAt;
+  lockSquadForDate(userId, window.lockDate, lockedAt.toISOString(), window.unlockAt.toISOString());
 }
 
 function settleUserLiveAwards(userId: number) {
