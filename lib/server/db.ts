@@ -712,20 +712,15 @@ const DAILY_FREE_CREDITS = 2;
 
 export function awardDailyCredits(userId: number): number {
   const db = getDb();
+  ensureUserState(userId);
   const todayUTC = new Date().toISOString().slice(0, 10);
-  const row = db.prepare("SELECT daily_credits_granted_date FROM user_state WHERE user_id = ?").get(userId) as { daily_credits_granted_date: string | null } | undefined;
-  if (row?.daily_credits_granted_date === todayUTC) return 0;
-  db.prepare("UPDATE user_state SET daily_credits_granted_date = ? WHERE user_id = ?").run(todayUTC, userId);
+  // Atomic claim: only one concurrent caller can flip the date for today.
+  const result = db
+    .prepare("UPDATE user_state SET daily_credits_granted_date = ? WHERE user_id = ? AND (daily_credits_granted_date IS NULL OR daily_credits_granted_date <> ?)")
+    .run(todayUTC, userId, todayUTC);
+  if (result.changes === 0) return 0;
   db.prepare("UPDATE users SET reward_credits = reward_credits + ? WHERE id = ?").run(DAILY_FREE_CREDITS, userId);
   return DAILY_FREE_CREDITS;
-}
-
-export function spendCredits(userId: number, amount: number): boolean {
-  const db = getDb();
-  const user = db.prepare("SELECT reward_credits FROM users WHERE id = ?").get(userId) as { reward_credits: number } | undefined;
-  if (!user || user.reward_credits < amount) return false;
-  db.prepare("UPDATE users SET reward_credits = reward_credits - ? WHERE id = ?").run(amount, userId);
-  return true;
 }
 
 export function spendCreditsForPlayers(userId: number, amount: number, playerIds: number[]): boolean {
@@ -1140,7 +1135,6 @@ export function logKmEntry({
 export function logActivityWithServerAwards({
   userId,
   activityCredits,
-  cardsEarned,
   activityType = "walk",
   activityAmount = activityCredits,
   activityUnit = "km",
@@ -1148,12 +1142,12 @@ export function logActivityWithServerAwards({
   rewardCreditValue,
   balanceBefore,
   balanceAfter,
-  awardedPlayerIds,
+  activityPlayerIds,
+  generateBonusPlayerIds,
   chatMessageId
 }: {
   userId: number;
   activityCredits: number;
-  cardsEarned: number;
   activityType?: ActivityType;
   activityAmount?: number;
   activityUnit?: string;
@@ -1161,7 +1155,8 @@ export function logActivityWithServerAwards({
   rewardCreditValue?: number;
   balanceBefore: number;
   balanceAfter: number;
-  awardedPlayerIds: number[];
+  activityPlayerIds: number[];
+  generateBonusPlayerIds: (count: number) => number[];
   chatMessageId?: number | null;
 }) {
   const database = getDb();
@@ -1170,15 +1165,24 @@ export function logActivityWithServerAwards({
 
   try {
     ensureUserState(userId);
-    const user = database.prepare("SELECT username FROM users WHERE id = ?").get(userId) as { username: string } | undefined;
+    const user = database.prepare("SELECT username, reward_credits FROM users WHERE id = ?").get(userId) as { username: string; reward_credits: number } | undefined;
     username = user?.username ?? "Someone";
     const current = database.prepare("SELECT total_km FROM user_state WHERE user_id = ?").get(userId) as { total_km: number };
     const newTotalKm = Number((current.total_km + activityCredits).toFixed(2));
 
+    // Consume bonus pack credits atomically: read fresh inside the transaction,
+    // convert exactly that many to pulls, and decrement by the amount consumed.
+    const bonusCredits = Math.max(0, Math.floor(user?.reward_credits ?? 0));
+    const bonusPlayerIds = bonusCredits > 0 ? generateBonusPlayerIds(bonusCredits) : [];
+    const awardedPlayerIds = [...activityPlayerIds, ...bonusPlayerIds];
+    const cardsEarned = awardedPlayerIds.length;
+
     database
       .prepare("UPDATE user_state SET total_km = ?, km_balance = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?")
       .run(newTotalKm, balanceAfter, userId);
-    database.prepare("UPDATE users SET reward_credits = 0 WHERE id = ?").run(userId);
+    if (bonusCredits > 0) {
+      database.prepare("UPDATE users SET reward_credits = reward_credits - ? WHERE id = ?").run(bonusCredits, userId);
+    }
 
     const result = database
       .prepare(
@@ -1211,7 +1215,7 @@ export function logActivityWithServerAwards({
 
     database.exec("COMMIT");
     announcePremiumPulls(userId, username, awardedPlayerIds, "activity");
-    return { logId, totalKm: newTotalKm, kmBalance: balanceAfter };
+    return { logId, totalKm: newTotalKm, kmBalance: balanceAfter, bonusCredits, awardedPlayerIds };
   } catch (error) {
     database.exec("ROLLBACK");
     throw error;
@@ -1751,6 +1755,9 @@ function migrateUserState(database: DatabaseSync) {
   const colNames = new Set(cols.map((c) => c.name));
   if (!colNames.has("daily_credits_granted_date")) {
     database.exec("ALTER TABLE user_state ADD COLUMN daily_credits_granted_date TEXT");
+  }
+  if (!colNames.has("live_settle_key")) {
+    database.exec("ALTER TABLE user_state ADD COLUMN live_settle_key TEXT");
   }
 }
 

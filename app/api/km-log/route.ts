@@ -47,11 +47,8 @@ export async function POST(request: Request) {
   const activityCredits = calculateActivityCredits(activityType, amount);
   const currentState = getPersistedUserState(user.id);
   const preview = calculateRewards(activityCredits, currentState.kmBalance, multiplier);
-  const bonusCredits = Math.max(0, Math.floor(user.rewardCredits));
-  const cardsEarned = preview.rewards + bonusCredits;
   const allPlayers = getAllPlayers();
-  const awardedPlayers = Array.from({ length: cardsEarned }, () => getRandomPlayerFromPool(allPlayers));
-  const awardedPlayerIds = awardedPlayers.map((player) => player.id);
+  const activityPlayerIds = Array.from({ length: preview.rewards }, () => getRandomPlayerFromPool(allPlayers).id);
   const comment = typeof body.comment === "string" ? body.comment.trim().slice(0, 240) : "";
   const rewardCreditValue = Number((activityCredits * multiplier).toFixed(2));
   const activityCardsEarned = preview.rewards;
@@ -70,7 +67,6 @@ export async function POST(request: Request) {
   const persisted = logActivityWithServerAwards({
     userId: user.id,
     activityCredits,
-    cardsEarned,
     activityType,
     activityAmount: amount,
     activityUnit: activity.unit,
@@ -78,7 +74,8 @@ export async function POST(request: Request) {
     rewardCreditValue,
     balanceBefore: currentState.kmBalance,
     balanceAfter: preview.newBalance,
-    awardedPlayerIds,
+    activityPlayerIds,
+    generateBonusPlayerIds: (count) => Array.from({ length: count }, () => getRandomPlayerFromPool(allPlayers).id),
     chatMessageId
   });
   const nextState = getPersistedUserState(user.id);
@@ -86,9 +83,9 @@ export async function POST(request: Request) {
     ok: true,
     logsRemaining: MAX_LOGS_PER_DAY - logsToday - 1,
     multiplier,
-    bonusCredits,
-    playerIds: awardedPlayerIds,
-    players: awardedPlayerIds.map((id) => allPlayers.find((player) => player.id === id)).filter(Boolean),
+    bonusCredits: persisted.bonusCredits,
+    playerIds: persisted.awardedPlayerIds,
+    players: persisted.awardedPlayerIds.map((id) => allPlayers.find((player) => player.id === id)).filter(Boolean),
     state: { ...nextState, totalKm: persisted.totalKm, kmBalance: persisted.kmBalance }
   });
 }

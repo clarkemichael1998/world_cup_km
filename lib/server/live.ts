@@ -102,8 +102,32 @@ export function settleAllLiveAwards() {
 }
 
 function settleUserLiveAwards(userId: number) {
+  const database = getDb();
+  // Cheap change-detection: skip the full rescan unless results, scorer
+  // resolutions, or this user's locked squads changed since the last settle.
+  const settleKey = computeSettleKey(database, userId);
+  const row = database.prepare("SELECT live_settle_key FROM user_state WHERE user_id = ?").get(userId) as { live_settle_key: string | null } | undefined;
+  if (row?.live_settle_key === settleKey) return;
+
   awardResultCredits(userId);
   awardGoalBoosts(userId);
+  database.prepare("UPDATE user_state SET live_settle_key = ? WHERE user_id = ?").run(settleKey, userId);
+}
+
+function computeSettleKey(database: ReturnType<typeof getDb>, userId: number): string {
+  const fixtures = database
+    .prepare("SELECT COUNT(*) AS c, COALESCE(MAX(updated_at), '') AS m FROM fixture_results WHERE status = 'FINISHED' AND verified = 1")
+    .get() as { c: number; m: string };
+  const goals = database
+    .prepare("SELECT COUNT(*) AS c, COALESCE(SUM(id), 0) AS s, COALESCE(SUM(goal_count), 0) AS n FROM goal_scorers WHERE status = 'matched' AND player_id IS NOT NULL")
+    .get() as { c: number; s: number; n: number };
+  const assists = database
+    .prepare("SELECT COUNT(*) AS c, COALESCE(SUM(id), 0) AS s, COALESCE(SUM(assist_count), 0) AS n FROM assist_scorers WHERE status = 'matched' AND player_id IS NOT NULL")
+    .get() as { c: number; s: number; n: number };
+  const squads = database
+    .prepare("SELECT COUNT(*) AS c FROM locked_squads WHERE user_id = ?")
+    .get(userId) as { c: number };
+  return `f${fixtures.c}@${fixtures.m}|g${goals.c}.${goals.s}.${goals.n}|a${assists.c}.${assists.s}.${assists.n}|s${squads.c}`;
 }
 
 function getBestOwnedSquadLeaderboard(playerMap: Map<number, Player>) {
@@ -166,19 +190,26 @@ function awardResultCredits(userId: number) {
   const insertReward = database.prepare("INSERT OR IGNORE INTO reward_events (user_id, locked_squad_id, match_id, player_id, credits) VALUES (?, ?, ?, ?, ?)");
   const incrementUser = database.prepare("UPDATE users SET reward_credits = reward_credits + ? WHERE id = ?");
 
-  for (const locked of allLocked) {
-    const matches = database
-      .prepare("SELECT match_id, winner FROM fixture_results WHERE status = 'FINISHED' AND verified = 1 AND winner IS NOT NULL AND kickoff_at >= ? AND kickoff_at < ?")
-      .all(locked.locked_at, locked.unlock_at) as Array<{ match_id: string; winner: string }>;
-    const lockedPlayers = database.prepare("SELECT player_id, nation FROM locked_squad_players WHERE locked_squad_id = ?").all(locked.id) as Array<{ player_id: number; nation: string }>;
+  database.exec("BEGIN IMMEDIATE");
+  try {
+    for (const locked of allLocked) {
+      const matches = database
+        .prepare("SELECT match_id, winner FROM fixture_results WHERE status = 'FINISHED' AND verified = 1 AND winner IS NOT NULL AND kickoff_at >= ? AND kickoff_at < ?")
+        .all(locked.locked_at, locked.unlock_at) as Array<{ match_id: string; winner: string }>;
+      const lockedPlayers = database.prepare("SELECT player_id, nation FROM locked_squad_players WHERE locked_squad_id = ?").all(locked.id) as Array<{ player_id: number; nation: string }>;
 
-    for (const match of matches) {
-      for (const player of lockedPlayers) {
-        if (player.nation !== match.winner) continue;
-        const result = insertReward.run(userId, locked.id, match.match_id, player.player_id, creditValue);
-        if (result.changes > 0) incrementUser.run(creditValue, userId);
+      for (const match of matches) {
+        for (const player of lockedPlayers) {
+          if (player.nation !== match.winner) continue;
+          const result = insertReward.run(userId, locked.id, match.match_id, player.player_id, creditValue);
+          if (result.changes > 0) incrementUser.run(creditValue, userId);
+        }
       }
     }
+    database.exec("COMMIT");
+  } catch (error) {
+    database.exec("ROLLBACK");
+    throw error;
   }
 }
 
