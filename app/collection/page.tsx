@@ -12,36 +12,56 @@ import type { Player, Position, Rarity, UserState } from "@/lib/types";
 
 const positions: Array<Position | "all"> = ["all", "GK", "DF", "MF", "FW"];
 
+type TradeOffer = { id: number; username: string; playerId: number; createdAt: string; isMine: boolean };
+type RecentTrade = { offererUsername: string; acceptorUsername: string; playerId: number; acceptedPlayerId: number; completedAt: string };
+
 export default function CollectionPage() {
   const [state, setState] = useState<UserState | null>(null);
   const [nation, setNation] = useState("Argentina");
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
   const [nationSort, setNationSort] = useState<"alpha" | "closest">("closest");
   const [playerPool, setPlayerPool] = useState<Player[]>(basePlayerPool);
-  const [exchanging, setExchanging] = useState(false);
-  const [exchangeNotice, setExchangeNotice] = useState("");
+  const [offers, setOffers] = useState<TradeOffer[]>([]);
+  const [recentTrades, setRecentTrades] = useState<RecentTrade[]>([]);
+  const [offerPlayerId, setOfferPlayerId] = useState<number | "">("");
+  const [acceptSelections, setAcceptSelections] = useState<Record<number, number>>({});
+  const [tradeBusy, setTradeBusy] = useState(false);
+  const [tradeNotice, setTradeNotice] = useState("");
 
   useEffect(() => {
     loadUserStateAsync().then(setState);
     loadPlayerPool().then(setPlayerPool);
+    loadTrades();
   }, []);
 
-  async function exchangeDuplicates() {
-    if (exchanging) return;
-    setExchanging(true);
-    setExchangeNotice("");
+  async function loadTrades() {
     try {
-      const response = await fetch("/api/exchange", { method: "POST", credentials: "include" });
+      const response = await fetch("/api/trades", { credentials: "include" });
+      if (!response.ok) return;
       const payload = await response.json();
-      if (!response.ok) {
-        setExchangeNotice(payload.error ?? "Exchange failed.");
-        return;
-      }
-      setExchangeNotice(`Swapped ${payload.duplicatesSpent} duplicates for ${payload.creditsGained} pack credit${payload.creditsGained === 1 ? "" : "s"}!`);
+      setOffers(payload.offers ?? []);
+      setRecentTrades(payload.recent ?? []);
+    } catch {}
+  }
+
+  async function tradeAction(body: Record<string, unknown>, successNotice: string) {
+    if (tradeBusy) return;
+    setTradeBusy(true);
+    setTradeNotice("");
+    try {
+      const response = await fetch("/api/trades", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(body)
+      });
+      const payload = await response.json();
+      setTradeNotice(response.ok ? successNotice : payload.error ?? "Trade action failed.");
+      await loadTrades();
       const refreshed = await loadUserStateAsync();
       setState(refreshed);
     } finally {
-      setExchanging(false);
+      setTradeBusy(false);
     }
   }
 
@@ -71,33 +91,115 @@ export default function CollectionPage() {
     .filter((item) => item.count > 0);
   const albumCode = `KMXI-${nation.slice(0, 3).toUpperCase()}-${String(collectedOnPage).padStart(2, "0")}`;
   const selectedFlag = flagUrl(nation);
-  const totalDuplicates = state ? Object.values(state.duplicateCounts).reduce((sum, count) => sum + (count ?? 0), 0) : 0;
-  const exchangeableCredits = Math.floor(totalDuplicates / 3);
+  const playerById = useMemo(() => new Map(playerPool.map((player) => [player.id, player])), [playerPool]);
+  const myDuplicates = useMemo(
+    () =>
+      Object.entries(state?.duplicateCounts ?? {})
+        .filter(([, count]) => (count ?? 0) > 0)
+        .map(([id]) => playerById.get(Number(id)))
+        .filter((player): player is Player => Boolean(player))
+        .sort((a, b) => b.rating - a.rating || a.name.localeCompare(b.name)),
+    [state, playerById]
+  );
+  const showTradePanel = myDuplicates.length > 0 || offers.length > 0;
 
   return (
     <div>
       <PageTitle title="Sticker Album" subtitle={`${owned.length} official KMXI sticker${owned.length === 1 ? "" : "s"} placed in your World Cup 2026 album.`} />
 
-      {totalDuplicates > 0 ? (
+      {showTradePanel ? (
         <section className="mb-5 rounded-lg border border-amber-300 bg-amber-50 p-4 shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-black uppercase tracking-wide text-amber-800">Duplicate Exchange</p>
-              <p className="mt-1 text-sm font-bold text-amber-900">
-                You have {totalDuplicates} duplicate{totalDuplicates === 1 ? "" : "s"}. 3 duplicates = 1 pack credit.
-                {exchangeableCredits === 0 ? ` ${3 - totalDuplicates} more to your first swap.` : ""}
-              </p>
-              {exchangeNotice ? <p className="mt-1 text-xs font-black text-amber-800">{exchangeNotice}</p> : null}
-            </div>
-            <button
-              onClick={exchangeDuplicates}
-              disabled={exchanging || exchangeableCredits === 0}
-              className="rounded-md bg-amber-600 px-5 py-2.5 text-sm font-black text-white hover:bg-amber-700 disabled:opacity-40"
+          <p className="text-sm font-black uppercase tracking-wide text-amber-800">Sticker Trading</p>
+          <p className="mt-1 text-xs font-semibold text-amber-700">
+            Offer a duplicate up for trade. Anyone can accept by giving one of their own duplicates back — one for one. You always keep your placed sticker.
+          </p>
+          {tradeNotice ? <p className="mt-2 rounded-md bg-amber-100 px-3 py-1.5 text-xs font-black text-amber-900">{tradeNotice}</p> : null}
+
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <select
+              className="rounded-md border border-amber-300 bg-white px-3 py-2 text-sm font-bold text-amber-950"
+              value={offerPlayerId}
+              onChange={(event) => setOfferPlayerId(event.target.value ? Number(event.target.value) : "")}
             >
-              {exchanging ? "Swapping..." : exchangeableCredits > 0 ? `Swap ${exchangeableCredits * 3} dupes → ${exchangeableCredits} credit${exchangeableCredits === 1 ? "" : "s"}` : "Not enough dupes yet"}
+              <option value="">{myDuplicates.length > 0 ? "Choose a duplicate to offer..." : "No duplicates to offer"}</option>
+              {myDuplicates.map((player) => (
+                <option key={player.id} value={player.id}>
+                  {player.name} ({player.rating} {player.rarity}) x{(state?.duplicateCounts[player.id] ?? 0) + 1}
+                </option>
+              ))}
+            </select>
+            <button
+              onClick={() => offerPlayerId !== "" && tradeAction({ action: "create", playerId: offerPlayerId }, "Offer posted — waiting for a taker.")}
+              disabled={tradeBusy || offerPlayerId === ""}
+              className="rounded-md bg-amber-600 px-4 py-2 text-sm font-black text-white hover:bg-amber-700 disabled:opacity-40"
+            >
+              Offer for Trade
             </button>
           </div>
-          <p className="mt-2 text-xs font-semibold text-amber-700">Lowest-rarity duplicates are spent first — your Icon dupes are safe until the end.</p>
+
+          {offers.length > 0 ? (
+            <div className="mt-4 space-y-2">
+              <p className="text-xs font-black uppercase tracking-wide text-amber-800/80">Open Offers</p>
+              {offers.map((offer) => {
+                const player = playerById.get(offer.playerId);
+                return (
+                  <div key={offer.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-amber-200 bg-white/70 px-3 py-2">
+                    <p className="min-w-0 text-sm font-bold text-amber-950">
+                      <span className="font-black">{offer.username}</span> offers{" "}
+                      <span className="font-black">{player ? `${player.name} (${player.rating} ${player.rarity})` : `Player ${offer.playerId}`}</span>
+                    </p>
+                    {offer.isMine ? (
+                      <button
+                        onClick={() => tradeAction({ action: "cancel", offerId: offer.id }, "Offer withdrawn.")}
+                        disabled={tradeBusy}
+                        className="rounded-md bg-amber-200 px-3 py-1.5 text-xs font-black text-amber-900 hover:bg-amber-300 disabled:opacity-40"
+                      >
+                        Cancel
+                      </button>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <select
+                          className="rounded-md border border-amber-300 bg-white px-2 py-1.5 text-xs font-bold text-amber-950"
+                          value={acceptSelections[offer.id] ?? ""}
+                          onChange={(event) => setAcceptSelections((prev) => ({ ...prev, [offer.id]: Number(event.target.value) }))}
+                        >
+                          <option value="">Give in return...</option>
+                          {myDuplicates.map((player) => (
+                            <option key={player.id} value={player.id}>
+                              {player.name} ({player.rating})
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          onClick={() => acceptSelections[offer.id] && tradeAction({ action: "accept", offerId: offer.id, playerId: acceptSelections[offer.id] }, "Trade complete!")}
+                          disabled={tradeBusy || !acceptSelections[offer.id]}
+                          className="rounded-md bg-pitch px-3 py-1.5 text-xs font-black text-white hover:bg-green-800 disabled:opacity-40"
+                        >
+                          Accept
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="mt-3 text-xs font-semibold text-amber-700/80">No open offers right now — post one above.</p>
+          )}
+
+          {recentTrades.length > 0 ? (
+            <div className="mt-4">
+              <p className="text-xs font-black uppercase tracking-wide text-amber-800/80">Recent Trades</p>
+              <div className="mt-1 space-y-1">
+                {recentTrades.slice(0, 5).map((trade, index) => (
+                  <p key={index} className="text-xs font-semibold text-amber-800">
+                    🔁 {trade.offererUsername} swapped {playerById.get(trade.playerId)?.name ?? `Player ${trade.playerId}`} to {trade.acceptorUsername} for{" "}
+                    {playerById.get(trade.acceptedPlayerId)?.name ?? `Player ${trade.acceptedPlayerId}`}
+                  </p>
+                ))}
+              </div>
+            </div>
+          ) : null}
         </section>
       ) : null}
 

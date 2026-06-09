@@ -276,6 +276,25 @@ export function getDb() {
       FOREIGN KEY (created_by) REFERENCES users(id),
       FOREIGN KEY (chat_message_id) REFERENCES chat_messages(id)
     );
+    CREATE TABLE IF NOT EXISTS trade_offers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      player_id INTEGER NOT NULL,
+      status TEXT NOT NULL DEFAULT 'open',
+      accepted_by INTEGER,
+      accepted_player_id INTEGER,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      completed_at TEXT,
+      FOREIGN KEY (user_id) REFERENCES users(id),
+      FOREIGN KEY (accepted_by) REFERENCES users(id)
+    );
+    CREATE TABLE IF NOT EXISTS boost_announcements (
+      match_id TEXT NOT NULL,
+      player_id INTEGER NOT NULL,
+      event_type TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (match_id, player_id, event_type)
+    );
   `);
   migrateKmLogActivity(db);
   migrateChatMessages(db);
@@ -1356,47 +1375,124 @@ export function getMatchdayHeadToHead(limit = 10) {
     }));
 }
 
-const DUPLICATES_PER_CREDIT = 3;
+// Returns true only for the first caller per (match, player, event) so a
+// goal/assist is announced once game-wide, not once per user who locked them.
+export function claimBoostAnnouncement(matchId: string, playerId: number, eventType: "goal" | "assist"): boolean {
+  const result = getDb()
+    .prepare("INSERT OR IGNORE INTO boost_announcements (match_id, player_id, event_type) VALUES (?, ?, ?)")
+    .run(matchId, playerId, eventType);
+  return result.changes > 0;
+}
 
-export function exchangeDuplicates(userId: number): { creditsGained: number; duplicatesSpent: number } {
+export function getOpenTradeOffers() {
+  return getDb()
+    .prepare(
+      `SELECT t.id, t.user_id, t.player_id, t.created_at, users.username
+       FROM trade_offers t
+       JOIN users ON users.id = t.user_id
+       WHERE t.status = 'open'
+       ORDER BY t.created_at DESC`
+    )
+    .all() as Array<{ id: number; user_id: number; player_id: number; created_at: string; username: string }>;
+}
+
+export function getRecentCompletedTrades(limit = 10) {
+  return getDb()
+    .prepare(
+      `SELECT t.player_id, t.accepted_player_id, t.completed_at,
+              offerer.username AS offerer_username, acceptor.username AS acceptor_username
+       FROM trade_offers t
+       JOIN users offerer ON offerer.id = t.user_id
+       JOIN users acceptor ON acceptor.id = t.accepted_by
+       WHERE t.status = 'completed'
+       ORDER BY t.completed_at DESC
+       LIMIT ?`
+    )
+    .all(limit) as Array<{ player_id: number; accepted_player_id: number; completed_at: string; offerer_username: string; acceptor_username: string }>;
+}
+
+export function createTradeOffer(userId: number, playerId: number): string | null {
   const db = getDb();
-  const rarityRank: Record<string, number> = { clowns: 0, common: 1, rare: 2, epic: 3, legend: 4, icon: 5 };
-  const playerMap = new Map(getAllPlayers().map((p) => [p.id, p]));
+  const owned = db.prepare("SELECT duplicate_count FROM user_players WHERE user_id = ? AND player_id = ?").get(userId, playerId) as { duplicate_count: number } | undefined;
+  if (!owned || owned.duplicate_count < 1) return "You can only offer a player you hold a duplicate of.";
 
+  const openForPlayer = db
+    .prepare("SELECT COUNT(*) AS c FROM trade_offers WHERE user_id = ? AND player_id = ? AND status = 'open'")
+    .get(userId, playerId) as { c: number };
+  if (openForPlayer.c >= owned.duplicate_count) return "All your spare copies of this player are already up for trade.";
+
+  db.prepare("INSERT INTO trade_offers (user_id, player_id) VALUES (?, ?)").run(userId, playerId);
+  return null;
+}
+
+export function cancelTradeOffer(userId: number, offerId: number): string | null {
+  const result = getDb()
+    .prepare("UPDATE trade_offers SET status = 'cancelled' WHERE id = ? AND user_id = ? AND status = 'open'")
+    .run(offerId, userId);
+  return result.changes > 0 ? null : "Offer not found or no longer open.";
+}
+
+export function acceptTradeOffer(offerId: number, acceptorId: number, offeredPlayerId: number): string | null {
+  const db = getDb();
   db.exec("BEGIN IMMEDIATE");
   try {
-    const rows = db
-      .prepare("SELECT player_id, duplicate_count FROM user_players WHERE user_id = ? AND duplicate_count > 0")
-      .all(userId) as Array<{ player_id: number; duplicate_count: number }>;
-    const totalDuplicates = rows.reduce((sum, row) => sum + row.duplicate_count, 0);
-    const creditsGained = Math.floor(totalDuplicates / DUPLICATES_PER_CREDIT);
-    if (creditsGained === 0) {
+    const offer = db
+      .prepare("SELECT id, user_id, player_id FROM trade_offers WHERE id = ? AND status = 'open'")
+      .get(offerId) as { id: number; user_id: number; player_id: number } | undefined;
+    if (!offer) {
       db.exec("ROLLBACK");
-      return { creditsGained: 0, duplicatesSpent: 0 };
+      return "That offer is no longer open.";
+    }
+    if (offer.user_id === acceptorId) {
+      db.exec("ROLLBACK");
+      return "You can't accept your own offer.";
+    }
+    if (offer.player_id === offeredPlayerId) {
+      db.exec("ROLLBACK");
+      return "Swapping a player for the same player would be pointless, even by clown standards.";
     }
 
-    // Spend lowest-value duplicates first so the exchange never eats a
-    // prized Icon dupe before a clown.
-    const ordered = rows.sort((a, b) => {
-      const pa = playerMap.get(a.player_id);
-      const pb = playerMap.get(b.player_id);
-      return (rarityRank[pa?.rarity ?? "common"] - rarityRank[pb?.rarity ?? "common"]) || ((pa?.rating ?? 0) - (pb?.rating ?? 0));
-    });
-    let toSpend = creditsGained * DUPLICATES_PER_CREDIT;
-    const updateDuplicate = db.prepare("UPDATE user_players SET duplicate_count = ? WHERE user_id = ? AND player_id = ?");
-    for (const row of ordered) {
-      if (toSpend === 0) break;
-      const spend = Math.min(row.duplicate_count, toSpend);
-      updateDuplicate.run(row.duplicate_count - spend, userId, row.player_id);
-      toSpend -= spend;
+    const offererDupe = db.prepare("SELECT duplicate_count FROM user_players WHERE user_id = ? AND player_id = ?").get(offer.user_id, offer.player_id) as { duplicate_count: number } | undefined;
+    if (!offererDupe || offererDupe.duplicate_count < 1) {
+      db.prepare("UPDATE trade_offers SET status = 'cancelled' WHERE id = ?").run(offer.id);
+      db.exec("COMMIT");
+      return "The offerer no longer has a spare copy — offer withdrawn.";
+    }
+    const acceptorDupe = db.prepare("SELECT duplicate_count FROM user_players WHERE user_id = ? AND player_id = ?").get(acceptorId, offeredPlayerId) as { duplicate_count: number } | undefined;
+    if (!acceptorDupe || acceptorDupe.duplicate_count < 1) {
+      db.exec("ROLLBACK");
+      return "You can only trade a player you hold a duplicate of.";
     }
 
-    db.prepare("UPDATE users SET reward_credits = reward_credits + ? WHERE id = ?").run(creditsGained, userId);
+    transferTradedPlayer(db, offer.user_id, acceptorId, offer.player_id);
+    transferTradedPlayer(db, acceptorId, offer.user_id, offeredPlayerId);
+
+    db.prepare("UPDATE trade_offers SET status = 'completed', accepted_by = ?, accepted_player_id = ?, completed_at = CURRENT_TIMESTAMP WHERE id = ?")
+      .run(acceptorId, offeredPlayerId, offer.id);
     db.exec("COMMIT");
-    return { creditsGained, duplicatesSpent: creditsGained * DUPLICATES_PER_CREDIT };
+
+    const playerMap = new Map(getAllPlayers().map((p) => [p.id, p]));
+    const offererName = (db.prepare("SELECT username FROM users WHERE id = ?").get(offer.user_id) as { username: string } | undefined)?.username ?? "Someone";
+    const acceptorName = (db.prepare("SELECT username FROM users WHERE id = ?").get(acceptorId) as { username: string } | undefined)?.username ?? "Someone";
+    const gave = playerMap.get(offer.player_id)?.name ?? `Player ${offer.player_id}`;
+    const got = playerMap.get(offeredPlayerId)?.name ?? `Player ${offeredPlayerId}`;
+    createAdminChatMessage(`🔁 Trade complete: ${offererName} swapped ${gave} to ${acceptorName} for ${got}.`);
+    return null;
   } catch (error) {
     db.exec("ROLLBACK");
     throw error;
+  }
+}
+
+// Moves one copy of a player from one user to another: the giver spends a
+// duplicate, the receiver gains a duplicate (if owned) or the sticker itself.
+function transferTradedPlayer(db: DatabaseSync, fromUserId: number, toUserId: number, playerId: number) {
+  db.prepare("UPDATE user_players SET duplicate_count = duplicate_count - 1 WHERE user_id = ? AND player_id = ?").run(fromUserId, playerId);
+  const existing = db.prepare("SELECT duplicate_count FROM user_players WHERE user_id = ? AND player_id = ?").get(toUserId, playerId);
+  if (existing) {
+    db.prepare("UPDATE user_players SET duplicate_count = duplicate_count + 1 WHERE user_id = ? AND player_id = ?").run(toUserId, playerId);
+  } else {
+    db.prepare("INSERT INTO user_players (user_id, player_id, duplicate_count) VALUES (?, ?, 0)").run(toUserId, playerId);
   }
 }
 
