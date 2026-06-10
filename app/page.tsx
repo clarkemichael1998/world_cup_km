@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { BrandLogo } from "@/components/BrandLogo";
+import { Button } from "@/components/Button";
 import { ChatFeed } from "@/components/ChatFeed";
 
 const WC_FINAL = new Date("2026-07-19T18:00:00Z");
@@ -114,13 +115,9 @@ export default function Home() {
               value={newsMessage}
               onChange={(event) => setNewsMessage(event.target.value)}
             />
-            <button
-              onClick={submitNews}
-              disabled={newsBusy || !newsMessage.trim()}
-              className="rounded-md bg-amber-600 px-5 py-2 text-sm font-black text-white hover:bg-amber-700 disabled:opacity-40"
-            >
+            <Button variant="accent" onClick={submitNews} disabled={newsBusy || !newsMessage.trim()}>
               {newsBusy ? "Publishing..." : "Publish"}
-            </button>
+            </Button>
           </div>
           {newsNotice ? <p className="mt-2 text-xs font-black text-amber-800">{newsNotice}</p> : null}
         </section>
@@ -140,10 +137,9 @@ export default function Home() {
               <button onClick={() => setRedeemAmount((a) => Math.min(rewardCredits, 20, a + 1))} disabled={redeemAmount >= Math.min(rewardCredits, 20)}
                 className="rounded-md bg-amber-200 px-2 py-1 text-sm font-black text-amber-900 hover:bg-amber-300 disabled:opacity-40">+</button>
             </div>
-            <button onClick={openPack} disabled={redeeming}
-              className="rounded-md bg-amber-600 px-5 py-2.5 font-black text-white hover:bg-amber-700 disabled:opacity-40">
+            <Button variant="accent" onClick={openPack} disabled={redeeming}>
               {redeeming ? "Opening…" : `Open ${redeemAmount}`}
-            </button>
+            </Button>
           </div>
         </section>
       ) : null}

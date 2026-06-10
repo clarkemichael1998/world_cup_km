@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
+import { Button } from "@/components/Button";
 import { PageTitle } from "@/components/PageTitle";
 import {
   activityDefinitions,
@@ -116,13 +117,9 @@ export default function AddKmPage() {
               setError("");
             }}
           />
-          <button
-            className="rounded-md bg-boot px-5 py-3 font-black text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
-            type="submit"
-            disabled={limitReached}
-          >
+          <Button variant="danger" size="lg" type="submit" disabled={limitReached}>
             Review
-          </button>
+          </Button>
         </div>
         <label className="mt-4 block text-sm font-bold uppercase tracking-wide text-green-900/70" htmlFor="activity-comment">
           Optional note for the group

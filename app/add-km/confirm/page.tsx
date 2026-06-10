@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { Button, buttonClasses } from "@/components/Button";
 import { PageTitle } from "@/components/PageTitle";
 import {
   activityDefinitions,
@@ -135,12 +136,12 @@ export default function ConfirmActivityPage() {
         {error ? <p className="mt-4 rounded-md bg-red-50 p-3 text-sm font-bold text-red-700">{error}</p> : null}
 
         <div className="mt-5 flex flex-wrap gap-3">
-          <Link href="/add-km" className="rounded-md bg-green-950/10 px-5 py-3 font-black text-green-950 hover:bg-green-950/15">
+          <Link href="/add-km" className={buttonClasses("ghost", "lg")}>
             Back to edit
           </Link>
-          <button className="rounded-md bg-boot px-5 py-3 font-black text-white hover:bg-red-700 disabled:opacity-50" disabled={submitting} onClick={submitFinal}>
+          <Button variant="danger" size="lg" disabled={submitting} onClick={submitFinal}>
             {submitting ? "Submitting..." : "Submit Activity"}
-          </button>
+          </Button>
         </div>
       </section>
     </div>

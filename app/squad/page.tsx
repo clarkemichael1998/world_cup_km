@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { Button, buttonClasses } from "@/components/Button";
 import { autoPickBestXI, calculateSquadRating, canPlaySlot, getOwnedPlayers, getPlayer, slotAllowedPositions, squadSlots } from "@/lib/squadUtils";
 import { loadUserStateAsync, saveUserState } from "@/lib/storage";
 import { flagUrl } from "@/lib/flags";
@@ -158,20 +159,20 @@ export default function SquadPage() {
           </div>
         </div>
         <div className="flex flex-wrap gap-2 self-start md:justify-end">
-          <Link href="/matchday-guide" className="rounded-md border border-green-900/15 bg-white px-4 py-2 text-sm font-black text-green-950 hover:bg-green-50">
+          <Link href="/matchday-guide" className={buttonClasses("outline", "md")}>
             Matchday Guide
           </Link>
-          <button className="rounded-md bg-boot px-4 py-2 text-sm font-black text-white hover:bg-red-700" onClick={autoPick}>
+          <Button variant="danger" onClick={autoPick}>
             Auto-pick Best XI
-          </button>
-          <button
-            className="rounded-md bg-pitch px-4 py-2 text-sm font-black text-white hover:bg-green-800 disabled:cursor-not-allowed disabled:opacity-45"
+          </Button>
+          <Button
+            variant="primary"
             onClick={autoPickPlayingToday}
             disabled={!lockStatus || lockStatus.upcomingFixtures.length === 0}
             title={!lockStatus || lockStatus.upcomingFixtures.length === 0 ? "No fixtures loaded for the lock date." : "Pick the best XI from nations playing on the lock date."}
           >
             Auto-pick Playing Today
-          </button>
+          </Button>
         </div>
       </div>
 

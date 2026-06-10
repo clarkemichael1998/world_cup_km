@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Button } from "@/components/Button";
 import { PageTitle } from "@/components/PageTitle";
 
 export default function LoginPage() {
@@ -48,9 +49,9 @@ export default function LoginPage() {
           ⚠️ There is no password recovery. If you forget your password, your account cannot be accessed. Write it down somewhere safe.
         </p>
         {error ? <p className="mt-3 text-sm font-bold text-red-700">{error}</p> : null}
-        <button className="mt-5 rounded-md bg-pitch px-5 py-3 font-black text-white hover:bg-green-800" disabled={busy}>
+        <Button type="submit" variant="primary" size="lg" className="mt-5" disabled={busy}>
           {busy ? "Working..." : "Continue"}
-        </button>
+        </Button>
       </form>
     </div>
   );
