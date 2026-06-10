@@ -103,8 +103,12 @@ export default function SquadPage() {
     setState(updated);
     saveUserState(updated);
     syncDraftSquad(updated.squad);
+    const playingCount = Object.values(updated.squad).filter((id) => {
+      const player = getPlayer(id, playerPool);
+      return player && playingNations.has(player.nation);
+    }).length;
     const selectedCount = Object.keys(updated.squad).length;
-    setLockNotice(`Auto-picked ${selectedCount}/11 players from nations playing on ${lockStatus.lockDate}.`);
+    setLockNotice(`Prioritised ${playingCount} player${playingCount === 1 ? "" : "s"} from nations playing on ${lockStatus.lockDate}, then filled the rest of your best XI (${selectedCount}/11).`);
   }
 
   const owned = state ? getOwnedPlayers(state, playerPool) : [];
@@ -445,20 +449,28 @@ function getFixtureNations(lockStatus: LockStatus) {
 }
 
 function autoPickBestXIFromNations(state: UserState, nations: Set<string>, playerPool: Player[]): UserState {
-  const owned = getOwnedPlayers(state, playerPool).filter((player) => nations.has(player.nation));
+  const owned = getOwnedPlayers(state, playerPool);
+  const playing = owned.filter((player) => nations.has(player.nation));
   const used = new Set<number>();
   const squad: UserState["squad"] = {};
 
-  for (const slot of squadSlots) {
-    const pick = owned
-      .filter((player) => canPlaySlot(player, slot) && !used.has(player.id))
-      .sort((a, b) => b.rating - a.rating || a.name.localeCompare(b.name))[0];
-
-    if (pick) {
-      used.add(pick.id);
-      squad[slot] = pick.id;
+  const fillFrom = (pool: Player[]) => {
+    for (const slot of squadSlots) {
+      if (squad[slot]) continue;
+      const pick = pool
+        .filter((player) => canPlaySlot(player, slot) && !used.has(player.id))
+        .sort((a, b) => b.rating - a.rating || a.name.localeCompare(b.name))[0];
+      if (pick) {
+        used.add(pick.id);
+        squad[slot] = pick.id;
+      }
     }
-  }
+  };
+
+  // Prioritise players whose nations play today, then backfill any empty
+  // slots with the best of the rest so the XI is never left half-full.
+  fillFrom(playing);
+  fillFrom(owned);
 
   return { ...state, squad };
 }
