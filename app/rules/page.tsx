@@ -89,13 +89,30 @@ function SimpleRules() {
         </p>
       </Section>
 
-      <Section title="Squad Lock and Boosts">
+      <Section title="Squad Lock and Matchdays">
         <ul className="list-disc space-y-1 pl-5">
           <li>Build a strict <strong>4-3-3</strong>: 1 GK, 4 DF, 3 MF, 3 FW.</li>
-          <li>Your squad locks each day at <strong>3:00 PM UK time</strong>.</li>
-          <li>Players must be in your locked XI on the day to earn match rewards.</li>
-          <li>Goals and assists permanently change ratings.</li>
-          <li>Viral World Cup moments can also affect ratings at admin discretion.</li>
+          <li>Your squad locks each day at <strong>3:00 PM UK time</strong> for that matchday.</li>
+          <li>Edit freely before the lock; after it, your XI is set until the next 3pm.</li>
+          <li>Only players in your <strong>locked XI on the day</strong> earn match rewards.</li>
+        </ul>
+      </Section>
+
+      <Section title="In-Match Rewards">
+        <p>When real World Cup matches play, your locked players go to work:</p>
+        <ul className="mt-2 list-disc space-y-1 pl-5">
+          <li><strong>Match win:</strong> each locked player whose nation wins earns you <strong>3 pack credits</strong>. A draw earns nothing.</li>
+          <li><strong>Goals &amp; assists</strong> permanently boost that player&apos;s rating, by rarity:</li>
+        </ul>
+        <DataTable
+          headers={["Rarity", "Per goal", "Per assist"]}
+          rows={boostRows.map((row) => [<span key={row.rarity} className={row.colour}>{row.rarity}</span>, row.goal, row.assist])}
+        />
+        <ul className="mt-3 list-disc space-y-1 pl-5">
+          <li>Boosts scale per goal: a brace is <strong>2x</strong>, a hattrick <strong>3x</strong>, and so on.</li>
+          <li><strong>Clown stickers lose rating</strong> when they score or assist. High risk, high reward.</li>
+          <li>Boosts are permanent and stack all tournament. Only matter if the player was in your locked XI that day — no retroactive boosts for players you pack later.</li>
+          <li>Viral World Cup moments can also swing ratings at admin discretion.</li>
         </ul>
       </Section>
 
@@ -217,18 +234,37 @@ function DetailedRules() {
 
         <Section title="6. Match Rewards and Rating Boosts">
           <p>
-            The tournament matters. If players in your locked XI show up on the pitch, your collection can grow stronger.
+            The tournament is the engine. Every day your locked XI plays for you: nations winning their matches pay out pack credits, and your players scoring or assisting permanently change their ratings. Everything below only counts for players in your <strong>locked squad on the day of the match</strong>.
           </p>
+
+          <p className="mt-3 font-black text-green-950">Match-win credits</p>
+          <ul className="mt-1 list-disc space-y-1 pl-5 text-green-900/70">
+            <li>For every match a nation <strong>wins</strong>, each player from that nation in your locked XI pays out <strong>3 pack credits</strong>.</li>
+            <li>Two locked players from the same winning nation pay <strong>3 credits each</strong> (6 total).</li>
+            <li><strong>Draws and losses pay nothing.</strong> Only a win triggers credits.</li>
+            <li>Credits are awarded once per match and never double-counted.</li>
+          </ul>
+
+          <p className="mt-4 font-black text-green-950">Goal and assist boosts</p>
+          <p className="mt-1 text-green-900/70">Each goal or assist permanently adjusts that player&apos;s rating, by rarity:</p>
           <DataTable
             headers={["Rarity", "Per goal", "Per assist"]}
             rows={boostRows.map((row) => [<span key={row.rarity} className={row.colour}>{row.rarity}</span>, row.goal, row.assist])}
           />
           <ul className="mt-3 list-disc space-y-1 pl-5 text-green-900/70">
-            <li>Goals and assists permanently boost that player sticker.</li>
-            <li>Boosts stack across the tournament. A hattrick earns 3x the goal boost.</li>
-            <li>The player must be in your <strong>locked squad on the day of the performance</strong>.</li>
-            <li>Packing a player later gives no retroactive boost for earlier goals or assists.</li>
-            <li>Clown stickers lose rating for goals and assists. Choose carefully. The game has jokes, but it also has consequences.</li>
+            <li><strong>Boosts scale with output.</strong> A goal applies the per-goal value; a brace doubles it, a hattrick triples it, and so on. Assists scale the same way at the per-assist value.</li>
+            <li><strong>Lower-rated, more common stickers gain the most</strong> — a Common forward scoring is worth +10, while an Icon is worth +2. The little guys can climb fast.</li>
+            <li><strong>Clown stickers lose rating</strong> for goals (-5) and assists (-3). Starting a clown is a gamble: brilliant if they sit on the bench in real life, painful if they score.</li>
+            <li>Boosts are <strong>permanent and stack</strong> across the whole tournament.</li>
+            <li>The player must be in your <strong>locked XI on the matchday</strong>. Packing them later gives no retroactive boost for earlier goals or assists.</li>
+            <li>Every manager who locked that player gets the boost on their own copy — boosts are per-sticker, not shared.</li>
+          </ul>
+
+          <p className="mt-4 font-black text-green-950">How results settle</p>
+          <ul className="mt-1 list-disc space-y-1 pl-5 text-green-900/70">
+            <li>Results and scorers are pulled from official match data and applied automatically once a match is finished and verified.</li>
+            <li>Where a scorer&apos;s name can&apos;t be matched automatically, an admin confirms it manually — so a boost may land shortly after the final whistle, not instantly.</li>
+            <li>Goal and assist boosts are announced once in the group chat when they land.</li>
           </ul>
         </Section>
 
