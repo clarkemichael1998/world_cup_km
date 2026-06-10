@@ -12,59 +12,17 @@ import type { Player, Position, Rarity, UserState } from "@/lib/types";
 
 const positions: Array<Position | "all"> = ["all", "GK", "DF", "MF", "FW"];
 
-type TradeProposal = { id: number; username: string; playerId: number; isMine: boolean };
-type TradeOffer = { id: number; username: string; playerId: number; createdAt: string; isMine: boolean; proposals: TradeProposal[] };
-type RecentTrade = { offererUsername: string; acceptorUsername: string; playerId: number; acceptedPlayerId: number; completedAt: string };
-
 export default function CollectionPage() {
   const [state, setState] = useState<UserState | null>(null);
   const [nation, setNation] = useState("Argentina");
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
   const [nationSort, setNationSort] = useState<"alpha" | "closest">("closest");
   const [playerPool, setPlayerPool] = useState<Player[]>(basePlayerPool);
-  const [offers, setOffers] = useState<TradeOffer[]>([]);
-  const [recentTrades, setRecentTrades] = useState<RecentTrade[]>([]);
-  const [offerPlayerId, setOfferPlayerId] = useState<number | "">("");
-  const [acceptSelections, setAcceptSelections] = useState<Record<number, number>>({});
-  const [tradeBusy, setTradeBusy] = useState(false);
-  const [tradeNotice, setTradeNotice] = useState("");
 
   useEffect(() => {
     loadUserStateAsync().then(setState);
     loadPlayerPool().then(setPlayerPool);
-    loadTrades();
   }, []);
-
-  async function loadTrades() {
-    try {
-      const response = await fetch("/api/trades", { credentials: "include" });
-      if (!response.ok) return;
-      const payload = await response.json();
-      setOffers(payload.offers ?? []);
-      setRecentTrades(payload.recent ?? []);
-    } catch {}
-  }
-
-  async function tradeAction(body: Record<string, unknown>, successNotice: string) {
-    if (tradeBusy) return;
-    setTradeBusy(true);
-    setTradeNotice("");
-    try {
-      const response = await fetch("/api/trades", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(body)
-      });
-      const payload = await response.json();
-      setTradeNotice(response.ok ? successNotice : payload.error ?? "Trade action failed.");
-      await loadTrades();
-      const refreshed = await loadUserStateAsync();
-      setState(refreshed);
-    } finally {
-      setTradeBusy(false);
-    }
-  }
 
   const nations = useMemo(() => Array.from(new Set(playerPool.map((player) => player.nation))).sort(), [playerPool]);
   const countryPlayers = useMemo(
@@ -92,17 +50,7 @@ export default function CollectionPage() {
     .filter((item) => item.count > 0);
   const albumCode = `KMXI-${nation.slice(0, 3).toUpperCase()}-${String(collectedOnPage).padStart(2, "0")}`;
   const selectedFlag = flagUrl(nation);
-  const playerById = useMemo(() => new Map(playerPool.map((player) => [player.id, player])), [playerPool]);
-  const myDuplicates = useMemo(
-    () =>
-      Object.entries(state?.duplicateCounts ?? {})
-        .filter(([, count]) => (count ?? 0) > 0)
-        .map(([id]) => playerById.get(Number(id)))
-        .filter((player): player is Player => Boolean(player))
-        .sort((a, b) => b.rating - a.rating || a.name.localeCompare(b.name)),
-    [state, playerById]
-  );
-  const showTradePanel = myDuplicates.length > 0 || offers.length > 0;
+  const totalDuplicates = state ? Object.values(state.duplicateCounts).reduce((sum, count) => sum + (count ?? 0), 0) : 0;
 
   const albumPercent = playerPool.length > 0 ? Math.round((owned.length / playerPool.length) * 100) : 0;
 
@@ -126,144 +74,17 @@ export default function CollectionPage() {
         </div>
       </section>
 
-      {showTradePanel ? (
-        <section className="mb-5 rounded-lg border border-amber-300 bg-amber-50 p-4 shadow-sm">
-          <p className="text-sm font-black uppercase tracking-wide text-amber-800">Sticker Trading</p>
-          <p className="mt-1 text-xs font-semibold text-amber-700">
-            Offer a duplicate up for trade. Others propose one of their duplicates in return, and you confirm the swap you like — one for one. You always keep your placed sticker.
-          </p>
-          {tradeNotice ? <p className="mt-2 rounded-md bg-amber-100 px-3 py-1.5 text-xs font-black text-amber-900">{tradeNotice}</p> : null}
-
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <select
-              className="rounded-md border border-amber-300 bg-white px-3 py-2 text-sm font-bold text-amber-950"
-              value={offerPlayerId}
-              onChange={(event) => setOfferPlayerId(event.target.value ? Number(event.target.value) : "")}
-            >
-              <option value="">{myDuplicates.length > 0 ? "Choose a duplicate to offer..." : "No duplicates to offer"}</option>
-              {myDuplicates.map((player) => (
-                <option key={player.id} value={player.id}>
-                  {player.name} ({player.rating} {player.rarity}, {player.nation}) x{(state?.duplicateCounts[player.id] ?? 0) + 1}
-                </option>
-              ))}
-            </select>
-            <button
-              onClick={() => offerPlayerId !== "" && tradeAction({ action: "create", playerId: offerPlayerId }, "Offer posted — waiting for a taker.")}
-              disabled={tradeBusy || offerPlayerId === ""}
-              className="rounded-md bg-amber-600 px-4 py-2 text-sm font-black text-white hover:bg-amber-700 disabled:opacity-40"
-            >
-              Offer for Trade
-            </button>
+      {totalDuplicates > 0 ? (
+        <Link
+          href="/trade"
+          className="mb-5 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 shadow-sm transition hover:bg-amber-100"
+        >
+          <div>
+            <p className="text-sm font-black text-amber-900">🔁 You have {totalDuplicates} duplicate{totalDuplicates === 1 ? "" : "s"} to trade</p>
+            <p className="text-xs font-semibold text-amber-700">Swap spares one-for-one with the group on the Trading page.</p>
           </div>
-
-          {offers.length > 0 ? (
-            <div className="mt-4 space-y-2">
-              <p className="text-xs font-black uppercase tracking-wide text-amber-800/80">Open Offers</p>
-              {offers.map((offer) => {
-                const myProposal = offer.proposals.find((proposal) => proposal.isMine);
-                return (
-                  <div key={offer.id} className="rounded-md border border-amber-200 bg-white/70 px-3 py-2">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="min-w-0 text-sm font-bold text-amber-950">
-                        <span className="font-black">{offer.username}</span> offers <span className="font-black">{describePlayer(playerById.get(offer.playerId), offer.playerId)}</span>
-                        {offer.proposals.length > 0 ? <span className="ml-2 text-xs font-black text-amber-700">· {offer.proposals.length} proposal{offer.proposals.length === 1 ? "" : "s"}</span> : null}
-                      </p>
-                      {offer.isMine ? (
-                        <button
-                          onClick={() => tradeAction({ action: "cancel", offerId: offer.id }, "Offer withdrawn.")}
-                          disabled={tradeBusy}
-                          className="rounded-md bg-amber-200 px-3 py-1.5 text-xs font-black text-amber-900 hover:bg-amber-300 disabled:opacity-40"
-                        >
-                          Cancel Offer
-                        </button>
-                      ) : myProposal ? (
-                        <div className="flex items-center gap-2">
-                          <p className="text-xs font-bold text-amber-800">You proposed {describePlayer(playerById.get(myProposal.playerId), myProposal.playerId)} — waiting on {offer.username}</p>
-                          <button
-                            onClick={() => tradeAction({ action: "withdraw", proposalId: myProposal.id }, "Proposal withdrawn.")}
-                            disabled={tradeBusy}
-                            className="rounded-md bg-amber-200 px-3 py-1.5 text-xs font-black text-amber-900 hover:bg-amber-300 disabled:opacity-40"
-                          >
-                            Withdraw
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <select
-                            className="rounded-md border border-amber-300 bg-white px-2 py-1.5 text-xs font-bold text-amber-950"
-                            value={acceptSelections[offer.id] ?? ""}
-                            onChange={(event) => setAcceptSelections((prev) => ({ ...prev, [offer.id]: Number(event.target.value) }))}
-                          >
-                            <option value="">Offer in return...</option>
-                            {myDuplicates.map((player) => (
-                              <option key={player.id} value={player.id}>
-                                {player.name} ({player.rating} {player.rarity}, {player.nation})
-                              </option>
-                            ))}
-                          </select>
-                          <button
-                            onClick={() => acceptSelections[offer.id] && tradeAction({ action: "propose", offerId: offer.id, playerId: acceptSelections[offer.id] }, "Proposal sent — the offerer decides.")}
-                            disabled={tradeBusy || !acceptSelections[offer.id]}
-                            className="rounded-md bg-pitch px-3 py-1.5 text-xs font-black text-white hover:bg-green-800 disabled:opacity-40"
-                          >
-                            Propose Swap
-                          </button>
-                        </div>
-                      )}
-                    </div>
-
-                    {offer.isMine && offer.proposals.length > 0 ? (
-                      <div className="mt-2 space-y-1.5 border-t border-amber-200 pt-2">
-                        {offer.proposals.map((proposal) => (
-                          <div key={proposal.id} className="flex flex-wrap items-center justify-between gap-2">
-                            <p className="text-xs font-bold text-amber-900">
-                              <span className="font-black">{proposal.username}</span> offers {describePlayer(playerById.get(proposal.playerId), proposal.playerId)} in return
-                            </p>
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={() => tradeAction({ action: "confirm", proposalId: proposal.id }, "Trade complete!")}
-                                disabled={tradeBusy}
-                                className="rounded-md bg-pitch px-3 py-1 text-xs font-black text-white hover:bg-green-800 disabled:opacity-40"
-                              >
-                                Confirm Trade
-                              </button>
-                              <button
-                                onClick={() => tradeAction({ action: "decline", proposalId: proposal.id }, "Proposal declined.")}
-                                disabled={tradeBusy}
-                                className="rounded-md bg-amber-200 px-3 py-1 text-xs font-black text-amber-900 hover:bg-amber-300 disabled:opacity-40"
-                              >
-                                Decline
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : null}
-                    {offer.isMine && offer.proposals.length === 0 ? (
-                      <p className="mt-1 text-xs font-semibold text-amber-700/75">No proposals yet — hold tight.</p>
-                    ) : null}
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <p className="mt-3 text-xs font-semibold text-amber-700/80">No open offers right now — post one above.</p>
-          )}
-
-          {recentTrades.length > 0 ? (
-            <div className="mt-4">
-              <p className="text-xs font-black uppercase tracking-wide text-amber-800/80">Recent Trades</p>
-              <div className="mt-1 space-y-1">
-                {recentTrades.slice(0, 5).map((trade, index) => (
-                  <p key={index} className="text-xs font-semibold text-amber-800">
-                    🔁 {trade.offererUsername} swapped {playerById.get(trade.playerId)?.name ?? `Player ${trade.playerId}`} to {trade.acceptorUsername} for{" "}
-                    {playerById.get(trade.acceptedPlayerId)?.name ?? `Player ${trade.acceptedPlayerId}`}
-                  </p>
-                ))}
-              </div>
-            </div>
-          ) : null}
-        </section>
+          <span className="rounded-md bg-amber-600 px-4 py-2 text-sm font-black text-white">Go to Trading</span>
+        </Link>
       ) : null}
 
       <section className="mb-5 rounded-lg border border-green-900/10 bg-white p-3 shadow-sm">
@@ -487,10 +308,6 @@ function StickerDetails({
       </div>
     </div>
   );
-}
-
-function describePlayer(player: Player | undefined, fallbackId: number) {
-  return player ? `${player.name} (${player.rating} ${player.rarity}, ${player.nation})` : `Player ${fallbackId}`;
 }
 
 function positionRank(position: Position) {

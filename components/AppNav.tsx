@@ -50,6 +50,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="flex gap-2 text-sm font-semibold text-green-950">
             <NavLink href="/add-km" label="Add Activity" />
             <NavLink href="/collection" label="Stickers" />
+            <NavLink href="/trade" label="Trade" />
             <NavLink href="/squad" label="Squad" badge={badges.squadNeedsLock ? "Lock" : undefined} />
             <Link className="rounded-md px-3 py-2 hover:bg-green-100" href="/squads">Squads</Link>
             <Link className="rounded-md px-3 py-2 hover:bg-green-100" href="/leaderboard">Leaderboard</Link>
