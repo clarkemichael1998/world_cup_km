@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { Button } from "@/components/Button";
 import { PageTitle } from "@/components/PageTitle";
 import { flagUrl } from "@/lib/flags";
 import { basePlayerPool, loadPlayerPool } from "@/lib/playerPool";
@@ -120,13 +121,14 @@ export default function TradePage() {
             ))}
           </select>
           {offerPreview ? <StickerChip player={offerPreview} /> : null}
-          <button
+          <Button
+            variant="accent"
+            className="shrink-0"
             onClick={() => offerPlayerId !== "" && tradeAction({ action: "create", playerId: offerPlayerId }, "Offer posted — waiting for proposals.")}
             disabled={tradeBusy || offerPlayerId === ""}
-            className="shrink-0 rounded-md bg-amber-600 px-4 py-2 text-sm font-black text-white hover:bg-amber-700 disabled:opacity-40"
           >
             Post Offer
-          </button>
+          </Button>
         </div>
         {myDuplicates.length === 0 ? (
           <p className="mt-2 text-xs font-semibold text-amber-700/80">
@@ -145,13 +147,14 @@ export default function TradePage() {
                 <div key={offer.id} className="rounded-lg border border-amber-200 bg-amber-50/50 p-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <StickerCard player={playerById.get(offer.playerId)} fallbackId={offer.playerId} label="You're offering" />
-                    <button
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       onClick={() => tradeAction({ action: "cancel", offerId: offer.id }, "Offer withdrawn.")}
                       disabled={tradeBusy}
-                      className="rounded-md bg-amber-200 px-3 py-1.5 text-xs font-black text-amber-900 hover:bg-amber-300 disabled:opacity-40"
                     >
                       Cancel
-                    </button>
+                    </Button>
                   </div>
                   {offer.proposals.length > 0 ? (
                     <div className="mt-3 space-y-2 border-t border-amber-200 pt-3">
@@ -160,20 +163,22 @@ export default function TradePage() {
                         <div key={proposal.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-white/70 px-2 py-2">
                           <StickerCard player={playerById.get(proposal.playerId)} fallbackId={proposal.playerId} label={`${proposal.username} gives`} />
                           <div className="flex items-center gap-2">
-                            <button
+                            <Button
+                              variant="primary"
+                              size="sm"
                               onClick={() => tradeAction({ action: "confirm", proposalId: proposal.id }, "Trade complete! 🔁")}
                               disabled={tradeBusy}
-                              className="rounded-md bg-pitch px-3 py-1.5 text-xs font-black text-white hover:bg-green-800 disabled:opacity-40"
                             >
                               Confirm
-                            </button>
-                            <button
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
                               onClick={() => tradeAction({ action: "decline", proposalId: proposal.id }, "Proposal declined.")}
                               disabled={tradeBusy}
-                              className="rounded-md bg-green-950/10 px-3 py-1.5 text-xs font-black text-green-900 hover:bg-green-950/15 disabled:opacity-40"
                             >
                               Decline
-                            </button>
+                            </Button>
                           </div>
                         </div>
                       ))}
@@ -204,13 +209,14 @@ export default function TradePage() {
                           <span className="text-xs font-bold text-green-900/60">You proposed</span>
                           <StickerChip player={playerById.get(myProposal.playerId)} />
                         </div>
-                        <button
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           onClick={() => tradeAction({ action: "withdraw", proposalId: myProposal.id }, "Proposal withdrawn.")}
                           disabled={tradeBusy}
-                          className="rounded-md bg-green-950/10 px-3 py-1.5 text-xs font-black text-green-900 hover:bg-green-950/15 disabled:opacity-40"
                         >
                           Withdraw
-                        </button>
+                        </Button>
                       </div>
                     ) : (
                       <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-green-900/10 pt-3">
@@ -227,13 +233,15 @@ export default function TradePage() {
                             </option>
                           ))}
                         </select>
-                        <button
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          className="shrink-0"
                           onClick={() => acceptSelections[offer.id] && tradeAction({ action: "propose", offerId: offer.id, playerId: acceptSelections[offer.id] }, "Proposal sent — the offerer decides.")}
                           disabled={tradeBusy || !acceptSelections[offer.id]}
-                          className="shrink-0 rounded-md bg-pitch px-3 py-1.5 text-xs font-black text-white hover:bg-green-800 disabled:opacity-40"
                         >
                           Propose
-                        </button>
+                        </Button>
                       </div>
                     )}
                   </div>
