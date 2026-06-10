@@ -52,7 +52,7 @@ export default function CommunitySquadsPage() {
 
   return (
     <div>
-      <PageTitle title="Community Squads" subtitle="Compare everyone's strongest XI, locked squads, and player-level win, goal, and assist awards." />
+      <PageTitle title="Rivals" subtitle="Compare everyone's strongest XI, locked squads, and player-level win, goal, and assist awards." />
 
       {squads === null ? (
         <p className="rounded-lg bg-white p-6 text-sm font-bold text-green-900/60 shadow-sm">Loading squads...</p>

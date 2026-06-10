@@ -51,19 +51,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <Link href="/" aria-label="KMXI home">
             <BrandLogo variant="nav" />
           </Link>
-          <div className="flex gap-2 text-sm font-semibold text-green-950">
-            <NavLink href="/add-km" label="Add Activity" />
+          <div className="flex items-center gap-1 text-sm font-semibold text-green-950">
+            <NavLink href="/add-km" label="Log" />
             <NavLink href="/collection" label="Stickers" />
-            <NavLink href="/trade" label="Trade" />
             <NavLink href="/squad" label="Squad" badge={badges.squadNeedsLock ? "Lock" : undefined} />
-            <Link className="rounded-md px-3 py-2 hover:bg-green-100" href="/squads">Squads</Link>
-            <NavLink href="/matchday-guide" label="Guide" />
+            <NavLink href="/trade" label="Trade" />
             <NavLink href="/results" label="Results" />
-            <Link className="rounded-md px-3 py-2 hover:bg-green-100" href="/leaderboard">Leaderboard</Link>
-            <NavLink href="/suggestions" label="Suggestions" />
-            <Link className="rounded-md px-3 py-2 hover:bg-green-100" href="/rules">Rules</Link>
+            <NavLink href="/leaderboard" label="Leaderboard" />
+            <NavLink href="/squads" label="Rivals" />
+            <span className="mx-1 h-5 w-px bg-green-900/10" />
+            <NavLink href="/matchday-guide" label="Guide" />
+            <NavLink href="/rules" label="Rules" />
+            <NavLink href="/suggestions" label="Ideas" />
             {isAdmin ? <Link className="rounded-md bg-amber-100 px-3 py-2 font-black text-amber-900 hover:bg-amber-200" href="/admin">Admin</Link> : null}
-            <Link className="rounded-md px-3 py-2 hover:bg-green-100" href="/login">Login</Link>
             {badges.credits > 0 ? <span className="rounded-full bg-amber-100 px-2 py-1 text-xs font-black text-amber-900">{badges.credits} packs</span> : null}
             <NavActions />
           </div>
