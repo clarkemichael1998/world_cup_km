@@ -92,7 +92,7 @@ function SimpleRules() {
       <Section title="Squad Lock and Boosts">
         <ul className="list-disc space-y-1 pl-5">
           <li>Build a strict <strong>4-3-3</strong>: 1 GK, 4 DF, 3 MF, 3 FW.</li>
-          <li>Your squad locks each day at <strong>11:00 AM UK time</strong>.</li>
+          <li>Your squad locks each day at <strong>3:00 PM UK time</strong>.</li>
           <li>Players must be in your locked XI on the day to earn match rewards.</li>
           <li>Goals and assists permanently change ratings.</li>
           <li>Viral World Cup moments can also affect ratings at admin discretion.</li>
@@ -210,8 +210,8 @@ function DetailedRules() {
           <ul className="mt-3 list-disc space-y-1 pl-5 text-green-900/70">
             <li>Use Auto-pick to fill your squad with your highest-rated available players.</li>
             <li>Your squad can be changed freely until the daily lock.</li>
-            <li>Each day at <strong>11:00 AM UK time</strong>, your current squad is locked for that matchday.</li>
-            <li>Your squad resets for the next lock window at 11:00 AM the following day.</li>
+            <li>Each day at <strong>3:00 PM UK time</strong>, your current squad is locked for that matchday.</li>
+            <li>Your squad resets for the next lock window at 3:00 PM the following day.</li>
           </ul>
         </Section>
 

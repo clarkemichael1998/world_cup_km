@@ -6,6 +6,7 @@ import type { Player, SquadSlot } from "@/lib/types";
 const tournamentStart = "2026-06-11";
 const tournamentEnd = "2026-07-19";
 const creditValue = 3;
+const LOCK_HOUR = 15; // 3pm UK time
 
 export type LiveStatus = {
   tournamentActive: boolean;
@@ -123,7 +124,7 @@ function ensureCurrentWindowLock(userId: number, now: Date) {
   const existing = database.prepare("SELECT id FROM locked_squads WHERE user_id = ? AND lock_date = ?").get(userId, window.lockDate);
   if (existing) return;
   // Auto-lock from the draft squad. locked_at is the auto-lock creation time
-  // (not the 11:00 window start), so matches that kicked off before the user
+  // (not the 3pm window start), so matches that kicked off before the user
   // first showed up today cannot be claimed by editing the draft afterwards.
   const lockedAt = now > window.lockAt ? now : window.lockAt;
   lockSquadForDate(userId, window.lockDate, lockedAt.toISOString(), window.unlockAt.toISOString());
@@ -308,13 +309,13 @@ function londonLockWindow(now: Date) {
   const parts = Object.fromEntries(londonParts.map((part) => [part.type, part.value]));
   const today = `${parts.year}-${parts.month}-${parts.day}`;
   const currentMinutes = Number(parts.hour) * 60 + Number(parts.minute);
-  const lockDate = currentMinutes >= 11 * 60 ? today : addDays(today, -1);
+  const lockDate = currentMinutes >= LOCK_HOUR * 60 ? today : addDays(today, -1);
   const nextDate = addDays(lockDate, 1);
 
   return {
     lockDate,
-    lockAt: zonedLondonDate(lockDate, 11),
-    unlockAt: zonedLondonDate(nextDate, 11)
+    lockAt: zonedLondonDate(lockDate, LOCK_HOUR),
+    unlockAt: zonedLondonDate(nextDate, LOCK_HOUR)
   };
 }
 

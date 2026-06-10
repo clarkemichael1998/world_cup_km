@@ -4,7 +4,9 @@ import { syncFixtureResults } from "@/lib/server/fixtures";
 import { settleUserLive } from "@/lib/server/live";
 import type { Player } from "@/lib/types";
 
-// Returns the "next" lock window — always the next 11am London that hasn't passed yet
+const LOCK_HOUR = 15; // 3pm UK time
+
+// Returns the "next" lock window — always the next 3pm London that hasn't passed yet
 function nextLockWindow(now = new Date()) {
   const londonParts = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Europe/London",
@@ -15,9 +17,9 @@ function nextLockWindow(now = new Date()) {
   const today = `${parts.year}-${parts.month}-${parts.day}`;
   const currentMinutes = Number(parts.hour) * 60 + Number(parts.minute);
 
-  // If before 11am, the next lock is today at 11am; if after 11am, next lock is tomorrow at 11am
-  const lockDate = currentMinutes < 11 * 60 ? today : addDays(today, 1);
-  return { lockDate, lockAt: zonedLondonDate(lockDate, 11), unlockAt: zonedLondonDate(addDays(lockDate, 1), 11) };
+  // If before the cutoff, the next lock is today; otherwise it's tomorrow.
+  const lockDate = currentMinutes < LOCK_HOUR * 60 ? today : addDays(today, 1);
+  return { lockDate, lockAt: zonedLondonDate(lockDate, LOCK_HOUR), unlockAt: zonedLondonDate(addDays(lockDate, 1), LOCK_HOUR) };
 }
 
 function addDays(date: string, days: number) {
