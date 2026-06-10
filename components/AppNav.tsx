@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { AuthGuard } from "@/components/AuthGuard";
+import { BrandLogo } from "@/components/BrandLogo";
 import { MobileNav } from "@/components/MobileNav";
 import { NavActions } from "@/components/NavActions";
 
@@ -47,8 +48,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     >
       <header className="nav-blur hidden border-b border-green-900/10 bg-white/80 md:block sticky top-0 z-40">
         <nav className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
-          <Link href="/" className="text-xl font-black tracking-tight text-pitch">
-            ⚽ KMXI
+          <Link href="/" aria-label="KMXI home">
+            <BrandLogo variant="nav" />
           </Link>
           <div className="flex gap-2 text-sm font-semibold text-green-950">
             <NavLink href="/add-km" label="Add Activity" />
@@ -72,7 +73,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         className="nav-blur sticky top-0 z-40 flex items-center justify-between gap-3 border-b border-green-900/10 bg-white/80 px-4 py-3 md:hidden"
         style={{ paddingTop: "max(0.75rem, env(safe-area-inset-top, 0px))" }}
       >
-        <Link href="/" className="shrink-0 text-lg font-black tracking-tight text-pitch">⚽ KMXI</Link>
+        <Link href="/" className="shrink-0" aria-label="KMXI home"><BrandLogo variant="nav" /></Link>
         <div className="flex min-w-0 items-center gap-2">
           <Link href="/suggestions" className="whitespace-nowrap rounded-md bg-green-950/5 px-2 py-1 text-xs font-black uppercase tracking-wide text-green-900 hover:bg-green-950/10">
             Ideas

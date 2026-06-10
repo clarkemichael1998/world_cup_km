@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { PageTitle } from "@/components/PageTitle";
 import { autoPickBestXI, calculateSquadRating, canPlaySlot, getOwnedPlayers, getPlayer, slotAllowedPositions, squadSlots } from "@/lib/squadUtils";
 import { loadUserStateAsync, saveUserState } from "@/lib/storage";
 import { flagUrl } from "@/lib/flags";
@@ -140,9 +139,20 @@ export default function SquadPage() {
 
   return (
     <div>
-      <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
-        <PageTitle title="Squad" subtitle={`${selectedPlayers.length}/11 selected${rating ? ` - Average ${rating.toFixed(1)}` : ""}`} />
-        <div className="mb-4 flex flex-wrap gap-2 self-start md:mb-8 md:justify-end">
+      <div className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-center">
+        <div className="flex items-center gap-3">
+          {rating ? (
+            <span className="flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-xl bg-gradient-to-br from-amber-200 to-gold shadow-sm">
+              <span className="text-xl font-black leading-none text-green-950">{rating.toFixed(1)}</span>
+              <span className="text-[8px] font-black uppercase tracking-wide text-green-950/60">avg</span>
+            </span>
+          ) : null}
+          <div>
+            <h1 className="text-4xl font-black tracking-tight text-green-950">Squad</h1>
+            <p className="mt-1 text-sm font-bold text-green-900/60">{selectedPlayers.length}/11 selected · 4-3-3</p>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2 self-start md:justify-end">
           <Link href="/matchday-guide" className="rounded-md border border-green-900/15 bg-white px-4 py-2 text-sm font-black text-green-950 hover:bg-green-50">
             Matchday Guide
           </Link>
@@ -239,10 +249,16 @@ export default function SquadPage() {
       )}
 
       <section className="grid gap-4 md:grid-cols-[minmax(0,1fr)_300px] xl:grid-cols-[minmax(0,1fr)_340px]">
-        <div className="rounded-lg bg-pitch p-3 text-white shadow-sm">
-          <div className="relative overflow-hidden rounded-md border border-white/20 bg-green-950/25 p-3">
+        <div className="rounded-lg bg-gradient-to-b from-emerald-700 via-pitch to-green-900 p-3 text-white shadow-md">
+          <div
+            className="relative overflow-hidden rounded-md border border-white/20 p-3"
+            style={{ backgroundImage: "repeating-linear-gradient(0deg, rgba(255,255,255,0.05) 0px, rgba(255,255,255,0.05) 26px, rgba(0,0,0,0.05) 26px, rgba(0,0,0,0.05) 52px)" }}
+          >
             <div className="pointer-events-none absolute inset-4 rounded-[50%] border border-white/15" />
+            <div className="pointer-events-none absolute left-1/2 top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/25" />
             <div className="pointer-events-none absolute left-1/2 top-0 h-full w-px bg-white/10" />
+            <div className="pointer-events-none absolute left-1/2 top-0 h-10 w-24 -translate-x-1/2 rounded-b-md border border-t-0 border-white/15" />
+            <div className="pointer-events-none absolute bottom-0 left-1/2 h-10 w-24 -translate-x-1/2 rounded-t-md border border-b-0 border-white/15" />
 
             <div className="relative space-y-2">
               {formationRows.map((row) => (

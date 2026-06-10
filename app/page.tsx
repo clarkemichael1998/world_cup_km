@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { PageTitle } from "@/components/PageTitle";
+import { BrandLogo } from "@/components/BrandLogo";
 import { formatDate } from "@/lib/formatDate";
 import { basePlayerPool, loadPlayerPool } from "@/lib/playerPool";
 import { activityDefinitions } from "@/lib/rewardEngine";
@@ -141,7 +141,10 @@ export default function Home() {
 
   return (
     <div>
-      <PageTitle title="KMXI" subtitle="Your World Cup 2026 sticker chase. Log activity, open packs, and keep your XI sharp." />
+      <div className="mb-8">
+        <BrandLogo />
+        <p className="mt-3 max-w-2xl text-base font-medium text-green-900/75">Your World Cup 2026 sticker chase. Log activity, open packs, and keep your XI sharp.</p>
+      </div>
 
       {countdown ? (
         <section className="mb-4 rounded-lg border border-green-900/20 bg-pitch p-4 text-white shadow-sm">

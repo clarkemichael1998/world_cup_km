@@ -125,45 +125,25 @@ export default function CollectionPage() {
         </div>
       </section>
 
-      <section className="album-paper relative mb-5 overflow-hidden rounded-lg border border-green-900/10 bg-[#fbf7ea] shadow-sm">
-        <div className="pointer-events-none absolute bottom-0 left-8 top-0 hidden w-px bg-green-950/10 sm:block" />
-        <div className="pointer-events-none absolute bottom-0 left-10 top-0 hidden w-px bg-white/70 sm:block" />
-
-        <div className="relative border-b border-green-900/10 bg-white/60 p-4 sm:pl-16">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <p className="text-xs font-black uppercase tracking-[0.24em] text-green-900/45">Album Page {albumCode}</p>
-              <div className="mt-1 flex items-center gap-3">
-                {selectedFlag ? <img src={selectedFlag} alt={`${nation} flag`} className="h-8 w-12 rounded object-cover shadow-sm" /> : null}
-                <h2 className="text-2xl font-black text-green-950">{nation}</h2>
-              </div>
-              <p className="mt-1 text-sm font-bold text-green-900/55">
-                {collectedOnPage}/{countryPlayers.length} stickers collected.
-              </p>
-            </div>
-            {raritySummary.length > 0 ? (
-              <div className="flex flex-wrap gap-2">
-                {raritySummary.map((item) => (
-                  <span key={item.rarity} className="rounded-full bg-green-950/8 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-green-950">
-                    {item.rarity} x{item.count}
-                  </span>
-                ))}
-              </div>
-            ) : null}
-          </div>
-        </div>
-
-      </section>
-
       <section className="album-paper relative rounded-lg border border-green-900/10 bg-[#fbf7ea] p-3 shadow-sm md:p-5">
-        <div className="mb-4 flex items-center justify-between gap-3 border-b border-green-900/10 pb-3">
+        <div className="mb-4 flex flex-col gap-3 border-b border-green-900/10 pb-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.24em] text-green-900/40">Page Spread</p>
-            <p className="text-sm font-black text-green-950">{nation} sticker spaces</p>
+            <p className="text-[10px] font-black uppercase tracking-[0.24em] text-green-900/45">Album Page {albumCode}</p>
+            <div className="mt-1.5 flex items-center gap-3">
+              {selectedFlag ? <img src={selectedFlag} alt={`${nation} flag`} className="h-8 w-12 rounded object-cover shadow-sm" /> : null}
+              <h2 className="text-2xl font-black text-green-950">{nation}</h2>
+              <span className="rounded-full bg-green-950/8 px-2.5 py-1 text-xs font-black text-green-950">{collectedOnPage}/{countryPlayers.length}</span>
+            </div>
           </div>
-          <div className="rounded-md border border-green-900/10 bg-white/60 px-2 py-1 text-[10px] font-black uppercase tracking-wide text-green-900/50">
-            {collectedOnPage}/{countryPlayers.length} filled
-          </div>
+          {raritySummary.length > 0 ? (
+            <div className="flex flex-wrap gap-1.5">
+              {raritySummary.map((item) => (
+                <span key={item.rarity} className="rounded-full bg-green-950/8 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-green-950">
+                  {item.rarity} ×{item.count}
+                </span>
+              ))}
+            </div>
+          ) : null}
         </div>
 
         <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7">
