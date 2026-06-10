@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAllPlayers, getCurrentUser, getLockedSquadForDate, getUpcomingFixtures, lockSquadForDate, unlockSquadForDate } from "@/lib/server/db";
+import { getAllPlayers, getCurrentUser, getLockedSquadForDate, getFixturesInWindow, lockSquadForDate, unlockSquadForDate } from "@/lib/server/db";
 import { syncFixtureResults } from "@/lib/server/fixtures";
 import { settleUserLive } from "@/lib/server/live";
 import type { Player } from "@/lib/types";
@@ -40,7 +40,7 @@ export async function GET() {
   settleUserLive(user.id);
   const window = nextLockWindow();
   const locked = getLockedSquadForDate(user.id, window.lockDate);
-  const fixtures = getUpcomingFixtures(window.lockDate);
+  const fixtures = getFixturesInWindow(window.lockAt.toISOString(), window.unlockAt.toISOString());
   const playerMap = new Map((getAllPlayers() as Player[]).map((p) => [p.id, p]));
   const lockedPlayers = locked
     ? locked.players.map(({ slot, player_id }) => {

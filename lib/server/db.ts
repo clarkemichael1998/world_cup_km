@@ -2031,10 +2031,13 @@ function averageCommunityRating(players: Array<{ effectiveRating: number }>) {
   return Math.round((players.reduce((sum, player) => sum + player.effectiveRating, 0) / players.length) * 10) / 10;
 }
 
-export function getUpcomingFixtures(date: string) {
+// Fixtures kicking off inside the lock window [startIso, endIso). This matches
+// how live settlement buckets matches (by kickoff_at, not calendar match_date),
+// so a late kickoff that rolls past midnight UTC still shows under its lock day.
+export function getFixturesInWindow(startIso: string, endIso: string) {
   return getDb()
-    .prepare(`SELECT match_id, home_team, away_team, kickoff_at, status, winner FROM fixture_results WHERE match_date = ? ORDER BY kickoff_at`)
-    .all(date) as Array<{ match_id: string; home_team: string; away_team: string; kickoff_at: string; status: string; winner: string | null }>;
+    .prepare(`SELECT match_id, home_team, away_team, kickoff_at, status, winner FROM fixture_results WHERE kickoff_at >= ? AND kickoff_at < ? ORDER BY kickoff_at`)
+    .all(startIso, endIso) as Array<{ match_id: string; home_team: string; away_team: string; kickoff_at: string; status: string; winner: string | null }>;
 }
 
 export function getLockedSquadForDate(userId: number, lockDate: string) {
