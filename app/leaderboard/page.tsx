@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { PageTitle } from "@/components/PageTitle";
+import { Skeleton } from "@/components/Skeleton";
 
 type Entry = { username: string; total_km: number; games_won: number; best_squad_rating: number; goal_bonus: number; assist_bonus: number };
 type Matchday = { date: string; entries: Array<{ username: string; credits: number; boost: number }> };
@@ -32,7 +33,16 @@ export default function LeaderboardPage() {
 
       <section className="mt-2 overflow-x-auto overflow-hidden rounded-lg border border-green-900/10 bg-white shadow-sm">
         {leaderboard === null ? (
-          <p className="p-6 text-sm font-semibold text-green-900/60">Loading...</p>
+          <div className="divide-y divide-green-900/10">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3 px-4 py-3">
+                <Skeleton className="h-5 w-5 shrink-0 rounded-full" />
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="ml-auto h-4 w-10" />
+                <Skeleton className="h-4 w-12" />
+              </div>
+            ))}
+          </div>
         ) : leaderboard.length === 0 ? (
           <p className="p-6 text-sm font-semibold text-green-900/60">No entries yet - be the first to log an activity!</p>
         ) : (

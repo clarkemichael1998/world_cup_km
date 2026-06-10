@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { PageTitle } from "@/components/PageTitle";
+import { Skeleton, SkeletonCard } from "@/components/Skeleton";
 import { formatDate } from "@/lib/formatDate";
 import { basePlayerPool, loadPlayerPool } from "@/lib/playerPool";
 import type { Player } from "@/lib/types";
@@ -89,7 +90,24 @@ export default function ProfilePage() {
   }
 
   if (!profile) {
-    return <PageTitle title={username || "Profile"} subtitle="Loading profile..." />;
+    return (
+      <div>
+        <PageTitle title={username || "Profile"} subtitle="Loading profile..." />
+        <section className="grid grid-cols-2 gap-3 md:grid-cols-5 md:gap-4">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="rounded-lg border border-green-900/10 bg-white p-4 shadow-sm">
+              <Skeleton className="h-3 w-3/4" />
+              <Skeleton className="mt-2 h-7 w-1/2" />
+            </div>
+          ))}
+        </section>
+        <div className="mt-5 grid gap-5 lg:grid-cols-2">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <SkeletonCard key={i} lines={5} />
+          ))}
+        </div>
+      </div>
+    );
   }
 
   return (

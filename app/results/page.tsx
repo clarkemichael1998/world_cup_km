@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { PageTitle } from "@/components/PageTitle";
+import { Skeleton } from "@/components/Skeleton";
 import { flagUrl } from "@/lib/flags";
 
 function londonToday() {
@@ -53,7 +54,28 @@ export default function ResultsPage() {
       <PageTitle title="Results" subtitle="Every World Cup fixture by day, with the KMXI players who scored and assisted." />
 
       {days === null ? (
-        <p className="rounded-lg bg-white p-6 text-sm font-semibold text-green-900/60 shadow-sm">Loading results...</p>
+        <div className="space-y-6">
+          {Array.from({ length: 2 }).map((_, d) => (
+            <section key={d}>
+              <Skeleton className="mb-2 h-4 w-40" />
+              <div className="grid gap-3 md:grid-cols-2">
+                {Array.from({ length: 2 }).map((_, i) => (
+                  <div key={i} className="rounded-lg border border-green-900/10 bg-white p-4 shadow-sm">
+                    <div className="flex items-center justify-between gap-3">
+                      <Skeleton className="h-5 w-24" />
+                      <Skeleton className="h-5 w-14" />
+                      <Skeleton className="h-5 w-24" />
+                    </div>
+                    <div className="mt-3 space-y-1.5 border-t border-green-900/10 pt-3">
+                      <Skeleton className="h-3 w-2/3" />
+                      <Skeleton className="h-3 w-1/2" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
       ) : days.length === 0 ? (
         <p className="rounded-lg bg-white p-6 text-sm font-semibold text-green-900/60 shadow-sm">No fixtures yet. They&apos;ll appear here as the tournament kicks off.</p>
       ) : (

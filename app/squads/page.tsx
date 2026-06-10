@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { PageTitle } from "@/components/PageTitle";
+import { SkeletonCard } from "@/components/Skeleton";
 
 type SquadPlayer = {
   slot: string;
@@ -55,7 +56,11 @@ export default function CommunitySquadsPage() {
       <PageTitle title="Rivals" subtitle="Compare everyone's strongest XI, locked squads, and player-level win, goal, and assist awards." />
 
       {squads === null ? (
-        <p className="rounded-lg bg-white p-6 text-sm font-bold text-green-900/60 shadow-sm">Loading squads...</p>
+        <section className="grid gap-5 xl:grid-cols-2">
+          {Array.from({ length: 2 }).map((_, i) => (
+            <SkeletonCard key={i} lines={6} />
+          ))}
+        </section>
       ) : squads.length === 0 ? (
         <p className="rounded-lg bg-white p-6 text-sm font-bold text-green-900/60 shadow-sm">No squads yet.</p>
       ) : (
