@@ -35,7 +35,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   }, []);
 
-  const isDanielAustraliaDay = username?.toLowerCase() === "danielm" && getLondonDateString() === "2026-06-10";
+  const londonDate = getLondonDateString();
+  // Daniel's screen rides upside down across these days (inclusive). ISO date
+  // strings compare lexicographically, so >=/<= bounds the window correctly.
+  const isDanielAustraliaDay = username?.toLowerCase() === "danielm" && londonDate >= "2026-06-10" && londonDate <= "2026-06-12";
 
   return (
     <div
