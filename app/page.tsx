@@ -1,15 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { BrandLogo } from "@/components/BrandLogo";
-import { formatDate } from "@/lib/formatDate";
-import { basePlayerPool, loadPlayerPool } from "@/lib/playerPool";
-import { activityDefinitions } from "@/lib/rewardEngine";
-import { calculateSquadRating, getPlayer, squadSlots } from "@/lib/squadUtils";
-import { loadUserStateAsync } from "@/lib/storage";
-import type { ActivityType, Player, UserState } from "@/lib/types";
+import { ChatFeed } from "@/components/ChatFeed";
 
 const WC_FINAL = new Date("2026-07-19T18:00:00Z");
 
@@ -28,63 +22,22 @@ function useCountdown() {
   return { days, hours, mins, secs };
 }
 
-type FeedEntry = {
-  username: string;
-  distance_km: number;
-  activity_type?: ActivityType;
-  activity_amount?: number | null;
-  activity_unit?: string | null;
-  comment?: string | null;
-  cards_earned: number;
-  created_at: string;
-};
-
-type LockStatus = {
-  lockDate: string;
-  lockAt: string;
-  isLocked: boolean;
-  upcomingFixtures: Array<{ matchId: string; homeTeam: string; awayTeam: string; kickoffAt: string; status: string; winner: string | null }>;
-};
-
 export default function Home() {
-  const [state, setState] = useState<UserState | null>(null);
-  const [communityKm, setCommunityKm] = useState<number | null>(null);
-  const [feed, setFeed] = useState<FeedEntry[]>([]);
   const [rewardCredits, setRewardCredits] = useState<number | null>(null);
-  const [streak, setStreak] = useState(0);
   const [canSetNews, setCanSetNews] = useState(false);
   const [wonMatchday, setWonMatchday] = useState<string | null>(null);
   const [newsMessage, setNewsMessage] = useState("");
   const [newsNotice, setNewsNotice] = useState("");
   const [newsBusy, setNewsBusy] = useState(false);
-  const [matchday, setMatchday] = useState<LockStatus | null>(null);
   const [redeemAmount, setRedeemAmount] = useState(1);
   const [redeeming, setRedeeming] = useState(false);
-  const [playerPool, setPlayerPool] = useState<Player[]>(basePlayerPool);
   const router = useRouter();
   const countdown = useCountdown();
 
   useEffect(() => {
-    loadUserStateAsync().then(setState);
-    loadPlayerPool().then(setPlayerPool);
-    fetch("/api/community")
-      .then((r) => r.json())
-      .then((p) => setCommunityKm(p.community.totalKm))
-      .catch(() => {});
     fetch("/api/credits", { credentials: "include" })
       .then((r) => r.json())
-      .then((p) => {
-        setRewardCredits(p.credits ?? 0);
-        setStreak(p.streak ?? 0);
-      })
-      .catch(() => {});
-    fetch("/api/km-log")
-      .then((r) => r.json())
-      .then((p) => setFeed(p.feed ?? []))
-      .catch(() => {});
-    fetch("/api/squad/lock", { credentials: "include" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((p) => setMatchday(p))
+      .then((p) => setRewardCredits(p.credits ?? 0))
       .catch(() => {});
     fetch("/api/news", { credentials: "include" })
       .then((r) => r.json())
@@ -114,12 +67,6 @@ export default function Home() {
     }
   }
 
-  const squadRating = state ? calculateSquadRating(state, playerPool) : 0;
-  const nextRewardProgress = state ? Math.min(100, Math.round(state.kmBalance * 100)) : 0;
-  const matchdayNations = new Set(matchday?.upcomingFixtures.flatMap((fixture) => [fixture.homeTeam, fixture.awayTeam]) ?? []);
-  const selectedPlayers = state ? squadSlots.map((slot) => getPlayer(state.squad[slot], playerPool)).filter(Boolean) : [];
-  const selectedPlayingToday = selectedPlayers.filter((player) => player && matchdayNations.has(player.nation)).length;
-
   async function openPack() {
     if (redeeming || !rewardCredits || rewardCredits < redeemAmount) return;
     setRedeeming(true);
@@ -128,7 +75,7 @@ export default function Home() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ amount: redeemAmount }),
+        body: JSON.stringify({ amount: redeemAmount })
       });
       if (res.ok) {
         setRewardCredits((c) => (c ?? 0) - redeemAmount);
@@ -140,33 +87,25 @@ export default function Home() {
   }
 
   return (
-    <div>
-      <div className="mb-8">
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <BrandLogo />
-        <p className="mt-3 max-w-2xl text-base font-medium text-green-900/75">Your World Cup 2026 sticker chase. Log activity, open packs, and keep your XI sharp.</p>
-      </div>
-
-      {countdown ? (
-        <section className="mb-4 rounded-lg border border-green-900/20 bg-pitch p-4 text-white shadow-sm">
-          <p className="text-xs font-black uppercase tracking-wide text-green-200/80">World Cup Final Countdown</p>
-          <div className="mt-2 flex items-end gap-4">
+        {countdown ? (
+          <div className="flex items-end gap-3 rounded-lg border border-green-900/20 bg-pitch px-4 py-2.5 text-white shadow-sm">
             <CountUnit value={countdown.days} label="days" />
             <CountUnit value={countdown.hours} label="hrs" />
             <CountUnit value={countdown.mins} label="min" />
             <CountUnit value={countdown.secs} label="sec" />
           </div>
-          <p className="mt-2 text-xs font-semibold text-green-200/70">Activity logging locks at kick-off · July 19, 2026</p>
-        </section>
-      ) : (
-        <section className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-4 shadow-sm">
-          <p className="text-sm font-black text-amber-900">The World Cup Final has kicked off — activity logging is now locked. Thanks for playing!</p>
-        </section>
-      )}
+        ) : (
+          <p className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-black text-amber-900">Final kicked off — logging locked.</p>
+        )}
+      </div>
 
       {canSetNews ? (
-        <section className="mb-4 rounded-lg border border-amber-400 bg-gradient-to-r from-amber-50 to-yellow-50 p-4 shadow-sm">
+        <section className="rounded-lg border border-amber-400 bg-gradient-to-r from-amber-50 to-yellow-50 p-4 shadow-sm">
           <p className="text-sm font-black uppercase tracking-wide text-amber-800">👑 Matchday Champion{wonMatchday ? ` — ${wonMatchday}` : ""}</p>
-          <p className="mt-1 text-sm font-bold text-amber-900">You won yesterday's head-to-head. Your prize: you set today's news reel. Use it wisely. Or don't.</p>
+          <p className="mt-1 text-sm font-bold text-amber-900">You won yesterday&apos;s head-to-head. Your prize: set today&apos;s news reel.</p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <input
               className="min-w-0 flex-1 rounded-md border border-amber-300 bg-white px-3 py-2 text-sm font-semibold text-amber-950"
@@ -187,156 +126,29 @@ export default function Home() {
         </section>
       ) : null}
 
-      <section className="mb-4 rounded-lg border border-green-900/10 bg-white p-4 shadow-sm">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      {rewardCredits !== null && rewardCredits > 0 ? (
+        <section className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 p-4 shadow-sm">
           <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="text-xs font-black uppercase tracking-wide text-green-900/50">Next best move</p>
-              {streak > 0 ? (
-                <span className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wide ${streak >= 7 ? "bg-orange-100 text-orange-800" : "bg-green-950/5 text-green-900/60"}`}>
-                  🔥 {streak}-day streak{streak >= 7 ? " · +1 daily credit" : streak >= 4 ? ` · ${7 - streak} to bonus` : ""}
-                </span>
-              ) : null}
-            </div>
-            <h2 className="mt-1 text-2xl font-black text-green-950">{rewardCredits && rewardCredits > 0 ? "Open your available packs" : "Log activity to earn your next sticker"}</h2>
-            <p className="mt-1 text-sm font-semibold text-green-900/65">
-              {state ? `${state.kmBalance.toFixed(2)} activity credits banked · ${(1 - state.kmBalance).toFixed(2)} to your next pull.` : "Loading your progress..."}
-            </p>
+            <p className="text-sm font-black uppercase tracking-wide text-amber-800">Pack Credits</p>
+            <p className="mt-0.5 text-xl font-black text-amber-900">{rewardCredits} <span className="text-sm font-semibold text-amber-700">to open</span></p>
           </div>
-          <Link href="/add-km" className="shrink-0 self-start rounded-md bg-boot px-5 py-3 text-sm font-black text-white shadow-sm hover:bg-red-700">
-            Log Activity
-          </Link>
-        </div>
-        <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-green-100" role="progressbar" aria-valuenow={nextRewardProgress} aria-valuemin={0} aria-valuemax={100} aria-label="Progress to next sticker">
-          <div className="h-full rounded-full bg-boot transition-all" style={{ width: `${nextRewardProgress}%` }} />
-        </div>
-      </section>
-
-      <section className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
-        <Stat label="Activity Credits" value={state ? state.totalKm.toFixed(1) : "..."} />
-        <Stat label="Group Credits" value={communityKm === null ? "..." : communityKm.toFixed(1)} />
-        <Stat label="Stickers" value={state ? String(state.ownedPlayerIds.length) : "..."} />
-        <Stat label="Squad Avg" value={state ? String(squadRating) : "..."} />
-      </section>
-
-      {matchday ? (
-        <section className="mt-4 rounded-lg border border-green-900/10 bg-white p-5 shadow-sm">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <p className="text-sm font-black uppercase tracking-wide text-green-900/60">Daily Matchday</p>
-              <h2 className="mt-1 text-2xl font-black text-green-950">{matchday.lockDate}</h2>
-              <p className="mt-1 text-sm font-semibold text-green-900/60">
-                {matchday.isLocked ? "Squad locked" : "Squad not locked"} · Locks {new Date(matchday.lockAt).toLocaleString("en-GB", { timeStyle: "short", timeZone: "Europe/London" })} UK
-              </p>
-              <LockCountdown lockAt={matchday.lockAt} isLocked={matchday.isLocked} />
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <button onClick={() => setRedeemAmount((a) => Math.max(1, a - 1))} disabled={redeemAmount <= 1}
+                className="rounded-md bg-amber-200 px-2 py-1 text-sm font-black text-amber-900 hover:bg-amber-300 disabled:opacity-40">−</button>
+              <span className="w-8 text-center text-lg font-black text-amber-900">{redeemAmount}</span>
+              <button onClick={() => setRedeemAmount((a) => Math.min(rewardCredits, 20, a + 1))} disabled={redeemAmount >= Math.min(rewardCredits, 20)}
+                className="rounded-md bg-amber-200 px-2 py-1 text-sm font-black text-amber-900 hover:bg-amber-300 disabled:opacity-40">+</button>
             </div>
-            <div className="grid min-w-0 gap-2 sm:grid-cols-3 lg:w-[420px]">
-              <MatchdayStat label="Locked Players Involved" value={`${selectedPlayingToday}/${selectedPlayers.length || 11}`} />
-              <MatchdayStat label="Fixtures" value={String(matchday.upcomingFixtures.length)} />
-              <MatchdayStat label="Possible Coverage" value={`${countCoveredFixtures(matchday, state, playerPool)}/${matchday.upcomingFixtures.length}`} />
-            </div>
-          </div>
-          <div className="mt-4 flex flex-wrap gap-2">
-            {matchday.upcomingFixtures.length > 0 ? (
-              matchday.upcomingFixtures.map((fixture) => (
-                <span key={fixture.matchId} className="rounded-md bg-green-950/5 px-3 py-2 text-xs font-black text-green-950">
-                  {fixture.homeTeam} vs {fixture.awayTeam}
-                </span>
-              ))
-            ) : (
-              <p className="text-sm font-semibold text-green-900/60">No fixtures listed for this lock date yet.</p>
-            )}
+            <button onClick={openPack} disabled={redeeming}
+              className="rounded-md bg-amber-600 px-5 py-2.5 font-black text-white hover:bg-amber-700 disabled:opacity-40">
+              {redeeming ? "Opening…" : `Open ${redeemAmount}`}
+            </button>
           </div>
         </section>
       ) : null}
 
-      {rewardCredits !== null && rewardCredits > 0 && (
-        <section className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-5 shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <p className="text-sm font-black uppercase tracking-wide text-amber-800">Pack Credits</p>
-              <p className="mt-1 text-2xl font-black text-amber-900">{rewardCredits} <span className="text-sm font-semibold text-amber-700">credit{rewardCredits === 1 ? "" : "s"} available</span></p>
-              <p className="mt-0.5 text-xs font-semibold text-amber-700">1 pack credit = 1 random player sticker</p>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2">
-                <button onClick={() => setRedeemAmount((a) => Math.max(1, a - 1))} disabled={redeemAmount <= 1}
-                  className="rounded-md bg-amber-200 px-2 py-1 text-sm font-black text-amber-900 hover:bg-amber-300 disabled:opacity-40">−</button>
-                <span className="w-8 text-center text-lg font-black text-amber-900">{redeemAmount}</span>
-                <button onClick={() => setRedeemAmount((a) => Math.min(rewardCredits, 20, a + 1))} disabled={redeemAmount >= Math.min(rewardCredits, 20)}
-                  className="rounded-md bg-amber-200 px-2 py-1 text-sm font-black text-amber-900 hover:bg-amber-300 disabled:opacity-40">+</button>
-              </div>
-              <button onClick={openPack} disabled={redeeming}
-                className="rounded-md bg-amber-600 px-5 py-2.5 font-black text-white hover:bg-amber-700 disabled:opacity-40">
-                {redeeming ? "Opening…" : `Open ${redeemAmount} Pack${redeemAmount === 1 ? "" : "s"}`}
-              </button>
-            </div>
-          </div>
-        </section>
-      )}
-
-      <section className="mt-6 rounded-lg border border-green-900/10 bg-white p-5 shadow-sm">
-        <p className="text-sm font-black uppercase tracking-wide text-green-900/60">Activity Feed</p>
-        <div className="mt-3 grid gap-2 sm:grid-cols-2">
-          {feed.length === 0 ? (
-            <p className="text-sm font-semibold text-green-900/60">No activity yet — be the first to log a session!</p>
-          ) : (
-            feed.map((entry, i) => (
-              <div key={i} className="flex items-start justify-between gap-3 rounded-md bg-green-950/5 px-3 py-2">
-                <div className="min-w-0">
-                  <div className="flex min-w-0 flex-wrap items-center gap-2">
-                    <Link className="truncate text-sm font-black text-green-950 hover:underline" href={`/profile/${encodeURIComponent(entry.username)}`}>{entry.username}</Link>
-                    <ActivityBadge type={entry.activity_type} />
-                  </div>
-                  <p className="mt-1 text-xs font-semibold text-green-900/60">{formatActivity(entry)} · {formatDate(entry.created_at)}</p>
-                  {entry.comment ? <p className="mt-1 line-clamp-2 text-xs font-semibold text-green-950/75">“{entry.comment}”</p> : null}
-                </div>
-                <div className="shrink-0 text-right">
-                  <p className="text-sm font-black text-pitch">+{entry.distance_km.toFixed(1)} credits</p>
-                  {entry.cards_earned > 0 && (
-                    <p className="text-xs font-bold text-amber-700">+{entry.cards_earned} sticker{entry.cards_earned === 1 ? "" : "s"}</p>
-                  )}
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      </section>
-    </div>
-  );
-}
-
-function formatActivity(entry: FeedEntry) {
-  const activity = entry.activity_type ? activityDefinitions[entry.activity_type] : undefined;
-  const amount = entry.activity_amount ?? entry.distance_km;
-  const unit = entry.activity_unit ?? "km";
-  return `${activity?.label ?? "Activity"} · ${Number(amount).toFixed(unit === "km" ? 1 : 0)} ${unit}`;
-}
-
-const activityBadgeStyles: Record<ActivityType, string> = {
-  walk: "bg-sky-100 text-sky-800",
-  run: "bg-green-100 text-green-800",
-  cycle: "bg-violet-100 text-violet-800",
-  strength: "bg-amber-100 text-amber-900",
-  sport: "bg-red-100 text-red-800",
-  mobility: "bg-teal-100 text-teal-800"
-};
-
-function ActivityBadge({ type }: { type?: ActivityType }) {
-  const activityType = type ?? "walk";
-  const activity = activityDefinitions[activityType];
-  return (
-    <span className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wide ${activityBadgeStyles[activityType]}`}>
-      {activity.label}
-    </span>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-lg border border-green-900/10 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md md:p-5">
-      <p className="text-xs font-bold uppercase tracking-wide text-green-800/70 md:text-sm">{label}</p>
-      <p className="mt-2 text-3xl font-black text-green-950 md:text-4xl">{value}</p>
+      <ChatFeed />
     </div>
   );
 }
@@ -344,43 +156,8 @@ function Stat({ label, value }: { label: string; value: string }) {
 function CountUnit({ value, label }: { value: number; label: string }) {
   return (
     <div className="text-center">
-      <p className="text-3xl font-black leading-none tabular-nums">{String(value).padStart(2, "0")}</p>
-      <p className="text-[10px] font-black uppercase tracking-wide text-green-200/70">{label}</p>
+      <p className="text-2xl font-black leading-none tabular-nums">{String(value).padStart(2, "0")}</p>
+      <p className="text-[9px] font-black uppercase tracking-wide text-green-200/70">{label}</p>
     </div>
   );
 }
-
-function LockCountdown({ lockAt, isLocked }: { lockAt: string; isLocked: boolean }) {
-  const remaining = new Date(lockAt).getTime() - Date.now();
-  if (remaining <= 0) {
-    return (
-      <p className="mt-2 inline-flex rounded-full bg-green-100 px-3 py-1 text-xs font-black text-green-800">
-        🔒 Window live — squads are locked in for this matchday
-      </p>
-    );
-  }
-  const hours = Math.floor(remaining / 3600000);
-  const mins = Math.floor((remaining % 3600000) / 60000);
-  const urgent = remaining < 2 * 3600000;
-  return (
-    <p className={`mt-2 inline-flex rounded-full px-3 py-1 text-xs font-black ${urgent ? "bg-amber-100 text-amber-900" : "bg-green-950/5 text-green-900/70"}`}>
-      {urgent ? "⚠️ " : "⏱️ "}Locks in {hours > 0 ? `${hours}h ` : ""}{mins}m{isLocked ? " — your XI is set" : " — draft auto-locks if you don't"}
-    </p>
-  );
-}
-
-function MatchdayStat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-md bg-green-950/5 px-3 py-2">
-      <p className="text-[10px] font-black uppercase tracking-wide text-green-900/50">{label}</p>
-      <p className="mt-0.5 text-lg font-black text-green-950">{value}</p>
-    </div>
-  );
-}
-
-function countCoveredFixtures(matchday: LockStatus, state: UserState | null, playerPool: Player[]) {
-  if (!state) return 0;
-  const selected = squadSlots.map((slot) => getPlayer(state.squad[slot], playerPool)).filter(Boolean);
-  return matchday.upcomingFixtures.filter((fixture) => selected.some((player) => player && (player.nation === fixture.homeTeam || player.nation === fixture.awayTeam))).length;
-}
-

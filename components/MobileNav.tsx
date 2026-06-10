@@ -59,7 +59,6 @@ const coreTabs = [
 const moreLinks = [
   { href: "/results", label: "Results", emoji: "📋" },
   { href: "/trade", label: "Trade", emoji: "🔁" },
-  { href: "/chat", label: "Chat", emoji: "💬" },
   { href: "/squads", label: "Rivals", emoji: "🆚" },
   { href: "/matchday-guide", label: "Matchday Guide", emoji: "📖" },
   { href: "/suggestions", label: "Suggestions", emoji: "💡" },
