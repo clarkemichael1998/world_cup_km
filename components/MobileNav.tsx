@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const icons = {
   home: (
@@ -68,7 +68,33 @@ const moreLinks = [
 export function MobileNav() {
   const pathname = usePathname();
   const [moreOpen, setMoreOpen] = useState(false);
+  const [latestChatTs, setLatestChatTs] = useState(0);
   const moreActive = moreLinks.some((link) => pathname === link.href || pathname.startsWith(link.href + "/"));
+
+  // Poll the newest chat timestamp so the Home tab can flag unread messages.
+  useEffect(() => {
+    let active = true;
+    const check = () =>
+      fetch("/api/chat")
+        .then((r) => r.json())
+        .then((p) => {
+          if (!active) return;
+          const newest = (p.messages ?? []).reduce((max: number, m: { created_at: string }) => Math.max(max, new Date(m.created_at).getTime()), 0);
+          setLatestChatTs(newest);
+        })
+        .catch(() => {});
+    check();
+    const id = window.setInterval(() => {
+      if (!document.hidden) check();
+    }, 25000);
+    return () => {
+      active = false;
+      window.clearInterval(id);
+    };
+  }, []);
+
+  const lastSeen = typeof window !== "undefined" ? Number(window.localStorage.getItem("kmxi-last-chat-seen") ?? 0) : 0;
+  const hasUnread = pathname !== "/" && latestChatTs > lastSeen;
 
   return (
     <>
@@ -119,7 +145,10 @@ export function MobileNav() {
                   active ? "text-pitch" : "text-green-900/50"
                 }`}
               >
-                <span className={active ? "text-pitch" : "text-green-900/40"}>{tab.icon}</span>
+                <span className={`relative ${active ? "text-pitch" : "text-green-900/40"}`}>
+                  {tab.icon}
+                  {tab.href === "/" && hasUnread ? <span className="absolute -right-1 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-boot" /> : null}
+                </span>
                 {tab.label}
               </Link>
             );

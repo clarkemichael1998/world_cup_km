@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
+import { Badge, type BadgeTone } from "@/components/Badge";
 import { formatDate } from "@/lib/formatDate";
 
 const REACTIONS = ["👍", "👎", "🔥", "❤️", "😂", "🤡", "💩", "🫪"];
@@ -139,7 +140,7 @@ export function ChatFeed() {
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex min-w-0 items-center gap-2">
                       <Link className={`truncate text-sm font-black hover:underline ${tone.name}`} href={`/profile/${encodeURIComponent(item.username)}`}>{item.username}</Link>
-                      {tone.badge ? <span className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wide ${tone.badgeClass}`}>{tone.badge}</span> : null}
+                      {tone.badge ? <Badge tone={tone.badgeTone}>{tone.badge}</Badge> : null}
                     </div>
                     <time className="text-xs font-bold text-green-900/50">{formatDate(item.created_at)}</time>
                   </div>
@@ -219,18 +220,18 @@ function truncate(value: string, maxLength: number) {
   return value.length > maxLength ? `${value.slice(0, maxLength - 1)}…` : value;
 }
 
-function getMessageTone(item: ChatMessage) {
+function getMessageTone(item: ChatMessage): { container: string; name: string; text: string; badge: string; badgeTone: BadgeTone } {
   if (item.username === "admin") {
-    return { container: "border-amber-200 bg-amber-50", name: "text-amber-950", text: "text-amber-950", badge: "Admin", badgeClass: "bg-amber-200 text-amber-950" };
+    return { container: "border-amber-200 bg-amber-50", name: "text-amber-950", text: "text-amber-950", badge: "Admin", badgeTone: "amber" };
   }
   if (item.message.startsWith("[Activity log removed by admin]")) {
-    return { container: "border-slate-200 bg-slate-50", name: "text-slate-700", text: "text-slate-700", badge: "Removed", badgeClass: "bg-slate-200 text-slate-700" };
+    return { container: "border-slate-200 bg-slate-50", name: "text-slate-700", text: "text-slate-700", badge: "Removed", badgeTone: "slate" };
   }
   if (item.message.includes(" logged ") && item.message.includes("activity credits")) {
-    return { container: "border-green-200 bg-green-50", name: "text-green-950", text: "text-green-950", badge: "Activity", badgeClass: "bg-green-200 text-green-900" };
+    return { container: "border-green-200 bg-green-50", name: "text-green-950", text: "text-green-950", badge: "Activity", badgeTone: "green" };
   }
   if (item.message.includes(" pulled ") && (item.message.includes("Legend") || item.message.includes("Icon"))) {
-    return { container: "border-amber-300 bg-amber-50", name: "text-amber-950", text: "text-amber-950", badge: "Big Pull", badgeClass: "bg-amber-200 text-amber-950" };
+    return { container: "border-amber-300 bg-amber-50", name: "text-amber-950", text: "text-amber-950", badge: "Big Pull", badgeTone: "amber" };
   }
-  return { container: "border-transparent bg-green-950/5", name: "text-green-950", text: "text-green-950", badge: "", badgeClass: "" };
+  return { container: "border-transparent bg-green-950/5", name: "text-green-950", text: "text-green-950", badge: "", badgeTone: "neutral" };
 }

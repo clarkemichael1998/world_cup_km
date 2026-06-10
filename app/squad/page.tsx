@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { Badge } from "@/components/Badge";
 import { Button, buttonClasses } from "@/components/Button";
 import { autoPickBestXI, calculateSquadRating, canPlaySlot, getOwnedPlayers, getPlayer, slotAllowedPositions, squadSlots } from "@/lib/squadUtils";
 import { loadUserStateAsync, saveUserState } from "@/lib/storage";
@@ -179,9 +180,9 @@ export default function SquadPage() {
       {lockStatus && (
         <section className={`mb-4 rounded-lg border shadow-sm ${lockStatus.isLocked ? "border-amber-300 bg-amber-50" : "border-green-900/10 bg-white"}`}>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2 p-3">
-            <span className={`inline-flex shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wide ${lockStatus.isLocked ? "bg-amber-200 text-amber-950" : "bg-green-100 text-green-800"}`}>
+            <Badge tone={lockStatus.isLocked ? "amber" : "green"} className="shrink-0">
               {lockStatus.isLocked ? "🔒 Locked" : "Unlocked"}
-            </span>
+            </Badge>
             <p className="text-sm font-black text-green-950">
               Next lock {new Date(lockStatus.lockAt).toLocaleString("en-GB", { weekday: "short", hour: "2-digit", minute: "2-digit", timeZone: "Europe/London" })}
             </p>

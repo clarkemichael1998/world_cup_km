@@ -1,5 +1,15 @@
 import type { ReactNode } from "react";
 
+/**
+ * KMXI semantic colour palette — keep these meanings consistent app-wide:
+ *  - green  → primary / success / owned / a win
+ *  - amber  → rewards & high value (pack credits, champion, locked, premium pulls)
+ *  - red    → destructive / penalties / clowns
+ *  - sky    → neutral informational status (kickoff time, live)
+ *  - slate  → muted / removed / disabled
+ *  - orange → streaks / on-fire
+ *  - neutral→ default chip with no strong meaning
+ */
 export type BadgeTone = "neutral" | "green" | "amber" | "red" | "sky" | "slate" | "orange";
 
 const TONES: Record<BadgeTone, string> = {

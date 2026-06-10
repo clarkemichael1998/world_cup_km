@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { Badge } from "@/components/Badge";
 import { PlayerCard } from "@/components/PlayerCard";
 import { PageTitle } from "@/components/PageTitle";
 import { flagUrl } from "@/lib/flags";
@@ -138,9 +139,9 @@ export default function CollectionPage() {
           {raritySummary.length > 0 ? (
             <div className="flex flex-wrap gap-1.5">
               {raritySummary.map((item) => (
-                <span key={item.rarity} className="rounded-full bg-green-950/8 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-green-950">
+                <Badge key={item.rarity} tone="neutral" className="px-2.5 py-1">
                   {item.rarity} ×{item.count}
-                </span>
+                </Badge>
               ))}
             </div>
           ) : null}
