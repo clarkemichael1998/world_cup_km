@@ -89,10 +89,10 @@ export default function Home() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <BrandLogo />
         {countdown ? (
-          <div className="flex items-end gap-3 rounded-lg border border-green-900/20 bg-pitch px-4 py-2.5 text-white shadow-sm">
+          <div className="flex items-end justify-between gap-2 rounded-lg border border-green-900/20 bg-pitch px-3 py-2 text-white shadow-sm sm:justify-start sm:gap-3 sm:px-4 sm:py-2.5">
             <CountUnit value={countdown.days} label="days" />
             <CountUnit value={countdown.hours} label="hrs" />
             <CountUnit value={countdown.mins} label="min" />
