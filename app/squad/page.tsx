@@ -34,6 +34,7 @@ export default function SquadPage() {
   const [lockStatus, setLockStatus] = useState<LockStatus | null>(null);
   const [lockBusy, setLockBusy] = useState(false);
   const [lockNotice, setLockNotice] = useState("");
+  const [lockExpanded, setLockExpanded] = useState(false);
   const [playerPool, setPlayerPool] = useState<Player[]>(basePlayerPool);
 
   useEffect(() => {
@@ -171,80 +172,79 @@ export default function SquadPage() {
       </div>
 
       {lockStatus && (
-        <section className={`mb-4 rounded-lg border p-5 shadow-sm ${lockStatus.isLocked ? "border-amber-300 bg-amber-50" : "border-green-900/10 bg-white"}`}>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <span className={`mb-2 inline-flex rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wide ${lockStatus.isLocked ? "bg-amber-200 text-amber-950" : "bg-green-100 text-green-800"}`}>
-                {lockStatus.isLocked ? "Locked" : "Unlocked"}
-              </span>
-              <p className="text-sm font-black uppercase tracking-wide text-green-900/60">
-                ⚽ Next Lock — {lockStatus.lockDate}
-              </p>
-              <p className="mt-0.5 text-xs font-semibold text-green-900/50">
-                Locks {new Date(lockStatus.lockAt).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/London" })} UK time
-              </p>
+        <section className={`mb-4 rounded-lg border shadow-sm ${lockStatus.isLocked ? "border-amber-300 bg-amber-50" : "border-green-900/10 bg-white"}`}>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 p-3">
+            <span className={`inline-flex shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wide ${lockStatus.isLocked ? "bg-amber-200 text-amber-950" : "bg-green-100 text-green-800"}`}>
+              {lockStatus.isLocked ? "🔒 Locked" : "Unlocked"}
+            </span>
+            <p className="text-sm font-black text-green-950">
+              Next lock {new Date(lockStatus.lockAt).toLocaleString("en-GB", { weekday: "short", hour: "2-digit", minute: "2-digit", timeZone: "Europe/London" })}
+            </p>
+            <span className="hidden text-xs font-bold text-green-900/55 sm:inline">
+              {selectedPlayingCount}/{selectedPlayers.length || 11} playing · {coveredFixtures}/{lockStatus.upcomingFixtures.length} fixtures covered
+            </span>
+            <div className="ml-auto flex items-center gap-2">
+              <button
+                onClick={toggleLock}
+                disabled={lockBusy}
+                className={`rounded-md px-4 py-1.5 text-xs font-black text-white transition disabled:opacity-50 ${lockStatus.isLocked ? "bg-amber-600 hover:bg-amber-700" : "bg-pitch hover:bg-green-800"}`}
+              >
+                {lockBusy ? "..." : lockStatus.isLocked ? "Unlock" : "Lock for matchday"}
+              </button>
+              <button
+                onClick={() => setLockExpanded((v) => !v)}
+                className="rounded-md px-2 py-1.5 text-xs font-black text-green-900/60 hover:bg-green-950/5"
+                aria-expanded={lockExpanded}
+                aria-label={lockExpanded ? "Hide matchday details" : "Show matchday details"}
+              >
+                {lockExpanded ? "Hide ▲" : "Details ▼"}
+              </button>
             </div>
-            <button
-              onClick={toggleLock}
-              disabled={lockBusy}
-              className={`rounded-md px-5 py-2 text-sm font-black text-white transition disabled:opacity-50 ${lockStatus.isLocked ? "bg-amber-600 hover:bg-amber-700" : "bg-pitch hover:bg-green-800"}`}
-            >
-              {lockBusy ? "..." : lockStatus.isLocked ? "🔒 Locked — Click to Unlock" : "🔓 Lock Squad for This Day"}
-            </button>
           </div>
 
-          {lockNotice ? (
-            <div className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm font-bold text-emerald-900">
-              {lockNotice}
-              {lockStatus.isLocked ? (
-                <span className="block text-xs font-semibold text-emerald-800/70">
-                  Unlocks {new Date(lockStatus.unlockAt).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/London" })} UK time.
-                </span>
+          {lockExpanded ? (
+            <div className="border-t border-green-900/10 p-3">
+              {lockNotice ? (
+                <div className="mb-3 rounded-md border border-emerald-200 bg-emerald-50 p-2 text-xs font-bold text-emerald-900">{lockNotice}</div>
+              ) : null}
+
+              <div className="grid gap-2 sm:grid-cols-3">
+                <LockSummary label="Playing Today" value={`${selectedPlayingCount}/${selectedPlayers.length || 11}`} />
+                <LockSummary label="Bench Risks" value={String(selectedBenchRisks)} />
+                <LockSummary label="Fixtures Covered" value={`${coveredFixtures}/${lockStatus.upcomingFixtures.length}`} />
+              </div>
+
+              {lockStatus.upcomingFixtures.length > 0 ? (
+                <div className="mt-3">
+                  <p className="mb-1.5 text-[10px] font-black uppercase tracking-wide text-green-900/50">Fixtures on {lockStatus.lockDate}</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {lockStatus.upcomingFixtures.map((f) => (
+                      <div key={f.matchId} className="rounded-md border border-green-900/10 bg-green-950/5 px-2 py-1 text-[11px] font-bold text-green-950">
+                        {f.homeTeam} v {f.awayTeam}
+                        {f.winner && <span className="ml-1 text-green-700">— {f.winner} win</span>}
+                        {f.status === "FINISHED" && !f.winner && <span className="ml-1 text-green-900/50">Draw</span>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <p className="mt-3 text-xs font-semibold text-green-900/50">No fixtures listed for {lockStatus.lockDate} yet.</p>
+              )}
+
+              {lockStatus.isLocked && lockStatus.lockedPlayers.length > 0 ? (
+                <div className="mt-3">
+                  <p className="mb-1.5 text-[10px] font-black uppercase tracking-wide text-green-900/50">Locked XI</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {lockStatus.lockedPlayers.map(({ slot, player }) => (
+                      <span key={slot} className="rounded-md bg-green-950/5 px-2 py-1 text-[11px] font-bold text-green-950">
+                        {player.name} <span className="text-green-900/50">{player.nation}</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
               ) : null}
             </div>
           ) : null}
-
-          <div className="mt-4 grid gap-2 sm:grid-cols-3">
-            <LockSummary label="Playing Today" value={`${selectedPlayingCount}/${selectedPlayers.length || 11}`} />
-            <LockSummary label="Bench Risks" value={String(selectedBenchRisks)} />
-            <LockSummary label="Fixtures Covered" value={`${coveredFixtures}/${lockStatus.upcomingFixtures.length}`} />
-          </div>
-
-          {lockStatus.isLocked && lockStatus.lockedPlayers.length > 0 && (
-            <div className="mt-4">
-              <p className="text-xs font-black uppercase tracking-wide text-green-900/50 mb-2">Locked XI</p>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-                {lockStatus.lockedPlayers.map(({ slot, player }) => (
-                  <div key={slot} className="rounded-md bg-green-950/5 px-3 py-2">
-                    <p className="text-[10px] font-black uppercase tracking-wide text-green-900/50">{slot}</p>
-                    <p className="mt-0.5 truncate text-sm font-black text-green-950">{player.name}</p>
-                    <p className="truncate text-xs font-semibold text-green-900/60">{player.nation}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {lockStatus.upcomingFixtures.length > 0 && (
-            <div className="mt-4">
-              <p className="text-xs font-black uppercase tracking-wide text-green-900/50 mb-2">Fixtures on {lockStatus.lockDate}</p>
-              <div className="flex flex-wrap gap-2">
-                {lockStatus.upcomingFixtures.map((f) => (
-                  <div key={f.matchId} className="rounded-md border border-green-900/10 bg-green-950/5 px-3 py-2 text-xs font-bold text-green-950">
-                    {f.homeTeam} vs {f.awayTeam}
-                    {f.winner && <span className="ml-2 text-green-700"> — {f.winner} win</span>}
-                    {f.status === "FINISHED" && !f.winner && <span className="ml-2 text-green-900/50">Draw</span>}
-                  </div>
-                ))}
-              </div>
-              {lockStatus.upcomingFixtures.length === 0 && (
-                <p className="text-xs font-semibold text-green-900/50">No fixtures listed for this date yet.</p>
-              )}
-            </div>
-          )}
-          {lockStatus.upcomingFixtures.length === 0 && (
-            <p className="mt-3 text-xs font-semibold text-green-900/50">No fixtures listed for {lockStatus.lockDate} yet.</p>
-          )}
         </section>
       )}
 
