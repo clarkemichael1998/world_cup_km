@@ -105,7 +105,7 @@ export default function Home() {
 
       {canSetNews ? (
         <section className="rounded-lg border border-amber-400 bg-gradient-to-r from-amber-50 to-yellow-50 p-4 shadow-sm">
-          <p className="text-sm font-black uppercase tracking-wide text-amber-800">👑 Matchday Champion{wonMatchday ? ` — ${wonMatchday}` : ""}</p>
+          <p className="text-sm font-bold uppercase tracking-wide text-amber-800">👑 Matchday Champion{wonMatchday ? ` — ${wonMatchday}` : ""}</p>
           <p className="mt-1 text-sm font-bold text-amber-900">You won yesterday&apos;s head-to-head. Your prize: set today&apos;s news reel.</p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <input
@@ -126,7 +126,7 @@ export default function Home() {
       {rewardCredits !== null && rewardCredits > 0 ? (
         <section className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 p-4 shadow-sm">
           <div>
-            <p className="text-sm font-black uppercase tracking-wide text-amber-800">Pack Credits</p>
+            <p className="text-sm font-bold uppercase tracking-wide text-amber-800">Pack Credits</p>
             <p className="mt-0.5 text-xl font-black text-amber-900">{rewardCredits} <span className="text-sm font-semibold text-amber-700">to open</span></p>
           </div>
           <div className="flex items-center gap-3">

@@ -171,7 +171,7 @@ function DetailedRules() {
           <div className="mt-3 overflow-hidden rounded-lg border border-green-900/10">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-green-950/5 text-left text-xs font-black uppercase tracking-wide text-green-900/60">
+                <tr className="bg-green-950/5 text-left text-xs font-bold uppercase tracking-wide text-green-900/60">
                   <th className="px-3 py-2">Activity</th>
                   <th className="px-3 py-2 text-right">Conversion</th>
                 </tr>
@@ -334,7 +334,7 @@ function Section({ title, children, tone = "default" }: { title: string; childre
 function Callout({ label, text }: { label: string; text: string }) {
   return (
     <li className="rounded-md bg-green-950/5 px-3 py-2">
-      <p className="text-xs font-black uppercase tracking-wide text-green-900/55">{label}</p>
+      <p className="text-xs font-bold uppercase tracking-wide text-green-900/55">{label}</p>
       <p className="mt-1 text-sm font-bold text-green-950">{text}</p>
     </li>
   );
@@ -345,7 +345,7 @@ function DataTable({ headers, rows }: { headers: string[]; rows: React.ReactNode
     <div className="mt-3 overflow-hidden rounded-lg border border-green-900/10">
       <table className="w-full text-sm">
         <thead>
-          <tr className="bg-green-950/5 text-left text-xs font-black uppercase tracking-wide text-green-900/60">
+          <tr className="bg-green-950/5 text-left text-xs font-bold uppercase tracking-wide text-green-900/60">
             {headers.map((header, index) => (
               <th key={header} className={`px-3 py-2 ${index > 0 ? "text-right" : ""}`}>{header}</th>
             ))}

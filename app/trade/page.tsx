@@ -106,7 +106,7 @@ export default function TradePage() {
       {tradeNotice ? <p className="mb-4 rounded-md bg-amber-100 px-3 py-2 text-sm font-black text-amber-900">{tradeNotice}</p> : null}
 
       <section className="mb-5 rounded-lg border border-amber-300 bg-amber-50 p-4 shadow-sm">
-        <p className="text-sm font-black uppercase tracking-wide text-amber-800">Offer a Duplicate</p>
+        <p className="text-sm font-bold uppercase tracking-wide text-amber-800">Offer a Duplicate</p>
         <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
           <select
             className="min-w-0 flex-1 rounded-md border border-amber-300 bg-white px-3 py-2 text-sm font-bold text-amber-950"
@@ -140,7 +140,7 @@ export default function TradePage() {
 
       <div className="grid gap-5 lg:grid-cols-2">
         <section className="rounded-lg border border-green-900/10 bg-white p-4 shadow-sm">
-          <p className="text-sm font-black uppercase tracking-wide text-green-900/60">Your Offers</p>
+          <p className="text-sm font-bold uppercase tracking-wide text-green-900/60">Your Offers</p>
           <div className="mt-3 space-y-3">
             {myOffers.length > 0 ? (
               myOffers.map((offer) => (
@@ -195,7 +195,7 @@ export default function TradePage() {
         </section>
 
         <section className="rounded-lg border border-green-900/10 bg-white p-4 shadow-sm">
-          <p className="text-sm font-black uppercase tracking-wide text-green-900/60">Open Offers</p>
+          <p className="text-sm font-bold uppercase tracking-wide text-green-900/60">Open Offers</p>
           <div className="mt-3 space-y-3">
             {otherOffers.length > 0 ? (
               otherOffers.map((offer) => {
@@ -220,7 +220,7 @@ export default function TradePage() {
                       </div>
                     ) : (
                       <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-green-900/10 pt-3">
-                        <span className="text-xs font-black uppercase tracking-wide text-green-900/50">Give in return</span>
+                        <span className="text-xs font-bold uppercase tracking-wide text-green-900/50">Give in return</span>
                         <select
                           className="min-w-0 flex-1 rounded-md border border-green-900/20 bg-white px-2 py-1.5 text-xs font-bold text-green-950"
                           value={acceptSelections[offer.id] ?? ""}
@@ -256,7 +256,7 @@ export default function TradePage() {
 
       {recentTrades.length > 0 ? (
         <section className="mt-5 rounded-lg border border-green-900/10 bg-white p-4 shadow-sm">
-          <p className="text-sm font-black uppercase tracking-wide text-green-900/60">Recent Trades</p>
+          <p className="text-sm font-bold uppercase tracking-wide text-green-900/60">Recent Trades</p>
           <div className="mt-3 space-y-2">
             {recentTrades.slice(0, 10).map((trade, index) => (
               <div key={index} className="flex flex-wrap items-center gap-2 rounded-md bg-green-950/5 px-3 py-2 text-xs font-bold text-green-950">

@@ -106,7 +106,7 @@ export default function ProfilePage() {
 
       <div className="mt-5 grid gap-5 lg:grid-cols-2">
         <section className="rounded-lg border border-green-900/10 bg-white p-5 shadow-sm">
-          <p className="text-sm font-black uppercase tracking-wide text-green-900/60">Best XI</p>
+          <p className="text-sm font-bold uppercase tracking-wide text-green-900/60">Best XI</p>
           <div className="mt-3 space-y-1.5">
             {bestXi.length > 0 ? (
               bestXi.map((player) => (
@@ -124,7 +124,7 @@ export default function ProfilePage() {
         </section>
 
         <section className="rounded-lg border border-green-900/10 bg-white p-5 shadow-sm">
-          <p className="text-sm font-black uppercase tracking-wide text-green-900/60">
+          <p className="text-sm font-bold uppercase tracking-wide text-green-900/60">
             Boosts Won {boostTotal !== 0 ? <span className={boostTotal > 0 ? "text-green-700" : "text-red-600"}>({boostTotal > 0 ? `+${boostTotal}` : boostTotal} total)</span> : null}
           </p>
           <div className="mt-3 max-h-80 space-y-1.5 overflow-y-auto pr-1">
@@ -149,7 +149,7 @@ export default function ProfilePage() {
         </section>
 
         <section className="rounded-lg border border-green-900/10 bg-white p-5 shadow-sm">
-          <p className="text-sm font-black uppercase tracking-wide text-green-900/60">Album Progress</p>
+          <p className="text-sm font-bold uppercase tracking-wide text-green-900/60">Album Progress</p>
           {profile.completedNations.length > 0 ? (
             <p className="mt-1 text-xs font-bold text-amber-700">📖 Completed pages: {profile.completedNations.join(", ")}</p>
           ) : null}
@@ -170,7 +170,7 @@ export default function ProfilePage() {
         </section>
 
         <section className="rounded-lg border border-green-900/10 bg-white p-5 shadow-sm">
-          <p className="text-sm font-black uppercase tracking-wide text-green-900/60">Locked XI History</p>
+          <p className="text-sm font-bold uppercase tracking-wide text-green-900/60">Locked XI History</p>
           <div className="mt-3 max-h-96 space-y-2 overflow-y-auto pr-1">
             {profile.lockedHistory.length > 0 ? (
               profile.lockedHistory.map((lock) => (

@@ -62,7 +62,7 @@ export default function CollectionPage() {
       <section className="mb-5 rounded-lg border border-green-900/10 bg-white p-4 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="text-xs font-black uppercase tracking-wide text-green-900/45">Album Completion</p>
+            <p className="text-xs font-bold uppercase tracking-wide text-green-900/45">Album Completion</p>
             <p className="text-sm font-bold text-green-950">{owned.length}/{playerPool.length} stickers placed</p>
           </div>
           <div className="flex items-center gap-3">
@@ -91,7 +91,7 @@ export default function CollectionPage() {
       <section className="mb-5 rounded-lg border border-green-900/10 bg-white p-3 shadow-sm">
         <div className="mb-3 flex items-center justify-between gap-3">
           <div>
-            <p className="text-xs font-black uppercase tracking-wide text-green-900/45">Country Pages</p>
+            <p className="text-xs font-bold uppercase tracking-wide text-green-900/45">Country Pages</p>
             <p className="text-sm font-bold text-green-950">
               {closestIncomplete ? `${closestIncomplete.nation} is closest: ${closestIncomplete.complete}/${closestIncomplete.total} (${closestIncomplete.percent}%).` : "Pick a nation to browse its full sticker page."}
             </p>
@@ -243,7 +243,7 @@ function EmptyStickerSlot({ player, compact = false }: { player: Player; compact
       </div>
       <div className="flex flex-1 flex-col items-center justify-center text-center">
         {flag ? <img src={flag} alt="" className="mb-4 h-8 w-12 rounded object-cover opacity-35 grayscale" /> : null}
-        <p className="text-xs font-black uppercase tracking-wide">Missing sticker</p>
+        <p className="text-xs font-bold uppercase tracking-wide">Missing sticker</p>
         <p className="mt-2 text-lg font-black leading-tight text-green-950/55">{player.name}</p>
         <p className="mt-1 text-xs font-bold text-green-900/45">{player.pos} - {player.club}</p>
       </div>

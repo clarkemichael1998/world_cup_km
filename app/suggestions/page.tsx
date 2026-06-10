@@ -104,7 +104,7 @@ export default function SuggestionsPage() {
 
       <section className="grid gap-5 lg:grid-cols-[360px_1fr]">
         <aside className="rounded-lg border border-green-900/10 bg-white p-5 shadow-sm">
-          <p className="text-sm font-black uppercase tracking-wide text-green-900/60">Add Suggestion</p>
+          <p className="text-sm font-bold uppercase tracking-wide text-green-900/60">Add Suggestion</p>
           <form onSubmit={submit} className="mt-3 space-y-3">
             <input
               className="w-full rounded-md border border-green-900/20 px-3 py-2 text-sm font-semibold"

@@ -269,7 +269,7 @@ export default function SquadPage() {
             <div className="relative space-y-2">
               {formationRows.map((row) => (
                 <div key={row.label} className="grid grid-cols-[28px_1fr] items-center gap-2">
-                  <p className="text-xs font-black uppercase tracking-wide text-green-100/70">{row.label}</p>
+                  <p className="text-xs font-bold uppercase tracking-wide text-green-100/70">{row.label}</p>
                   <div className={`grid gap-2 ${row.slots.length === 1 ? "mx-auto w-36" : row.slots.length === 4 ? "grid-cols-4" : "grid-cols-3"}`}>
                     {row.slots.map((slot) => (
                       <SquadToken
@@ -304,7 +304,7 @@ export default function SquadPage() {
             <>
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-xs font-black uppercase tracking-wide text-green-900/60">Swap {slotLabel(activeSlot)}</p>
+                  <p className="text-xs font-bold uppercase tracking-wide text-green-900/60">Swap {slotLabel(activeSlot)}</p>
                   <p className="mt-1 text-2xl font-black text-green-950">{activePosition}</p>
                 </div>
                 {activePlayer ? <RatingBadge player={activePlayer} /> : null}

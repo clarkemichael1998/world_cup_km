@@ -84,7 +84,7 @@ export default function AddKmPage() {
             Activity
           </label>
           {logsRemaining !== null && (
-            <span className={`text-xs font-black uppercase tracking-wide ${limitReached ? "text-red-600" : "text-green-700"}`}>
+            <span className={`text-xs font-bold uppercase tracking-wide ${limitReached ? "text-red-600" : "text-green-700"}`}>
               {limitReached ? "Limit reached" : `${logsRemaining} log${logsRemaining === 1 ? "" : "s"} left today`}
             </span>
           )}

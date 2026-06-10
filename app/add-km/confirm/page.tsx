@@ -121,7 +121,7 @@ export default function ConfirmActivityPage() {
 
         {currentPending.comment ? (
           <div className="mt-4 rounded-md bg-green-950/5 p-4">
-            <p className="text-xs font-black uppercase tracking-wide text-green-900/50">Comment</p>
+            <p className="text-xs font-bold uppercase tracking-wide text-green-900/50">Comment</p>
             <p className="mt-1 whitespace-pre-wrap break-words text-sm font-semibold text-green-950">“{currentPending.comment}”</p>
           </div>
         ) : null}
@@ -151,7 +151,7 @@ export default function ConfirmActivityPage() {
 function Summary({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-md bg-green-950/5 p-3">
-      <p className="text-xs font-black uppercase tracking-wide text-green-900/50">{label}</p>
+      <p className="text-xs font-bold uppercase tracking-wide text-green-900/50">{label}</p>
       <p className="mt-1 text-lg font-black text-green-950">{value}</p>
     </div>
   );

@@ -62,7 +62,7 @@ export default function ResultsPage() {
             const isToday = day.date === today;
             return (
               <section key={day.date} ref={day.date === anchorDate ? todayRef : undefined} className="scroll-mt-24">
-                <h2 className={`mb-2 flex items-center gap-2 text-sm font-black uppercase tracking-wide ${isToday ? "text-pitch" : "text-green-900/55"}`}>
+                <h2 className={`mb-2 flex items-center gap-2 text-sm font-bold uppercase tracking-wide ${isToday ? "text-pitch" : "text-green-900/55"}`}>
                   {formatDay(day.date)}
                   {isToday ? <span className="rounded-full bg-pitch px-2 py-0.5 text-[10px] text-white">Today</span> : null}
                 </h2>

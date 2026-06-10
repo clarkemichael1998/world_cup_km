@@ -46,7 +46,7 @@ export default function MatchdayGuidePage() {
           <div className="mt-3 overflow-hidden rounded-lg border border-green-900/10">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-green-950/5 text-left text-xs font-black uppercase tracking-wide text-green-900/60">
+                <tr className="bg-green-950/5 text-left text-xs font-bold uppercase tracking-wide text-green-900/60">
                   <th className="px-3 py-2">Rarity</th>
                   <th className="px-3 py-2 text-right">Per goal</th>
                   <th className="px-3 py-2 text-right">Per assist</th>
@@ -80,7 +80,7 @@ export default function MatchdayGuidePage() {
         </Step>
 
         <section className="rounded-lg border border-green-900/10 bg-green-950/5 p-5">
-          <p className="text-sm font-black uppercase tracking-wide text-green-900/60">Quick reference</p>
+          <p className="text-sm font-bold uppercase tracking-wide text-green-900/60">Quick reference</p>
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
             <Ref label="Formation" value="4-3-3 (GK · 4 DF · 3 MF · 3 FW)" />
             <Ref label="Lock time" value="3:00 PM UK daily" />

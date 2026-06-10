@@ -102,7 +102,7 @@ export default function RevealPage() {
             />
           ))}
         </div>
-        <p className="text-xs font-black uppercase tracking-wide text-green-900/50">
+        <p className="text-xs font-bold uppercase tracking-wide text-green-900/50">
           {index + 1} / {players.length}
         </p>
       </div>
@@ -128,7 +128,7 @@ export default function RevealPage() {
             View summary
           </button>
         ) : (
-          <p className="animate-pulse text-xs font-black uppercase tracking-widest text-green-900/40">
+          <p className="animate-pulse text-xs font-bold uppercase tracking-widest text-green-900/40">
             {stage === 0 ? "Tap to open" : stage === 3 ? "Tap for next card" : "Tap to reveal"}
           </p>
         )}
@@ -151,7 +151,7 @@ function RevealSummary({ players, state }: { players: Player[]; state: UserState
   return (
     <div className="mx-auto flex min-h-[60vh] max-w-2xl flex-col justify-center">
       <section className="rounded-lg border border-green-900/10 bg-white p-6 shadow-sm">
-        <p className="text-xs font-black uppercase tracking-wide text-green-900/50">Opening Summary</p>
+        <p className="text-xs font-bold uppercase tracking-wide text-green-900/50">Opening Summary</p>
         <h1 className="mt-1 text-3xl font-black text-green-950">{players.length} sticker{players.length === 1 ? "" : "s"} revealed</h1>
 
         <div className="mt-5 grid gap-3 sm:grid-cols-3">
@@ -161,7 +161,7 @@ function RevealSummary({ players, state }: { players: Player[]; state: UserState
         </div>
 
         <div className="mt-5 rounded-lg bg-green-950/5 p-4">
-          <p className="text-xs font-black uppercase tracking-wide text-green-900/50">Rarity Breakdown</p>
+          <p className="text-xs font-bold uppercase tracking-wide text-green-900/50">Rarity Breakdown</p>
           <div className="mt-3 flex flex-wrap gap-2">
             {Object.entries(rarityLabel).map(([rarity, label]) => {
               const count = rarityCounts[rarity as Player["rarity"]] ?? 0;
@@ -177,7 +177,7 @@ function RevealSummary({ players, state }: { players: Player[]; state: UserState
 
         {best ? (
           <div className="mt-5 rounded-lg border border-green-900/10 bg-green-50 p-4">
-            <p className="text-xs font-black uppercase tracking-wide text-green-900/50">Best Pull</p>
+            <p className="text-xs font-bold uppercase tracking-wide text-green-900/50">Best Pull</p>
             <p className="mt-1 text-xl font-black text-green-950">{best.name}</p>
             <p className="text-sm font-bold text-green-900/70">{best.rating} {rarityLabel[best.rarity]} - {best.nation} - {best.club}</p>
           </div>
@@ -199,7 +199,7 @@ function RevealSummary({ players, state }: { players: Player[]; state: UserState
 function SummaryStat({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-md bg-green-950/5 p-3">
-      <p className="text-xs font-black uppercase tracking-wide text-green-900/50">{label}</p>
+      <p className="text-xs font-bold uppercase tracking-wide text-green-900/50">{label}</p>
       <p className="mt-1 break-words text-lg font-black text-green-950">{value}</p>
     </div>
   );
@@ -256,7 +256,7 @@ function PlayerNameCard({ player }: { player: Player }) {
       <div className="flex min-h-[420px] flex-col items-center justify-center rounded-xl border border-white/10 bg-black/20 gap-5 p-8 text-center">
         <div className="animate-reveal-slide-up flex items-center gap-3" style={{ animationDelay: "0.05s" }}>
           {flag && <img src={flag} alt={player.nation} className="h-7 w-10 rounded object-cover shadow" />}
-          <p className="text-sm font-black uppercase tracking-wide text-white/60">{player.nation}</p>
+          <p className="text-sm font-bold uppercase tracking-wide text-white/60">{player.nation}</p>
         </div>
         <p className="animate-reveal-pop text-4xl font-black leading-tight text-white" style={{ animationDelay: "0.1s" }}>
           {player.name}
@@ -285,7 +285,7 @@ function FullCard({ player }: { player: Player }) {
     >
       <div className="flex min-h-[420px] flex-col rounded-xl border border-white/10 bg-black/20 p-5 gap-4">
         <div className="flex justify-center">
-          <span className="rounded-full border border-white/20 bg-white/15 px-4 py-1 text-xs font-black uppercase tracking-wide text-white">
+          <span className="rounded-full border border-white/20 bg-white/15 px-4 py-1 text-xs font-bold uppercase tracking-wide text-white">
             New signing
           </span>
         </div>

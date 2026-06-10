@@ -95,7 +95,7 @@ function SquadPanel({ title, rating, players, empty }: { title: string; rating: 
   return (
     <div className="rounded-lg bg-green-950/5 p-3">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <p className="text-xs font-black uppercase tracking-wide text-green-900/60">{title}</p>
+        <p className="text-xs font-bold uppercase tracking-wide text-green-900/60">{title}</p>
         <p className="rounded-md bg-white px-2 py-1 text-xs font-black text-pitch">{rating > 0 ? rating.toFixed(1) : "--"}</p>
       </div>
 

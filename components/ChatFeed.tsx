@@ -91,7 +91,7 @@ export function ChatFeed() {
     <section className="space-y-4">
       <div className="rounded-lg border border-green-900/10 bg-white p-4 shadow-sm">
         <div className="flex items-center justify-between gap-3">
-          <p className="text-sm font-black uppercase tracking-wide text-green-900/60">Group Chat</p>
+          <p className="text-sm font-bold uppercase tracking-wide text-green-900/60">Group Chat</p>
           <p className="text-xs font-bold text-green-900/45">Newest first</p>
         </div>
         <form onSubmit={submit} className="mt-3">

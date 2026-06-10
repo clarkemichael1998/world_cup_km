@@ -76,14 +76,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       >
         <Link href="/" className="shrink-0" aria-label="KMXI home"><BrandLogo variant="nav" /></Link>
         <div className="flex min-w-0 items-center gap-2">
-          <Link href="/suggestions" className="whitespace-nowrap rounded-md bg-green-950/5 px-2 py-1 text-xs font-black uppercase tracking-wide text-green-900 hover:bg-green-950/10">
+          <Link href="/suggestions" className="whitespace-nowrap rounded-md bg-green-950/5 px-2 py-1 text-xs font-bold uppercase tracking-wide text-green-900 hover:bg-green-950/10">
             Ideas
           </Link>
-          <Link href="/rules" className="whitespace-nowrap rounded-md bg-green-950/5 px-2 py-1 text-xs font-black uppercase tracking-wide text-green-900 hover:bg-green-950/10">
+          <Link href="/rules" className="whitespace-nowrap rounded-md bg-green-950/5 px-2 py-1 text-xs font-bold uppercase tracking-wide text-green-900 hover:bg-green-950/10">
             Rules
           </Link>
           {isAdmin ? (
-            <Link href="/admin" className="whitespace-nowrap rounded-md bg-amber-100 px-2 py-1 text-xs font-black uppercase tracking-wide text-amber-900 hover:bg-amber-200">
+            <Link href="/admin" className="whitespace-nowrap rounded-md bg-amber-100 px-2 py-1 text-xs font-bold uppercase tracking-wide text-amber-900 hover:bg-amber-200">
               Admin
             </Link>
           ) : null}

@@ -186,7 +186,7 @@ function MatchMonitorTab({ onForbidden }: { onForbidden: () => void }) {
       <div className="rounded-lg border border-green-900/10 bg-white p-5 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <p className="text-sm font-black uppercase tracking-wide text-green-900/60">Provider Status</p>
+            <p className="text-sm font-bold uppercase tracking-wide text-green-900/60">Provider Status</p>
             <p className="mt-1 text-sm font-semibold text-green-900/65">
               {data?.providerStatus ? `${data.providerStatus.provider} - ${data.providerStatus.status}` : "No provider run yet."}
             </p>
@@ -202,7 +202,7 @@ function MatchMonitorTab({ onForbidden }: { onForbidden: () => void }) {
       <div className="overflow-x-auto rounded-lg border border-green-900/10 bg-white shadow-sm">
         <table className="w-full min-w-[920px] text-sm">
           <thead>
-            <tr className="border-b border-green-900/10 bg-green-950/5 text-left text-xs font-black uppercase tracking-wide text-green-900/60">
+            <tr className="border-b border-green-900/10 bg-green-950/5 text-left text-xs font-bold uppercase tracking-wide text-green-900/60">
               <th className="px-3 py-3">Fixture</th>
               <th className="px-3 py-3">Kickoff</th>
               <th className="px-3 py-3">Status</th>
@@ -273,7 +273,7 @@ function LiveSettleTab({ onForbidden }: { onForbidden: () => void }) {
 
   return (
     <section className="max-w-2xl rounded-lg border border-green-900/10 bg-white p-6 shadow-sm">
-      <p className="text-sm font-black uppercase tracking-wide text-green-900/60">Live Match Settlement</p>
+      <p className="text-sm font-bold uppercase tracking-wide text-green-900/60">Live Match Settlement</p>
       <p className="mt-2 text-sm font-semibold text-green-900/65">
         Sync fixtures, settle win credits for every locked squad, and apply goal/assist rating boosts for every user. Safe to run more than once.
       </p>
@@ -368,7 +368,7 @@ function LateCallupsTab({ onForbidden }: { onForbidden: () => void }) {
     <div className="grid gap-6 lg:grid-cols-[minmax(0,520px)_1fr]">
       <form onSubmit={submit} className="space-y-4 rounded-lg border border-green-900/10 bg-white p-5 shadow-sm">
         <div>
-          <p className="text-sm font-black uppercase tracking-wide text-green-900/60">Late Call-Up</p>
+          <p className="text-sm font-bold uppercase tracking-wide text-green-900/60">Late Call-Up</p>
           <p className="mt-1 text-sm font-semibold text-green-900/60">Adds a player to the live app database. No code access needed.</p>
         </div>
 
@@ -451,7 +451,7 @@ function LateCallupsTab({ onForbidden }: { onForbidden: () => void }) {
       <section className="rounded-lg border border-green-900/10 bg-white p-5 shadow-sm">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-sm font-black uppercase tracking-wide text-green-900/60">Created This Way</p>
+            <p className="text-sm font-bold uppercase tracking-wide text-green-900/60">Created This Way</p>
             <p className="mt-1 text-sm font-semibold text-green-900/60">{players.length} late call-up{players.length === 1 ? "" : "s"} in the app database.</p>
           </div>
           <button onClick={load} className="rounded-md bg-green-950/8 px-3 py-2 text-xs font-black text-green-950 hover:bg-green-950/15">Refresh</button>
@@ -543,7 +543,7 @@ function ViralRatingsTab({ onForbidden }: { onForbidden: () => void }) {
     <div className="grid gap-6 lg:grid-cols-[minmax(0,520px)_1fr]">
       <form onSubmit={submit} className="space-y-4 rounded-lg border border-green-900/10 bg-white p-5 shadow-sm">
         <div>
-          <p className="text-sm font-black uppercase tracking-wide text-green-900/60">Viral Rating Change</p>
+          <p className="text-sm font-bold uppercase tracking-wide text-green-900/60">Viral Rating Change</p>
           <p className="mt-1 text-sm font-semibold text-green-900/60">Boost or downgrade a player for a World Cup moment. Every change is logged and posted to chat.</p>
         </div>
 
@@ -605,7 +605,7 @@ function ViralRatingsTab({ onForbidden }: { onForbidden: () => void }) {
       <section className="rounded-lg border border-green-900/10 bg-white p-5 shadow-sm">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-sm font-black uppercase tracking-wide text-green-900/60">Admin Log</p>
+            <p className="text-sm font-bold uppercase tracking-wide text-green-900/60">Admin Log</p>
             <p className="mt-1 text-sm font-semibold text-green-900/60">{adjustments.length} recent rating change{adjustments.length === 1 ? "" : "s"}.</p>
           </div>
           <button onClick={load} className="rounded-md bg-green-950/8 px-3 py-2 text-xs font-black text-green-950 hover:bg-green-950/15">Refresh</button>
@@ -701,7 +701,7 @@ function NewsReelTab({ onForbidden }: { onForbidden: () => void }) {
     <form onSubmit={save} className="max-w-2xl rounded-lg border border-green-900/10 bg-white p-6 shadow-sm">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-sm font-black uppercase tracking-wide text-green-900/60">News Reel</p>
+          <p className="text-sm font-bold uppercase tracking-wide text-green-900/60">News Reel</p>
           <p className="mt-1 text-sm font-semibold text-green-900/60">This updates the scrolling banner across the app without a redeploy.</p>
         </div>
         <label className="flex items-center gap-2 rounded-md bg-green-950/5 px-3 py-2 text-sm font-black text-green-950">
@@ -801,7 +801,7 @@ function ActivityReviewTab({ onForbidden }: { onForbidden: () => void }) {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-3">
-        <p className="text-sm font-black uppercase tracking-wide text-green-900/60">Recent Activity Submissions</p>
+        <p className="text-sm font-bold uppercase tracking-wide text-green-900/60">Recent Activity Submissions</p>
         <button onClick={load} className="rounded-md bg-green-950/8 px-3 py-1.5 text-xs font-black text-green-950 hover:bg-green-950/15">Refresh</button>
       </div>
       {logs.length === 0 ? (
@@ -852,7 +852,7 @@ function ActivityLogCard({ log, onRemove }: { log: ActivityLogRow; onRemove: (lo
       {log.comment ? <p className="mt-3 rounded-md bg-green-950/5 p-3 font-semibold text-green-950">“{log.comment}”</p> : null}
 
       <div className="mt-3">
-        <p className="text-xs font-black uppercase tracking-wide text-green-900/50">Cards Awarded</p>
+        <p className="text-xs font-bold uppercase tracking-wide text-green-900/50">Cards Awarded</p>
         <p className="mt-1 text-xs font-semibold text-green-900/70">{awards.length > 0 ? awards.join(", ") : "No award detail stored for this log."}</p>
       </div>
 
@@ -965,7 +965,7 @@ function ResultsTab({ onForbidden }: { onForbidden: () => void }) {
       </form>
 
       <div className="space-y-3">
-        <p className="text-sm font-black uppercase tracking-wide text-green-900/60">Submission Log</p>
+        <p className="text-sm font-bold uppercase tracking-wide text-green-900/60">Submission Log</p>
         {log.length === 0 ? (
           <p className="text-sm font-semibold text-green-900/60">No results submitted this session.</p>
         ) : (
@@ -1056,7 +1056,7 @@ function GoalScorersTab({ onForbidden }: { onForbidden: () => void }) {
 
       {/* Add manual entry */}
       <div className="rounded-lg border border-green-900/10 bg-white p-5 shadow-sm">
-        <p className="mb-3 text-sm font-black uppercase tracking-wide text-green-900/60">Add {eventType === "goal" ? "Goal Scorer" : "Assist"} Manually</p>
+        <p className="mb-3 text-sm font-bold uppercase tracking-wide text-green-900/60">Add {eventType === "goal" ? "Goal Scorer" : "Assist"} Manually</p>
         <form onSubmit={addManual} className="flex flex-wrap gap-3">
           <input value={addMatchId} onChange={(e) => setAddMatchId(e.target.value)} placeholder="Match ID (e.g. football-data-123)"
             className="flex-1 min-w-48 rounded-md border border-green-900/20 px-3 py-2 text-sm font-semibold text-green-950 focus:outline-none focus:ring-2 focus:ring-green-800" />
@@ -1078,7 +1078,7 @@ function GoalScorersTab({ onForbidden }: { onForbidden: () => void }) {
           <div className="flex gap-2">
             {(["all", "pending", "matched", "ignored"] as const).map((f) => (
               <button key={f} onClick={() => setFilter(f)}
-                className={`rounded-md px-3 py-1.5 text-xs font-black uppercase tracking-wide transition-colors ${filter === f ? "bg-green-950 text-white" : "bg-green-950/8 text-green-950 hover:bg-green-950/15"}`}>
+                className={`rounded-md px-3 py-1.5 text-xs font-bold uppercase tracking-wide transition-colors ${filter === f ? "bg-green-950 text-white" : "bg-green-950/8 text-green-950 hover:bg-green-950/15"}`}>
                 {f}
               </button>
             ))}
@@ -1152,7 +1152,7 @@ function GoalScorerCard({ scorer, eventType, onResolve }: { scorer: GoalScorerRo
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="space-y-1.5">
-      <label className="text-xs font-black uppercase tracking-wide text-green-900/60">{label}</label>
+      <label className="text-xs font-bold uppercase tracking-wide text-green-900/60">{label}</label>
       {children}
     </div>
   );

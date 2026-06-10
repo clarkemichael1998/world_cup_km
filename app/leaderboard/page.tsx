@@ -38,7 +38,7 @@ export default function LeaderboardPage() {
         ) : (
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-green-900/10 bg-green-950/5 text-left text-xs font-black uppercase tracking-wide text-green-900/60">
+              <tr className="border-b border-green-900/10 bg-green-950/5 text-left text-xs font-bold uppercase tracking-wide text-green-900/60">
                 <th className="w-10 px-4 py-3">#</th>
                 <th className="px-4 py-3">Player</th>
                 <th className="px-4 py-3 text-right">Squad Avg</th>
