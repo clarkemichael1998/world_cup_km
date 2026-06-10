@@ -41,6 +41,12 @@ button {
 
 .australia-mode {
   min-height: 100svh;
+}
+
+.australia-mode > header,
+.australia-mode > .news-reel,
+.australia-mode > main,
+.australia-mode > nav {
   transform: rotate(180deg);
   transform-origin: center center;
 }
