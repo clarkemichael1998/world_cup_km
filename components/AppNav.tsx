@@ -35,7 +35,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   }, []);
 
-  const isDanielAustraliaDay = username?.toLowerCase() === "danielm" && getLondonDateString() === "2026-06-09";
+  const isDanielAustraliaDay = username?.toLowerCase() === "danielm" && getLondonDateString() === "2026-06-10";
 
   return (
     <div
