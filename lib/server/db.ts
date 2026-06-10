@@ -2040,6 +2040,74 @@ export function getFixturesInWindow(startIso: string, endIso: string) {
     .all(startIso, endIso) as Array<{ match_id: string; home_team: string; away_team: string; kickoff_at: string; status: string; winner: string | null }>;
 }
 
+// All fixtures grouped by calendar date (newest first), each with the matched
+// KMXI-pool scorers and assisters. Scorers outside the sticker pool aren't
+// tracked, so this shows the players that matter for the game.
+export function getResultsByDay() {
+  const db = getDb();
+  const playerMap = new Map(getAllPlayers().map((p) => [p.id, p]));
+
+  const fixtures = db
+    .prepare(`SELECT match_id, match_date, kickoff_at, home_team, away_team, winner, status FROM fixture_results ORDER BY kickoff_at DESC, match_id DESC`)
+    .all() as Array<{ match_id: string; match_date: string; kickoff_at: string; home_team: string; away_team: string; winner: string | null; status: string }>;
+
+  const goalRows = db
+    .prepare("SELECT match_id, player_id, goal_count FROM goal_scorers WHERE status = 'matched' AND player_id IS NOT NULL")
+    .all() as Array<{ match_id: string; player_id: number; goal_count: number }>;
+  const assistRows = db
+    .prepare("SELECT match_id, player_id, assist_count FROM assist_scorers WHERE status = 'matched' AND player_id IS NOT NULL")
+    .all() as Array<{ match_id: string; player_id: number; assist_count: number }>;
+
+  type Contributor = { name: string; nation: string; rarity: string; count: number };
+  const goalsByMatch = new Map<string, Contributor[]>();
+  const assistsByMatch = new Map<string, Contributor[]>();
+
+  for (const row of goalRows) {
+    const player = playerMap.get(row.player_id);
+    if (!player) continue;
+    const list = goalsByMatch.get(row.match_id) ?? [];
+    list.push({ name: player.name, nation: player.nation, rarity: player.rarity, count: row.goal_count });
+    goalsByMatch.set(row.match_id, list);
+  }
+  for (const row of assistRows) {
+    const player = playerMap.get(row.player_id);
+    if (!player) continue;
+    const list = assistsByMatch.get(row.match_id) ?? [];
+    list.push({ name: player.name, nation: player.nation, rarity: player.rarity, count: row.assist_count });
+    assistsByMatch.set(row.match_id, list);
+  }
+
+  const byDate = new Map<string, Array<{
+    matchId: string;
+    kickoffAt: string;
+    homeTeam: string;
+    awayTeam: string;
+    winner: string | null;
+    status: string;
+    scorers: Contributor[];
+    assisters: Contributor[];
+  }>>();
+
+  for (const fixture of fixtures) {
+    const list = byDate.get(fixture.match_date) ?? [];
+    list.push({
+      matchId: fixture.match_id,
+      kickoffAt: fixture.kickoff_at,
+      homeTeam: fixture.home_team,
+      awayTeam: fixture.away_team,
+      winner: fixture.winner,
+      status: fixture.status,
+      scorers: (goalsByMatch.get(fixture.match_id) ?? []).sort((a, b) => b.count - a.count || a.name.localeCompare(b.name)),
+      assisters: (assistsByMatch.get(fixture.match_id) ?? []).sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
+    });
+    byDate.set(fixture.match_date, list);
+  }
+
+  return Array.from(byDate.entries())
+    .sort((a, b) => b[0].localeCompare(a[0]))
+    .map(([date, matches]) => ({ date, matches }));
+}
+
 export function getLockedSquadForDate(userId: number, lockDate: string) {
   const database = getDb();
   const locked = database.prepare("SELECT id FROM locked_squads WHERE user_id = ? AND lock_date = ?").get(userId, lockDate) as { id: number } | undefined;

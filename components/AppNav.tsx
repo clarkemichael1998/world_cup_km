@@ -58,6 +58,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <NavLink href="/squad" label="Squad" badge={badges.squadNeedsLock ? "Lock" : undefined} />
             <Link className="rounded-md px-3 py-2 hover:bg-green-100" href="/squads">Squads</Link>
             <NavLink href="/matchday-guide" label="Guide" />
+            <NavLink href="/results" label="Results" />
             <Link className="rounded-md px-3 py-2 hover:bg-green-100" href="/leaderboard">Leaderboard</Link>
             <NavLink href="/suggestions" label="Suggestions" />
             <Link className="rounded-md px-3 py-2 hover:bg-green-100" href="/rules">Rules</Link>

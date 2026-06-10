@@ -110,9 +110,14 @@ export default function MatchdayGuidePage() {
             <Ref label="Goal boost" value="+2 to +10 (clowns −5)" />
             <Ref label="Assist boost" value="+1 to +5 (clowns −3)" />
           </div>
-          <Link href="/squad" className="mt-4 inline-flex rounded-md bg-pitch px-5 py-3 text-sm font-black text-white hover:bg-green-800">
-            Go pick your XI
-          </Link>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Link href="/squad" className="inline-flex rounded-md bg-pitch px-5 py-3 text-sm font-black text-white hover:bg-green-800">
+              Go pick your XI
+            </Link>
+            <Link href="/results" className="inline-flex rounded-md border border-green-900/15 bg-white px-5 py-3 text-sm font-black text-green-950 hover:bg-green-50">
+              See results
+            </Link>
+          </div>
         </section>
       </div>
 
