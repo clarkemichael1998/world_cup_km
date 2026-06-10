@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { PageTitle } from "@/components/PageTitle";
 import { autoPickBestXI, calculateSquadRating, canPlaySlot, getOwnedPlayers, getPlayer, slotAllowedPositions, squadSlots } from "@/lib/squadUtils";
@@ -142,6 +143,9 @@ export default function SquadPage() {
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
         <PageTitle title="Squad" subtitle={`${selectedPlayers.length}/11 selected${rating ? ` - Average ${rating.toFixed(1)}` : ""}`} />
         <div className="mb-4 flex flex-wrap gap-2 self-start md:mb-8 md:justify-end">
+          <Link href="/matchday-guide" className="rounded-md border border-green-900/15 bg-white px-4 py-2 text-sm font-black text-green-950 hover:bg-green-50">
+            Matchday Guide
+          </Link>
           <button className="rounded-md bg-boot px-4 py-2 text-sm font-black text-white hover:bg-red-700" onClick={autoPick}>
             Auto-pick Best XI
           </button>
