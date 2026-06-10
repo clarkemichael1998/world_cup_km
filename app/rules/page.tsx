@@ -101,7 +101,7 @@ function SimpleRules() {
       <Section title="In-Match Rewards">
         <p>When real World Cup matches play, your locked players go to work:</p>
         <ul className="mt-2 list-disc space-y-1 pl-5">
-          <li><strong>Match win:</strong> each locked player whose nation wins earns you <strong>3 pack credits</strong>. A draw earns nothing.</li>
+          <li><strong>Match win:</strong> each locked player whose nation wins earns you <strong>1 pack credit</strong>. A draw earns nothing.</li>
           <li><strong>Goals &amp; assists</strong> permanently boost that player&apos;s rating, by rarity:</li>
         </ul>
         <DataTable
@@ -214,7 +214,7 @@ function DetailedRules() {
             <li><strong>Album milestones:</strong> collect every sticker on a nation&apos;s page and earn <strong>5 bonus credits</strong>, once per nation.</li>
             <li><strong>Sticker trading:</strong> offer a duplicate up for trade on the Sticker Album page. Other players propose one of their duplicates in return, and the original offerer confirms the swap they like — one for one. You only ever trade spares, so your placed stickers are safe.</li>
             <li><strong>Match credits</strong> are earned when players in your locked squad represent a winning nation.</li>
-            <li>A match win gives <strong>3 credits per eligible locked player</strong>.</li>
+            <li>A match win gives <strong>1 credit per eligible locked player</strong>.</li>
             <li>Credits can be spent on the home page. <strong>1 credit = 1 sticker pull</strong>, up to 20 at a time.</li>
             <li>Credits do not expire and carry over until spent.</li>
           </ul>
@@ -239,8 +239,8 @@ function DetailedRules() {
 
           <p className="mt-3 font-black text-green-950">Match-win credits</p>
           <ul className="mt-1 list-disc space-y-1 pl-5 text-green-900/70">
-            <li>For every match a nation <strong>wins</strong>, each player from that nation in your locked XI pays out <strong>3 pack credits</strong>.</li>
-            <li>Two locked players from the same winning nation pay <strong>3 credits each</strong> (6 total).</li>
+            <li>For every match a nation <strong>wins</strong>, each player from that nation in your locked XI pays out <strong>1 pack credit</strong>.</li>
+            <li>Two locked players from the same winning nation pay <strong>1 credit each</strong> (2 total).</li>
             <li><strong>Draws and losses pay nothing.</strong> Only a win triggers credits.</li>
             <li>Credits are awarded once per match and never double-counted.</li>
           </ul>

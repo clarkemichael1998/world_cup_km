@@ -2048,7 +2048,7 @@ export function getResultsByDay() {
   const playerMap = new Map(getAllPlayers().map((p) => [p.id, p]));
 
   const fixtures = db
-    .prepare(`SELECT match_id, match_date, kickoff_at, home_team, away_team, winner, status FROM fixture_results ORDER BY kickoff_at DESC, match_id DESC`)
+    .prepare(`SELECT match_id, match_date, kickoff_at, home_team, away_team, winner, status FROM fixture_results ORDER BY kickoff_at ASC, match_id ASC`)
     .all() as Array<{ match_id: string; match_date: string; kickoff_at: string; home_team: string; away_team: string; winner: string | null; status: string }>;
 
   const goalRows = db
@@ -2104,7 +2104,7 @@ export function getResultsByDay() {
   }
 
   return Array.from(byDate.entries())
-    .sort((a, b) => b[0].localeCompare(a[0]))
+    .sort((a, b) => a[0].localeCompare(b[0]))
     .map(([date, matches]) => ({ date, matches }));
 }
 

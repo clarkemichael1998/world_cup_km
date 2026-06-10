@@ -5,7 +5,7 @@ import type { Player, SquadSlot } from "@/lib/types";
 
 const tournamentStart = "2026-06-11";
 const tournamentEnd = "2026-07-19";
-const creditValue = 3;
+const creditValue = 1;
 const LOCK_HOUR = 15; // 3pm UK time
 
 export type LiveStatus = {

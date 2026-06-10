@@ -1,8 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { PageTitle } from "@/components/PageTitle";
 import { flagUrl } from "@/lib/flags";
+
+function londonToday() {
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/London", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
+  const byType = Object.fromEntries(parts.map((p) => [p.type, p.value]));
+  return `${byType.year}-${byType.month}-${byType.day}`;
+}
 
 type Contributor = { name: string; nation: string; rarity: string; count: number };
 type Match = {
@@ -19,6 +25,7 @@ type Day = { date: string; matches: Match[] };
 
 export default function ResultsPage() {
   const [days, setDays] = useState<Day[] | null>(null);
+  const todayRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     fetch("/api/results")
@@ -26,6 +33,20 @@ export default function ResultsPage() {
       .then((d) => setDays(d.days ?? []))
       .catch(() => setDays([]));
   }, []);
+
+  // Once results render, jump to today's fixtures so earlier days are above
+  // (scroll up) and upcoming days below (scroll down).
+  useEffect(() => {
+    if (days && days.length > 0 && todayRef.current) {
+      todayRef.current.scrollIntoView({ block: "start" });
+    }
+  }, [days]);
+
+  const today = londonToday();
+  // Anchor: today if present, otherwise the next upcoming day (days are ascending).
+  const anchorDate = days?.some((d) => d.date === today)
+    ? today
+    : days?.find((d) => d.date >= today)?.date ?? days?.[days.length - 1]?.date;
 
   return (
     <div>
@@ -37,16 +58,22 @@ export default function ResultsPage() {
         <p className="rounded-lg bg-white p-6 text-sm font-semibold text-green-900/60 shadow-sm">No fixtures yet. They&apos;ll appear here as the tournament kicks off.</p>
       ) : (
         <div className="space-y-6">
-          {days.map((day) => (
-            <section key={day.date}>
-              <h2 className="mb-2 text-sm font-black uppercase tracking-wide text-green-900/55">{formatDay(day.date)}</h2>
-              <div className="grid gap-3 md:grid-cols-2">
-                {day.matches.map((match) => (
-                  <MatchCard key={match.matchId} match={match} />
-                ))}
-              </div>
-            </section>
-          ))}
+          {days.map((day) => {
+            const isToday = day.date === today;
+            return (
+              <section key={day.date} ref={day.date === anchorDate ? todayRef : undefined} className="scroll-mt-24">
+                <h2 className={`mb-2 flex items-center gap-2 text-sm font-black uppercase tracking-wide ${isToday ? "text-pitch" : "text-green-900/55"}`}>
+                  {formatDay(day.date)}
+                  {isToday ? <span className="rounded-full bg-pitch px-2 py-0.5 text-[10px] text-white">Today</span> : null}
+                </h2>
+                <div className="grid gap-3 md:grid-cols-2">
+                  {day.matches.map((match) => (
+                    <MatchCard key={match.matchId} match={match} />
+                  ))}
+                </div>
+              </section>
+            );
+          })}
         </div>
       )}
 

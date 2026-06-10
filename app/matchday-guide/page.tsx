@@ -10,13 +10,6 @@ const boostRows = [
   { rarity: "Clowns", goal: "−5", assist: "−3", colour: "text-red-600" }
 ];
 
-const formationRows = [
-  { line: "FW", count: 3, tone: "bg-red-500" },
-  { line: "MF", count: 3, tone: "bg-amber-500" },
-  { line: "DF", count: 4, tone: "bg-sky-500" },
-  { line: "GK", count: 1, tone: "bg-emerald-600" }
-];
-
 export default function MatchdayGuidePage() {
   return (
     <div className="mx-auto max-w-3xl">
@@ -24,21 +17,7 @@ export default function MatchdayGuidePage() {
 
       <div className="space-y-5">
         <Step n={1} title="Build a 4-3-3">
-          <p>Pick your strongest eleven on the <Link href="/squad" className="font-black text-pitch underline">Squad page</Link>. The shape is fixed:</p>
-          <div className="mt-3 space-y-1.5">
-            {formationRows.map((row) => (
-              <div key={row.line} className="flex items-center gap-3">
-                <span className="w-8 text-xs font-black uppercase text-green-900/60">{row.line}</span>
-                <div className="flex gap-1.5">
-                  {Array.from({ length: row.count }).map((_, i) => (
-                    <span key={i} className={`h-6 w-6 rounded-full ${row.tone} shadow-sm`} />
-                  ))}
-                </div>
-                <span className="text-xs font-bold text-green-900/55">×{row.count}</span>
-              </div>
-            ))}
-          </div>
-          <p className="mt-3 text-green-900/70">That&apos;s 1 goalkeeper, 4 defenders, 3 midfielders, 3 forwards — 11 players. Use <strong>Auto-pick</strong> to fill it with your highest-rated available stickers.</p>
+          <p>Pick your strongest eleven on the <Link href="/squad" className="font-black text-pitch underline">Squad page</Link>: <strong>1 goalkeeper, 4 defenders, 3 midfielders, 3 forwards</strong>. Use <strong>Auto-pick</strong> to fill it with your highest-rated available stickers.</p>
         </Step>
 
         <Step n={2} title="Lock by 3:00 PM UK">
@@ -52,11 +31,11 @@ export default function MatchdayGuidePage() {
 
         <Step n={3} title="Win matches → earn pack credits">
           <div className="rounded-md bg-pitch/5 p-3">
-            <p className="text-2xl font-black text-pitch">3 credits</p>
+            <p className="text-2xl font-black text-pitch">1 credit</p>
             <p className="text-sm font-bold text-green-950">per locked player whose nation wins their match</p>
           </div>
           <ul className="mt-3 list-disc space-y-1.5 pl-5">
-            <li>Two locked players from the <strong>same winning nation</strong>? That&apos;s 3 each — 6 total.</li>
+            <li>Two locked players from the <strong>same winning nation</strong>? That&apos;s 1 each — 2 total.</li>
             <li><strong>Draws and losses pay nothing.</strong> Only a win triggers credits.</li>
             <li>Credits never expire. Spend them on the home page: <strong>1 credit = 1 sticker pull</strong>.</li>
           </ul>
@@ -85,7 +64,7 @@ export default function MatchdayGuidePage() {
             </table>
           </div>
           <ul className="mt-3 list-disc space-y-1.5 pl-5">
-            <li><strong>It scales:</strong> a brace doubles the goal value, a hattrick triples it.</li>
+            <li><strong>Every goal counts:</strong> the boost is the per-goal value times the goals scored. A Common scoring twice is +10 ×2 = +20; a hattrick is +30. Assists work the same way at the assist rate.</li>
             <li><strong>Commons climb fastest</strong> — a common scoring is worth +10, an icon only +2.</li>
             <li><strong>Clowns lose rating</strong> when they score (−5) or assist (−3). Start one at your peril.</li>
             <li>Boosts stack all tournament and apply to <strong>your own copy</strong> of the sticker. No boost for players you pack <em>after</em> the match.</li>
@@ -105,7 +84,7 @@ export default function MatchdayGuidePage() {
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
             <Ref label="Formation" value="4-3-3 (GK · 4 DF · 3 MF · 3 FW)" />
             <Ref label="Lock time" value="3:00 PM UK daily" />
-            <Ref label="Match win" value="+3 credits per locked player" />
+            <Ref label="Match win" value="+1 credit per locked player" />
             <Ref label="Draw / loss" value="Nothing" />
             <Ref label="Goal boost" value="+2 to +10 (clowns −5)" />
             <Ref label="Assist boost" value="+1 to +5 (clowns −3)" />
