@@ -313,6 +313,12 @@ export function getDb() {
       PRIMARY KEY (user_id, nation),
       FOREIGN KEY (user_id) REFERENCES users(id)
     );
+    CREATE TABLE IF NOT EXISTS rank_snapshots (
+      snapshot_date TEXT NOT NULL,
+      user_id INTEGER NOT NULL,
+      rank INTEGER NOT NULL,
+      PRIMARY KEY (snapshot_date, user_id)
+    );
   `);
   migrateKmLogActivity(db);
   migrateChatMessages(db);
@@ -1381,8 +1387,9 @@ export function getKmLeaderboard() {
     byUser.set(row.user_id, list);
   }
 
-  return visibleRows
+  const ranked = visibleRows
     .map((row) => ({
+      userId: row.id,
       username: row.username,
       total_km: row.total_km,
       games_won: row.games_won,
@@ -1391,6 +1398,49 @@ export function getKmLeaderboard() {
       assist_bonus: boostByUser.get(row.id)?.assist_bonus ?? 0
     }))
     .sort((a, b) => b.best_squad_rating - a.best_squad_rating || b.total_km - a.total_km);
+
+  // Movement since the previous day's snapshot of the squad-avg ranking.
+  const movementByUser = updateRankSnapshot(db, ranked.map((r) => r.userId));
+
+  return ranked.map((row) => ({
+    username: row.username,
+    total_km: row.total_km,
+    games_won: row.games_won,
+    best_squad_rating: row.best_squad_rating,
+    goal_bonus: row.goal_bonus,
+    assist_bonus: row.assist_bonus,
+    movement: movementByUser.get(row.userId) ?? null
+  }));
+}
+
+// Records today's ranking and returns each user's rank change vs the most
+// recent prior day's snapshot (positive = moved up, null = new this period).
+function updateRankSnapshot(db: DatabaseSync, orderedUserIds: number[]): Map<number, number | null> {
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/London" });
+  const prevDate = (db.prepare("SELECT MAX(snapshot_date) AS d FROM rank_snapshots WHERE snapshot_date < ?").get(today) as { d: string | null }).d;
+  const prevRanks = new Map<number, number>();
+  if (prevDate) {
+    const rows = db.prepare("SELECT user_id, rank FROM rank_snapshots WHERE snapshot_date = ?").all(prevDate) as Array<{ user_id: number; rank: number }>;
+    for (const r of rows) prevRanks.set(r.user_id, r.rank);
+  }
+
+  const movement = new Map<number, number | null>();
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    db.prepare("DELETE FROM rank_snapshots WHERE snapshot_date = ?").run(today);
+    const insert = db.prepare("INSERT INTO rank_snapshots (snapshot_date, user_id, rank) VALUES (?, ?, ?)");
+    orderedUserIds.forEach((userId, index) => {
+      const currentRank = index + 1;
+      insert.run(today, userId, currentRank);
+      const prev = prevRanks.get(userId);
+      movement.set(userId, prev === undefined ? null : prev - currentRank);
+    });
+    db.exec("COMMIT");
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
+  return movement;
 }
 
 export function getMatchdayHeadToHead(limit = 10) {
