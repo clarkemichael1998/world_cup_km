@@ -7,21 +7,21 @@ import { BrandLogo } from "@/components/BrandLogo";
 import { MobileNav } from "@/components/MobileNav";
 import { NavActions } from "@/components/NavActions";
 
+const GLOBAL_UPSIDE_DOWN_UNTIL = new Date("2026-06-10T23:21:00+01:00").getTime();
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   const [isAdmin, setIsAdmin] = useState(false);
-  const [username, setUsername] = useState<string | null>(null);
   const [badges, setBadges] = useState({ credits: 0, squadNeedsLock: false });
+  const [globalUpsideDown, setGlobalUpsideDown] = useState(() => Date.now() < GLOBAL_UPSIDE_DOWN_UNTIL);
 
   useEffect(() => {
     fetch("/api/auth/me", { credentials: "include" })
       .then((response) => response.json())
       .then((payload) => {
         setIsAdmin(Boolean(payload.user?.isAdmin));
-        setUsername(payload.user?.username ?? null);
       })
       .catch(() => {
         setIsAdmin(false);
-        setUsername(null);
       });
 
     fetch("/api/credits", { credentials: "include" })
@@ -36,14 +36,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   }, []);
 
-  const londonDate = getLondonDateString();
-  // Daniel's screen rides upside down across these days (inclusive). ISO date
-  // strings compare lexicographically, so >=/<= bounds the window correctly.
-  const isDanielAustraliaDay = username?.toLowerCase() === "danielm" && londonDate >= "2026-06-10" && londonDate <= "2026-06-12";
+  useEffect(() => {
+    if (!globalUpsideDown) return;
+
+    const remaining = GLOBAL_UPSIDE_DOWN_UNTIL - Date.now();
+    if (remaining <= 0) {
+      setGlobalUpsideDown(false);
+      return;
+    }
+
+    const timeout = window.setTimeout(() => setGlobalUpsideDown(false), remaining);
+    return () => window.clearTimeout(timeout);
+  }, [globalUpsideDown]);
 
   return (
     <div
-      className={`min-h-screen pb-16 md:pb-0 ${isDanielAustraliaDay ? "australia-mode" : ""}`}
+      className={`min-h-screen pb-16 md:pb-0 ${globalUpsideDown ? "australia-mode" : ""}`}
       style={{ paddingBottom: "calc(4rem + env(safe-area-inset-bottom, 0px))" }}
     >
       <header className="nav-blur hidden border-b border-green-900/10 bg-white/80 md:block sticky top-0 z-40">
@@ -106,17 +114,6 @@ function NavLink({ href, label, badge }: { href: string; label: string; badge?: 
       {badge ? <span className="ml-1 rounded-full bg-amber-200 px-1.5 py-0.5 text-[10px] font-black text-amber-950">{badge}</span> : null}
     </Link>
   );
-}
-
-function getLondonDateString() {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Europe/London",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit"
-  }).formatToParts(new Date());
-  const byType = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-  return `${byType.year}-${byType.month}-${byType.day}`;
 }
 
 function NewsBanner() {
