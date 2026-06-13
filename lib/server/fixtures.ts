@@ -20,12 +20,18 @@ export type ProviderStatus = {
   checkedAt: string;
 };
 
+// Maps provider / hand-typed team-name variants to the canonical nation string
+// used in the player data, so fixtures, win credits, and "playing today" all match.
 const footballDataTeamNames: Record<string, string> = {
   USA: "United States",
   "Korea Republic": "South Korea",
   "Côte d'Ivoire": "Ivory Coast",
   "Czechia": "Czech Republic",
-  "Congo DR": "DR Congo"
+  "Congo DR": "DR Congo",
+  "Bosnia": "Bosnia and Herzegovina",
+  "Bosnia-Herzegovina": "Bosnia and Herzegovina",
+  "Bosnia & Herzegovina": "Bosnia and Herzegovina",
+  "Bosnia and Herzegovina": "Bosnia and Herzegovina"
 };
 
 export async function syncFixtureResults() {
@@ -38,7 +44,10 @@ export async function syncFixtureResults() {
 }
 
 export function upsertManualFixture(result: Omit<FixtureResult, "source" | "verified">) {
-  upsertFixtures([{ ...result, source: "manual", verified: true }]);
+  const homeTeam = normalizeTeam(result.homeTeam);
+  const awayTeam = normalizeTeam(result.awayTeam);
+  const winner = result.winner ? normalizeTeam(result.winner) : null;
+  upsertFixtures([{ ...result, homeTeam, awayTeam, winner, source: "manual", verified: true }]);
   recordProviderRun("manual", "ok", `Imported manual result ${result.matchId}.`);
 }
 

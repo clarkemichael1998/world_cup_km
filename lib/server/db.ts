@@ -2349,6 +2349,23 @@ function migrateFixtureResults(database: DatabaseSync) {
 
   database.prepare("UPDATE fixture_results SET verified = 1 WHERE source = 'seed' OR source = 'manual'").run();
   database.prepare("UPDATE fixture_results SET updated_at = CURRENT_TIMESTAMP WHERE updated_at IS NULL").run();
+
+  // Normalise legacy team/winner name variants to the canonical player-data
+  // nation strings so "playing today", win credits, and boosts all match.
+  const nationFixes: Array<[string[], string]> = [
+    [["Bosnia", "Bosnia-Herzegovina", "Bosnia & Herzegovina"], "Bosnia and Herzegovina"],
+    [["USA"], "United States"],
+    [["Korea Republic"], "South Korea"],
+    [["Czechia"], "Czech Republic"],
+    [["Congo DR"], "DR Congo"]
+  ];
+  for (const [variants, canonical] of nationFixes) {
+    for (const variant of variants) {
+      database.prepare("UPDATE fixture_results SET home_team = ?, updated_at = CURRENT_TIMESTAMP WHERE home_team = ?").run(canonical, variant);
+      database.prepare("UPDATE fixture_results SET away_team = ?, updated_at = CURRENT_TIMESTAMP WHERE away_team = ?").run(canonical, variant);
+      database.prepare("UPDATE fixture_results SET winner = ?, updated_at = CURRENT_TIMESTAMP WHERE winner = ?").run(canonical, variant);
+    }
+  }
 }
 
 function seedFixtureResults(database: DatabaseSync) {
