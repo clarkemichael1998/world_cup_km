@@ -154,11 +154,24 @@ function computeSettleKey(database: ReturnType<typeof getDb>, userId: number): s
     .prepare("SELECT COUNT(*) AS c, COALESCE(SUM(id), 0) AS s, COALESCE(SUM(assist_count), 0) AS n FROM assist_scorers WHERE status = 'matched' AND player_id IS NOT NULL")
     .get() as { c: number; s: number; n: number };
   const squads = database
-    .prepare("SELECT COUNT(*) AS c FROM locked_squads WHERE user_id = ?")
-    .get(userId) as { c: number };
+    .prepare("SELECT id, locked_at, unlock_at FROM locked_squads WHERE user_id = ? ORDER BY id")
+    .all(userId) as Array<{ id: number; locked_at: string; unlock_at: string }>;
+  const squadPlayers = database
+    .prepare(
+      `SELECT lsp.locked_squad_id, lsp.slot, lsp.player_id
+       FROM locked_squad_players lsp
+       JOIN locked_squads ls ON ls.id = lsp.locked_squad_id
+       WHERE ls.user_id = ?
+       ORDER BY lsp.locked_squad_id, lsp.slot`
+    )
+    .all(userId) as Array<{ locked_squad_id: number; slot: string; player_id: number }>;
+  const squadSignature = [
+    ...squads.map((squad) => `${squad.id}@${squad.locked_at}-${squad.unlock_at}`),
+    ...squadPlayers.map((player) => `${player.locked_squad_id}.${player.slot}.${player.player_id}`)
+  ].join(",");
   // Version prefix: bump to force a one-time re-settle for all users after a
   // settlement-logic change (e.g. boosts now apply to draws/losses).
-  return `v2|f${fixtures.c}@${fixtures.m}|g${goals.c}.${goals.s}.${goals.n}|a${assists.c}.${assists.s}.${assists.n}|s${squads.c}`;
+  return `v3|f${fixtures.c}@${fixtures.m}|g${goals.c}.${goals.s}.${goals.n}|a${assists.c}.${assists.s}.${assists.n}|s${squadSignature}`;
 }
 
 function getBestOwnedSquadLeaderboard(playerMap: Map<number, Player>) {
