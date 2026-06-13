@@ -248,6 +248,23 @@ function LiveSettleTab({ onForbidden }: { onForbidden: () => void }) {
   const [resyncBusy, setResyncBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
+  const [diagUser, setDiagUser] = useState("");
+  const [diagLines, setDiagLines] = useState<string[] | null>(null);
+  const [diagBusy, setDiagBusy] = useState(false);
+
+  async function runDiagnostic() {
+    if (diagBusy || !diagUser.trim()) return;
+    setDiagBusy(true);
+    setDiagLines(null);
+    try {
+      const res = await fetch(`/api/admin/boost-diagnostic?username=${encodeURIComponent(diagUser.trim())}`, { credentials: "include" });
+      if (res.status === 403) { onForbidden(); return; }
+      const data = (await res.json().catch(() => ({}))) as { lines?: string[]; error?: string };
+      setDiagLines(data.lines ?? [data.error ?? "No result."]);
+    } finally {
+      setDiagBusy(false);
+    }
+  }
 
   async function settle() {
     if (busy) return;
@@ -347,6 +364,22 @@ function LiveSettleTab({ onForbidden }: { onForbidden: () => void }) {
 
       {notice ? <p className="mt-4 rounded-md bg-green-50 p-3 text-sm font-bold text-green-800">{notice}</p> : null}
       {error ? <p className="mt-4 rounded-md bg-red-50 p-3 text-sm font-bold text-red-700">{error}</p> : null}
+
+      <div className="mt-6 border-t border-green-900/10 pt-5">
+        <p className="text-sm font-bold uppercase tracking-wide text-green-900/60">Boost Diagnostic</p>
+        <p className="mt-2 text-sm font-semibold text-green-900/65">Enter a username to see, per locked squad, which matched goals/assists fell in the window, whether the player was in the locked XI, and whether a boost was applied.</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <input value={diagUser} onChange={(e) => setDiagUser(e.target.value)} placeholder="username (e.g. magseyclarke)"
+            className="min-w-48 flex-1 rounded-md border border-green-900/20 px-3 py-2 text-sm font-semibold text-green-950 focus:outline-none focus:ring-2 focus:ring-green-800" />
+          <button onClick={runDiagnostic} disabled={diagBusy || !diagUser.trim()}
+            className="rounded-md bg-green-950 px-5 py-2 font-black text-white hover:bg-green-800 disabled:opacity-40">
+            {diagBusy ? "Checking…" : "Check"}
+          </button>
+        </div>
+        {diagLines ? (
+          <pre className="mt-3 max-h-96 overflow-auto whitespace-pre-wrap rounded-md bg-green-950/5 p-3 text-xs font-semibold text-green-950">{diagLines.join("\n")}</pre>
+        ) : null}
+      </div>
     </section>
   );
 }
