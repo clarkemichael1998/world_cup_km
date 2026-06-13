@@ -1556,6 +1556,15 @@ export function getKmLeaderboard() {
     )
     .all() as Array<{ user_id: number; goal_bonus: number; assist_bonus: number }>;
   const boostByUser = new Map(boostRows.map((r) => [r.user_id, r]));
+  const playerBoostRows = db
+    .prepare("SELECT user_id, player_id, SUM(boost_amount) AS boost FROM goal_boosts GROUP BY user_id, player_id")
+    .all() as Array<{ user_id: number; player_id: number; boost: number }>;
+  const playerBoostsByUser = new Map<number, Map<number, number>>();
+  for (const row of playerBoostRows) {
+    const boosts = playerBoostsByUser.get(row.user_id) ?? new Map<number, number>();
+    boosts.set(row.player_id, row.boost ?? 0);
+    playerBoostsByUser.set(row.user_id, boosts);
+  }
 
   const byUser = new Map<number, number[]>();
   for (const row of visibleOwnedRows) {
@@ -1570,7 +1579,7 @@ export function getKmLeaderboard() {
       username: row.username,
       total_km: row.total_km,
       games_won: row.games_won,
-      best_squad_rating: computeBestSquadRating(byUser.get(row.id) ?? []),
+      best_squad_rating: computeBestSquadRating(byUser.get(row.id) ?? [], playerBoostsByUser.get(row.id)),
       goal_bonus: boostByUser.get(row.id)?.goal_bonus ?? 0,
       assist_bonus: boostByUser.get(row.id)?.assist_bonus ?? 0
     }))
@@ -2001,7 +2010,7 @@ function removeAwardedPlayer(userId: number, playerId: number) {
 
 const communitySquadSlots: SquadSlot[] = ["GK", "DF1", "DF2", "DF3", "DF4", "MF1", "MF2", "MF3", "FW1", "FW2", "FW3"];
 
-function computeBestSquadRating(playerIds: number[]): number {
+function computeBestSquadRating(playerIds: number[], boosts = new Map<number, number>()): number {
   if (playerIds.length === 0) return 0;
   const allPlayersForRating = getAllPlayers();
   const owned = playerIds.map((id) => allPlayersForRating.find((p) => p.id === id)).filter((player): player is Player => Boolean(player));
@@ -2010,8 +2019,13 @@ function computeBestSquadRating(playerIds: number[]): number {
   const picked: number[] = [];
 
   for (const pos of positions) {
-    const best = owned.filter((p) => p.pos === pos && !used.has(p.id)).sort((a, b) => b.rating - a.rating)[0];
-    if (best) { used.add(best.id); picked.push(best.rating); }
+    const best = owned
+      .filter((p) => p.pos === pos && !used.has(p.id))
+      .sort((a, b) => b.rating + (boosts.get(b.id) ?? 0) - (a.rating + (boosts.get(a.id) ?? 0)) || a.name.localeCompare(b.name))[0];
+    if (best) {
+      used.add(best.id);
+      picked.push(best.rating + (boosts.get(best.id) ?? 0));
+    }
   }
 
   if (picked.length === 0) return 0;
