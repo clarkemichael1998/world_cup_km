@@ -145,7 +145,7 @@ function settleUserLiveAwards(userId: number) {
 
 function computeSettleKey(database: ReturnType<typeof getDb>, userId: number): string {
   const fixtures = database
-    .prepare("SELECT COUNT(*) AS c, COALESCE(MAX(updated_at), '') AS m FROM fixture_results WHERE status = 'FINISHED' AND verified = 1")
+    .prepare("SELECT COUNT(*) AS c, COALESCE(MAX(updated_at), '') AS m FROM fixture_results WHERE status = 'FINISHED'")
     .get() as { c: number; m: string };
   const goals = database
     .prepare("SELECT COUNT(*) AS c, COALESCE(SUM(id), 0) AS s, COALESCE(SUM(goal_count), 0) AS n FROM goal_scorers WHERE status = 'matched' AND player_id IS NOT NULL")
@@ -156,7 +156,9 @@ function computeSettleKey(database: ReturnType<typeof getDb>, userId: number): s
   const squads = database
     .prepare("SELECT COUNT(*) AS c FROM locked_squads WHERE user_id = ?")
     .get(userId) as { c: number };
-  return `f${fixtures.c}@${fixtures.m}|g${goals.c}.${goals.s}.${goals.n}|a${assists.c}.${assists.s}.${assists.n}|s${squads.c}`;
+  // Version prefix: bump to force a one-time re-settle for all users after a
+  // settlement-logic change (e.g. boosts now apply to draws/losses).
+  return `v2|f${fixtures.c}@${fixtures.m}|g${goals.c}.${goals.s}.${goals.n}|a${assists.c}.${assists.s}.${assists.n}|s${squads.c}`;
 }
 
 function getBestOwnedSquadLeaderboard(playerMap: Map<number, Player>) {
@@ -251,8 +253,10 @@ function awardGoalBoosts(userId: number) {
     .all(userId) as Array<{ id: number; locked_at: string; unlock_at: string }>;
 
   for (const locked of allLocked) {
+    // Boosts apply for goals/assists in any FINISHED match — a draw or loss
+    // still counts (verified is only set for wins, so don't require it here).
     const matches = database
-      .prepare("SELECT match_id FROM fixture_results WHERE status = 'FINISHED' AND verified = 1 AND kickoff_at >= ? AND kickoff_at < ?")
+      .prepare("SELECT match_id FROM fixture_results WHERE status = 'FINISHED' AND kickoff_at >= ? AND kickoff_at < ?")
       .all(locked.locked_at, locked.unlock_at) as Array<{ match_id: string }>;
 
     const lockedPlayerIds = new Set(
