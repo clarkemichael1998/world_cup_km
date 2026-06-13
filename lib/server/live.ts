@@ -271,7 +271,7 @@ function awardGoalBoosts(userId: number) {
         if (!player) continue;
         const boostPerGoal = GOAL_BOOST_BY_RARITY[player.rarity] ?? 0;
         if (boostPerGoal !== 0 && awardGoalBoost(userId, playerId, match.match_id, boostPerGoal * goalCount)) {
-          announceBoost(match.match_id, playerId, player.name, boostPerGoal * goalCount, goalCount, "goal");
+          announceBoost(match.match_id, player, boostPerGoal * goalCount, goalCount, "goal");
         }
       }
 
@@ -282,7 +282,7 @@ function awardGoalBoosts(userId: number) {
         if (!player) continue;
         const boostPerAssist = ASSIST_BOOST_BY_RARITY[player.rarity] ?? 0;
         if (boostPerAssist !== 0 && awardGoalBoost(userId, playerId, `${match.match_id}:assist`, boostPerAssist * assistCount)) {
-          announceBoost(match.match_id, playerId, player.name, boostPerAssist * assistCount, assistCount, "assist");
+          announceBoost(match.match_id, player, boostPerAssist * assistCount, assistCount, "assist");
         }
       }
     }
@@ -290,14 +290,29 @@ function awardGoalBoosts(userId: number) {
 }
 
 // Announced once game-wide per (match, player, event) — the boost amount is
-// rarity-based and identical for every user who locked the player.
-function announceBoost(matchId: string, playerId: number, playerName: string, boost: number, count: number, type: "goal" | "assist") {
-  if (!claimBoostAnnouncement(matchId, playerId, type)) return;
-  const icon = type === "goal" ? "⚽" : "🅰️";
-  const action = type === "goal" ? "scored" : "assisted";
-  const times = count > 1 ? ` x${count}` : "";
-  const swing = boost > 0 ? `jumps +${boost}` : `drops ${boost}`;
-  createAdminChatMessage(`${icon} ${playerName} ${action}${times} — every locked sticker ${swing}!`);
+// rarity-based and identical for every user who locked the player. The "⚡UPGRADE"
+// / "🤡CLOWN" markers are detected by the chat to give these their own styling.
+function announceBoost(matchId: string, player: Player, boost: number, count: number, type: "goal" | "assist") {
+  if (!claimBoostAnnouncement(matchId, player.id, type)) return;
+  const feat = featPhrase(count, type);
+  if (boost > 0) {
+    createAdminChatMessage(`⚡ UPGRADE · ${player.name} ${feat}! Anyone who locked him gains +${boost} on his card. 📈`);
+  } else {
+    createAdminChatMessage(`🤡 CLOWN TAX · ${player.name} ${feat} — every locked card loses ${Math.abs(boost)}. Oof. 📉`);
+  }
+}
+
+function featPhrase(count: number, type: "goal" | "assist"): string {
+  if (type === "goal") {
+    if (count === 1) return "scored";
+    if (count === 2) return "bagged a brace";
+    if (count === 3) return "scored a hat-trick";
+    return `scored ${count}`;
+  }
+  if (count === 1) return "grabbed an assist";
+  if (count === 2) return "laid on two assists";
+  if (count === 3) return "set up three goals";
+  return `set up ${count} goals`;
 }
 
 function londonLockWindow(now: Date) {

@@ -221,6 +221,18 @@ function truncate(value: string, maxLength: number) {
 }
 
 function getMessageTone(item: ChatMessage): { container: string; name: string; text: string; badge: string; badgeTone: BadgeTone } {
+  if (item.message.startsWith("⚡ UPGRADE")) {
+    return { container: "border-emerald-300 bg-emerald-50", name: "text-emerald-900", text: "text-emerald-950", badge: "Upgrade", badgeTone: "green" };
+  }
+  if (item.message.startsWith("🤡 CLOWN TAX")) {
+    return { container: "border-red-300 bg-red-50", name: "text-red-900", text: "text-red-950", badge: "Clown Tax", badgeTone: "red" };
+  }
+  if (item.message.startsWith("🔁 Trade complete")) {
+    return { container: "border-sky-200 bg-sky-50", name: "text-sky-900", text: "text-sky-950", badge: "Trade", badgeTone: "sky" };
+  }
+  if (item.message.startsWith("📖 Album milestone")) {
+    return { container: "border-amber-200 bg-amber-50", name: "text-amber-950", text: "text-amber-950", badge: "Milestone", badgeTone: "amber" };
+  }
   if (item.username === "admin") {
     return { container: "border-amber-200 bg-amber-50", name: "text-amber-950", text: "text-amber-950", badge: "Admin", badgeTone: "amber" };
   }
