@@ -23,6 +23,20 @@ type Profile = {
   lockedHistory: Array<{ lockDate: string; players: Array<{ slot: string; playerId: number }> }>;
 };
 
+type PlayerBoost = { total: number; goal: number; assist: number };
+type XiPlayer = { slot: string; player: Player; boost: PlayerBoost; effectiveRating: number };
+
+const formationSlots = ["GK", "DF1", "DF2", "DF3", "DF4", "MF1", "MF2", "MF3", "FW1", "FW2", "FW3"];
+const formationRows = [["FW1", "FW2", "FW3"], ["MF1", "MF2", "MF3"], ["DF1", "DF2", "DF3", "DF4"], ["GK"]];
+const rarityClasses: Record<Player["rarity"], string> = {
+  clowns: "border-red-300 bg-red-50 text-red-950",
+  common: "border-slate-200 bg-white text-slate-950",
+  rare: "border-sky-300 bg-sky-50 text-sky-950",
+  epic: "border-fuchsia-300 bg-fuchsia-50 text-fuchsia-950",
+  legend: "border-amber-300 bg-amber-50 text-amber-950",
+  icon: "border-amber-300 bg-zinc-950 text-amber-50"
+};
+
 export default function ProfilePage() {
   const params = useParams<{ username: string }>();
   const username = decodeURIComponent(params.username ?? "");
@@ -43,6 +57,16 @@ export default function ProfilePage() {
 
   const playerById = useMemo(() => new Map(playerPool.map((player) => [player.id, player])), [playerPool]);
   const ownedIds = useMemo(() => new Set(profile?.ownedPlayerIds ?? []), [profile]);
+  const boostsByPlayer = useMemo(() => {
+    const result = new Map<number, PlayerBoost>();
+    for (const award of profile?.boosts ?? []) {
+      const current = result.get(award.playerId) ?? { total: 0, goal: 0, assist: 0 };
+      current.total += award.amount;
+      current[award.type] += award.amount;
+      result.set(award.playerId, current);
+    }
+    return result;
+  }, [profile]);
 
   const nationProgress = useMemo(() => {
     if (!profile) return [];
@@ -54,7 +78,7 @@ export default function ProfilePage() {
       byNation.set(player.nation, entry);
     }
     return Array.from(byNation.entries())
-      .map(([nation, counts]) => ({ nation, ...counts, percent: counts.total ? Math.round((counts.owned / counts.total) * 100) : 0 }))
+      .map(([nation, counts]) => ({ nation, ...counts, percent: Math.round((counts.owned / counts.total) * 100) }))
       .filter((item) => item.owned > 0)
       .sort((a, b) => b.percent - a.percent || a.nation.localeCompare(b.nation));
   }, [profile, playerPool, ownedIds]);
@@ -63,155 +87,86 @@ export default function ProfilePage() {
     if (!profile) return [];
     const owned = profile.ownedPlayerIds.map((id) => playerById.get(id)).filter((player): player is Player => Boolean(player));
     const used = new Set<number>();
-    const picked: Player[] = [];
-    for (const pos of ["GK", "DF", "DF", "DF", "DF", "MF", "MF", "MF", "FW", "FW", "FW"]) {
-      const best = owned.filter((player) => player.pos === pos && !used.has(player.id)).sort((a, b) => b.rating - a.rating)[0];
-      if (best) {
-        used.add(best.id);
-        picked.push(best);
-      }
+    const picked: XiPlayer[] = [];
+    for (const slot of formationSlots) {
+      const pos = slot.slice(0, 2);
+      const best = owned
+        .filter((player) => player.pos === pos && !used.has(player.id))
+        .sort((a, b) => effectiveRating(b, boostsByPlayer) - effectiveRating(a, boostsByPlayer) || a.name.localeCompare(b.name))[0];
+      if (!best) continue;
+      used.add(best.id);
+      const boost = boostsByPlayer.get(best.id) ?? emptyBoost();
+      picked.push({ slot, player: best, boost, effectiveRating: best.rating + boost.total });
     }
     return picked;
-  }, [profile, playerById]);
+  }, [profile, playerById, boostsByPlayer]);
 
-  const bestAvg = bestXi.length > 0 ? Math.round((bestXi.reduce((sum, player) => sum + player.rating, 0) / bestXi.length) * 10) / 10 : 0;
+  const bestAvg = bestXi.length ? bestXi.reduce((sum, item) => sum + item.effectiveRating, 0) / bestXi.length : 0;
   const albumPercent = playerPool.length > 0 && profile ? Math.round((profile.ownedPlayerIds.length / playerPool.length) * 100) : 0;
   const boostTotal = profile?.boosts.reduce((sum, boost) => sum + boost.amount, 0) ?? 0;
 
-  if (error) {
-    return (
-      <div>
-        <PageTitle title="Profile" subtitle={error} />
-        <Link className="inline-flex rounded-md bg-pitch px-5 py-3 font-black text-white hover:bg-green-800" href="/leaderboard">
-          Back to Leaderboard
-        </Link>
-      </div>
-    );
-  }
-
-  if (!profile) {
-    return (
-      <div>
-        <PageTitle title={username || "Profile"} subtitle="Loading profile..." />
-        <section className="grid grid-cols-2 gap-3 md:grid-cols-5 md:gap-4">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="rounded-lg border border-green-900/10 bg-white p-4 shadow-sm">
-              <Skeleton className="h-3 w-3/4" />
-              <Skeleton className="mt-2 h-7 w-1/2" />
-            </div>
-          ))}
-        </section>
-        <div className="mt-5 grid gap-5 lg:grid-cols-2">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <SkeletonCard key={i} lines={5} />
-          ))}
-        </div>
-      </div>
-    );
-  }
+  if (error) return <div><PageTitle title="Profile" subtitle={error} /><Link className="inline-flex rounded-md bg-pitch px-5 py-3 font-black text-white" href="/leaderboard">Back to Leaderboard</Link></div>;
+  if (!profile) return <LoadingProfile username={username} />;
 
   return (
     <div>
       <PageTitle title={profile.username} subtitle={`Playing since ${formatDate(profile.joinedAt)} · Album ${albumPercent}% complete`} />
 
       <section className="grid grid-cols-2 gap-3 md:grid-cols-5 md:gap-4">
-        <ProfileStat label="Best XI Avg" value={bestAvg > 0 ? bestAvg.toFixed(1) : "—"} />
+        <ProfileStat label="Best XI Avg" value={bestAvg > 0 ? bestAvg.toFixed(1) : "--"} />
         <ProfileStat label="Stickers" value={`${profile.ownedPlayerIds.length}/${playerPool.length}`} />
         <ProfileStat label="Activity Credits" value={profile.totalKm.toFixed(1)} />
-        <ProfileStat label="Games Won" value={profile.gamesWon > 0 ? String(profile.gamesWon) : "—"} />
-        <ProfileStat label="Streak" value={profile.streak > 0 ? `🔥 ${profile.streak}d` : "—"} />
+        <ProfileStat label="Games Won" value={profile.gamesWon > 0 ? String(profile.gamesWon) : "--"} />
+        <ProfileStat label="Streak" value={profile.streak > 0 ? `${profile.streak} days` : "--"} />
+      </section>
+
+      <section className="mt-5 overflow-hidden rounded-xl border border-green-900/10 bg-white shadow-sm">
+        <div className="flex items-end justify-between gap-4 border-b border-green-900/10 px-5 py-4">
+          <div><p className="text-sm font-black uppercase tracking-wide text-green-900/60">Best XI</p><p className="mt-1 text-sm font-semibold text-green-900/55">Strongest owned formation, including permanent upgrades.</p></div>
+          <SquadAverage value={bestAvg} />
+        </div>
+        <XiFormation players={bestXi} empty="No stickers collected yet." />
       </section>
 
       <div className="mt-5 grid gap-5 lg:grid-cols-2">
-        <section className="rounded-lg border border-green-900/10 bg-white p-5 shadow-sm">
-          <p className="text-sm font-bold uppercase tracking-wide text-green-900/60">Best XI</p>
-          <div className="mt-3 space-y-1.5">
-            {bestXi.length > 0 ? (
-              bestXi.map((player) => (
-                <div key={player.id} className="flex items-center justify-between gap-3 rounded-md bg-green-950/5 px-3 py-1.5 text-sm">
-                  <span className="w-8 shrink-0 text-xs font-black text-green-900/50">{player.pos}</span>
-                  <span className="min-w-0 flex-1 truncate font-bold text-green-950">{player.name}</span>
-                  <span className="truncate text-xs font-semibold text-green-900/55">{player.nation}</span>
-                  <span className="rounded bg-gold px-1.5 py-0.5 text-xs font-black text-green-950">{player.rating}</span>
-                </div>
-              ))
-            ) : (
-              <p className="text-sm font-semibold text-green-900/60">No stickers collected yet.</p>
-            )}
-          </div>
-        </section>
-
-        <section className="rounded-lg border border-green-900/10 bg-white p-5 shadow-sm">
-          <p className="text-sm font-bold uppercase tracking-wide text-green-900/60">
-            Boosts Won {boostTotal !== 0 ? <span className={boostTotal > 0 ? "text-green-700" : "text-red-600"}>({boostTotal > 0 ? `+${boostTotal}` : boostTotal} total)</span> : null}
-          </p>
+        <section className="rounded-xl border border-green-900/10 bg-white p-5 shadow-sm">
+          <p className="text-sm font-bold uppercase tracking-wide text-green-900/60">Boosts Won {boostTotal !== 0 ? <span className={boostTotal > 0 ? "text-green-700" : "text-red-600"}>({signed(boostTotal)} total)</span> : null}</p>
           <div className="mt-3 max-h-80 space-y-1.5 overflow-y-auto pr-1">
-            {profile.boosts.length > 0 ? (
-              profile.boosts.map((boost, index) => {
-                const player = playerById.get(boost.playerId);
-                return (
-                  <div key={index} className="flex items-center justify-between gap-3 rounded-md bg-green-950/5 px-3 py-1.5 text-sm">
-                    <span className="shrink-0">{boost.type === "goal" ? "⚽" : "🅰️"}</span>
-                    <span className="min-w-0 flex-1 truncate font-bold text-green-950">{player?.name ?? `Player ${boost.playerId}`}</span>
-                    <span className="text-xs font-semibold text-green-900/50">{formatDate(boost.createdAt)}</span>
-                    <span className={`w-10 text-right font-black ${boost.amount > 0 ? "text-green-700" : "text-red-600"}`}>
-                      {boost.amount > 0 ? `+${boost.amount}` : boost.amount}
-                    </span>
-                  </div>
-                );
-              })
-            ) : (
-              <p className="text-sm font-semibold text-green-900/60">No goal or assist boosts yet.</p>
-            )}
-          </div>
-        </section>
-
-        <section className="rounded-lg border border-green-900/10 bg-white p-5 shadow-sm">
-          <p className="text-sm font-bold uppercase tracking-wide text-green-900/60">Album Progress</p>
-          {profile.completedNations.length > 0 ? (
-            <p className="mt-1 text-xs font-bold text-amber-700">📖 Completed pages: {profile.completedNations.join(", ")}</p>
-          ) : null}
-          <div className="mt-3 grid gap-1.5 sm:grid-cols-2">
-            {nationProgress.map((item) => (
-              <div key={item.nation} className="rounded-md bg-green-950/5 px-3 py-1.5">
-                <div className="flex items-center justify-between text-xs font-bold text-green-950">
-                  <span className="truncate">{item.nation}</span>
-                  <span className="shrink-0 text-green-900/55">{item.owned}/{item.total}</span>
-                </div>
-                <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-green-950/10">
-                  <div className={`h-full rounded-full ${item.percent === 100 ? "bg-amber-500" : "bg-pitch"}`} style={{ width: `${item.percent}%` }} />
-                </div>
+            {profile.boosts.length ? profile.boosts.map((boost, index) => (
+              <div key={`${boost.matchId}-${boost.playerId}-${index}`} className="flex items-center gap-3 rounded-lg bg-green-950/5 px-3 py-2 text-sm">
+                <AwardBadge type={boost.type} amount={boost.amount} />
+                <span className="min-w-0 flex-1 truncate font-bold text-green-950">{playerById.get(boost.playerId)?.name ?? `Player ${boost.playerId}`}</span>
+                <span className="text-xs font-semibold text-green-900/50">{formatDate(boost.createdAt)}</span>
               </div>
-            ))}
-            {nationProgress.length === 0 ? <p className="text-sm font-semibold text-green-900/60">Album is empty so far.</p> : null}
+            )) : <p className="text-sm font-semibold text-green-900/60">No goal or assist boosts yet.</p>}
           </div>
         </section>
 
-        <section className="rounded-lg border border-green-900/10 bg-white p-5 shadow-sm">
+        <section className="rounded-xl border border-green-900/10 bg-white p-5 shadow-sm">
+          <p className="text-sm font-bold uppercase tracking-wide text-green-900/60">Album Progress</p>
+          {profile.completedNations.length ? <p className="mt-1 text-xs font-bold text-amber-700">Completed pages: {profile.completedNations.join(", ")}</p> : null}
+          <div className="mt-3 grid gap-1.5 sm:grid-cols-2">
+            {nationProgress.map((item) => <NationProgress key={item.nation} {...item} />)}
+            {!nationProgress.length ? <p className="text-sm font-semibold text-green-900/60">Album is empty so far.</p> : null}
+          </div>
+        </section>
+
+        <section className="rounded-xl border border-green-900/10 bg-white p-5 shadow-sm lg:col-span-2">
           <p className="text-sm font-bold uppercase tracking-wide text-green-900/60">Locked XI History</p>
-          <div className="mt-3 max-h-96 space-y-2 overflow-y-auto pr-1">
-            {profile.lockedHistory.length > 0 ? (
-              profile.lockedHistory.map((lock) => (
-                <details key={lock.lockDate} className="rounded-md bg-green-950/5 px-3 py-2">
-                  <summary className="cursor-pointer text-sm font-black text-green-950">
-                    {lock.lockDate} <span className="font-bold text-green-900/55">· {lock.players.length}/11 locked</span>
+          <div className="mt-3 grid gap-3 xl:grid-cols-2">
+            {profile.lockedHistory.length ? profile.lockedHistory.map((lock, index) => {
+              const players = lock.players.map(({ slot, playerId }) => toXiPlayer(slot, playerById.get(playerId), boostsByPlayer)).filter((item): item is XiPlayer => Boolean(item));
+              const average = players.length ? players.reduce((sum, item) => sum + item.effectiveRating, 0) / players.length : 0;
+              return (
+                <details key={lock.lockDate} open={index === 0} className="overflow-hidden rounded-lg border border-green-900/10 bg-green-950/5">
+                  <summary className="flex cursor-pointer items-center justify-between gap-3 px-4 py-3 text-sm font-black text-green-950">
+                    <span>{lock.lockDate} <span className="font-bold text-green-900/55">· {lock.players.length}/11 locked</span></span>
+                    <span className="rounded bg-white px-2 py-1 text-xs text-pitch shadow-sm">{average ? average.toFixed(1) : "--"}</span>
                   </summary>
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {lock.players.map(({ slot, playerId }) => {
-                      const player = playerById.get(playerId);
-                      return (
-                        <span key={slot} className="rounded bg-white px-2 py-1 text-xs font-bold text-green-950 shadow-sm">
-                          {player?.name ?? `Player ${playerId}`}
-                        </span>
-                      );
-                    })}
-                    {lock.players.length === 0 ? <span className="text-xs font-semibold text-green-900/55">Empty lock.</span> : null}
-                  </div>
+                  <XiFormation players={players} empty="Empty lock." compact />
                 </details>
-              ))
-            ) : (
-              <p className="text-sm font-semibold text-green-900/60">No locked squads yet.</p>
-            )}
+              );
+            }) : <p className="text-sm font-semibold text-green-900/60">No locked squads yet.</p>}
           </div>
         </section>
       </div>
@@ -219,11 +174,57 @@ export default function ProfilePage() {
   );
 }
 
-function ProfileStat({ label, value }: { label: string; value: string }) {
+function XiFormation({ players, empty, compact = false }: { players: XiPlayer[]; empty: string; compact?: boolean }) {
+  if (!players.length) return <p className="p-5 text-sm font-semibold text-green-900/60">{empty}</p>;
   return (
-    <div className="rounded-lg border border-green-900/10 bg-white p-4 shadow-sm">
-      <p className="text-xs font-bold uppercase tracking-wide text-green-800/70">{label}</p>
-      <p className="mt-1 text-2xl font-black text-green-950">{value}</p>
+    <div className={`relative overflow-hidden bg-green-800 ${compact ? "p-3" : "p-4 sm:p-6"}`}>
+      <div className="pointer-events-none absolute inset-3 rounded-[45%] border border-white/15" />
+      <div className="pointer-events-none absolute left-1/2 top-0 h-full border-l border-white/15" />
+      <div className="relative space-y-3 sm:space-y-4">
+        {formationRows.map((row) => <div key={row.join("-")} className="flex items-stretch justify-center gap-1.5 sm:gap-3">{row.map((slot) => <XiCard key={slot} slot={slot} item={players.find((candidate) => candidate.slot === slot)} compact={compact} />)}</div>)}
+      </div>
     </div>
   );
+}
+
+function XiCard({ slot, item, compact }: { slot: string; item?: XiPlayer; compact: boolean }) {
+  if (!item) return <div className={`${compact ? "h-14 w-16" : "h-24 w-20 sm:w-32"} rounded-lg border border-dashed border-white/25 bg-white/5`} />;
+  return (
+    <div className={`${rarityClasses[item.player.rarity]} ${compact ? "w-16 p-1.5" : "w-20 p-2 sm:w-32 sm:p-2.5"} relative rounded-lg border-2 shadow-md`}>
+      <div className="flex items-start justify-between gap-1"><span className="text-[8px] font-black uppercase opacity-50">{slot}</span><span className="rounded bg-green-950 px-1.5 py-0.5 text-[10px] font-black text-white">{item.effectiveRating}</span></div>
+      <p className={`${compact ? "text-[9px]" : "text-[10px] sm:text-xs"} mt-1 line-clamp-2 font-black leading-tight`}>{item.player.name}</p>
+      {!compact ? <p className="mt-0.5 hidden truncate text-[9px] font-bold opacity-55 sm:block">{item.player.nation}</p> : null}
+      {item.boost.total !== 0 ? <div className="mt-1 flex flex-wrap gap-1">{item.boost.goal !== 0 ? <AwardBadge type="goal" amount={item.boost.goal} compact /> : null}{item.boost.assist !== 0 ? <AwardBadge type="assist" amount={item.boost.assist} compact /> : null}</div> : null}
+    </div>
+  );
+}
+
+function AwardBadge({ type, amount, compact = false }: { type: "goal" | "assist"; amount: number; compact?: boolean }) {
+  const positive = amount > 0;
+  return <span title={`${type === "assist" ? "Assist" : "Goal"} boost ${signed(amount)}`} className={`inline-flex shrink-0 items-center gap-1 rounded-full px-1.5 py-0.5 font-black ring-1 ${compact ? "text-[8px]" : "text-[10px]"} ${positive ? "bg-emerald-100 text-emerald-800 ring-emerald-600/20" : "bg-red-100 text-red-700 ring-red-500/20"}`}><span className={`inline-flex h-3 w-3 items-center justify-center rounded-full text-[7px] text-white ${positive ? "bg-emerald-700" : "bg-red-600"}`}>{type === "assist" ? "A" : "G"}</span>{signed(amount)}</span>;
+}
+
+function NationProgress({ nation, owned, total, percent }: { nation: string; owned: number; total: number; percent: number }) {
+  return <div className="rounded-md bg-green-950/5 px-3 py-1.5"><div className="flex items-center justify-between text-xs font-bold text-green-950"><span className="truncate">{nation}</span><span className="shrink-0 text-green-900/55">{owned}/{total}</span></div><div className="mt-1 h-1.5 overflow-hidden rounded-full bg-green-950/10"><div className={`h-full rounded-full ${percent === 100 ? "bg-amber-500" : "bg-pitch"}`} style={{ width: `${percent}%` }} /></div></div>;
+}
+
+function ProfileStat({ label, value }: { label: string; value: string }) {
+  return <div className="rounded-lg border border-green-900/10 bg-white p-4 shadow-sm"><p className="text-xs font-bold uppercase tracking-wide text-green-800/70">{label}</p><p className="mt-1 text-2xl font-black text-green-950">{value}</p></div>;
+}
+
+function SquadAverage({ value }: { value: number }) {
+  return <div className="rounded-lg bg-green-950 px-3 py-2 text-right text-white shadow-sm"><p className="text-[9px] font-black uppercase tracking-widest text-white/60">Squad avg</p><p className="text-2xl font-black leading-none">{value > 0 ? value.toFixed(1) : "--"}</p></div>;
+}
+
+function LoadingProfile({ username }: { username: string }) {
+  return <div><PageTitle title={username || "Profile"} subtitle="Loading profile..." /><section className="grid grid-cols-2 gap-3 md:grid-cols-5 md:gap-4">{Array.from({ length: 5 }).map((_, i) => <div key={i} className="rounded-lg border border-green-900/10 bg-white p-4 shadow-sm"><Skeleton className="h-3 w-3/4" /><Skeleton className="mt-2 h-7 w-1/2" /></div>)}</section><div className="mt-5 grid gap-5 lg:grid-cols-2"><SkeletonCard lines={8} /><SkeletonCard lines={5} /></div></div>;
+}
+
+function emptyBoost(): PlayerBoost { return { total: 0, goal: 0, assist: 0 }; }
+function effectiveRating(player: Player, boosts: Map<number, PlayerBoost>) { return player.rating + (boosts.get(player.id)?.total ?? 0); }
+function signed(value: number) { return value > 0 ? `+${value}` : String(value); }
+function toXiPlayer(slot: string, player: Player | undefined, boosts: Map<number, PlayerBoost>): XiPlayer | null {
+  if (!player) return null;
+  const boost = boosts.get(player.id) ?? emptyBoost();
+  return { slot, player, boost, effectiveRating: player.rating + boost.total };
 }
