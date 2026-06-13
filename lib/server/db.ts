@@ -350,8 +350,7 @@ export function getNewsReel() {
 
 export function updateNewsReel(message: string, isActive: boolean, updatedBy: number) {
   const cleanMessage = message.trim().slice(0, 180);
-  const database = getDb();
-  database
+  getDb()
     .prepare(
       `INSERT INTO news_reel (id, message, is_active, updated_by, updated_at)
        VALUES (1, ?, ?, ?, CURRENT_TIMESTAMP)
@@ -362,7 +361,6 @@ export function updateNewsReel(message: string, isActive: boolean, updatedBy: nu
          updated_at = CURRENT_TIMESTAMP`
     )
     .run(cleanMessage, isActive ? 1 : 0, updatedBy);
-  createChatMessage(updatedBy, `News reel ${isActive ? "updated" : "paused"}: "${cleanMessage}"`);
   return getNewsReel();
 }
 
