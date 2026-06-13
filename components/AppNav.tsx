@@ -7,12 +7,9 @@ import { BrandLogo } from "@/components/BrandLogo";
 import { MobileNav } from "@/components/MobileNav";
 import { NavActions } from "@/components/NavActions";
 
-const GLOBAL_UPSIDE_DOWN_UNTIL = new Date("2026-06-14T00:30:00Z").getTime();
-
 export function AppShell({ children }: { children: React.ReactNode }) {
   const [isAdmin, setIsAdmin] = useState(false);
   const [badges, setBadges] = useState({ credits: 0, squadNeedsLock: false });
-  const [globalUpsideDown, setGlobalUpsideDown] = useState(() => Date.now() < GLOBAL_UPSIDE_DOWN_UNTIL);
 
   useEffect(() => {
     fetch("/api/auth/me", { credentials: "include" })
@@ -36,22 +33,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   }, []);
 
-  useEffect(() => {
-    if (!globalUpsideDown) return;
-
-    const remaining = GLOBAL_UPSIDE_DOWN_UNTIL - Date.now();
-    if (remaining <= 0) {
-      setGlobalUpsideDown(false);
-      return;
-    }
-
-    const timeout = window.setTimeout(() => setGlobalUpsideDown(false), remaining);
-    return () => window.clearTimeout(timeout);
-  }, [globalUpsideDown]);
-
   return (
     <div
-      className={`min-h-screen pb-16 md:pb-0 ${globalUpsideDown ? "australia-mode" : ""}`}
+      className="min-h-screen pb-16 md:pb-0"
       style={{ paddingBottom: "calc(4rem + env(safe-area-inset-bottom, 0px))" }}
     >
       <header className="nav-blur hidden border-b border-green-900/10 bg-white/80 md:block sticky top-0 z-40">

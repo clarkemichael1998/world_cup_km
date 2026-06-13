@@ -245,6 +245,7 @@ function MatchMonitorTab({ onForbidden }: { onForbidden: () => void }) {
 
 function LiveSettleTab({ onForbidden }: { onForbidden: () => void }) {
   const [busy, setBusy] = useState(false);
+  const [resyncBusy, setResyncBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
 
@@ -271,6 +272,33 @@ function LiveSettleTab({ onForbidden }: { onForbidden: () => void }) {
     }
   }
 
+  async function resyncGoals() {
+    if (resyncBusy) return;
+    setResyncBusy(true);
+    setNotice("");
+    setError("");
+    try {
+      const res = await fetch("/api/admin/resync-goals", { method: "POST", credentials: "include" });
+      if (res.status === 403) { onForbidden(); return; }
+      const data = (await res.json().catch(() => ({}))) as {
+        matchesChecked?: number;
+        goalsFound?: number;
+        remaining?: number;
+        usersSettled?: number;
+        message?: string;
+        error?: string;
+      };
+      if (!res.ok) {
+        setError(data.error ?? "Could not resync goals.");
+        return;
+      }
+      const more = (data.remaining ?? 0) > 0 ? ` Run again to fetch the remaining ${data.remaining}.` : "";
+      setNotice(`${data.message ?? ""} Re-settled ${data.usersSettled ?? 0} users.${more}`);
+    } finally {
+      setResyncBusy(false);
+    }
+  }
+
   return (
     <section className="max-w-2xl rounded-lg border border-green-900/10 bg-white p-6 shadow-sm">
       <p className="text-sm font-bold uppercase tracking-wide text-green-900/60">Live Match Settlement</p>
@@ -285,6 +313,20 @@ function LiveSettleTab({ onForbidden }: { onForbidden: () => void }) {
       >
         {busy ? "Settling..." : "Sync Fixtures & Settle All Users"}
       </button>
+
+      <div className="mt-6 border-t border-green-900/10 pt-5">
+        <p className="text-sm font-bold uppercase tracking-wide text-green-900/60">Retroactive Goal &amp; Assist Boosts</p>
+        <p className="mt-2 text-sm font-semibold text-green-900/65">
+          Pulls scorer detail for finished matches since the tournament start and re-applies goal/assist boosts to every user&apos;s past locked squads. Fetches a batch per click (API rate limit) — keep clicking until it reports 0 remaining.
+        </p>
+        <button
+          onClick={resyncGoals}
+          disabled={resyncBusy}
+          className="mt-4 rounded-md bg-amber-600 px-5 py-3 font-black text-white hover:bg-amber-700 disabled:opacity-40"
+        >
+          {resyncBusy ? "Resyncing..." : "Resync Goals & Apply Boosts"}
+        </button>
+      </div>
 
       {notice ? <p className="mt-4 rounded-md bg-green-50 p-3 text-sm font-bold text-green-800">{notice}</p> : null}
       {error ? <p className="mt-4 rounded-md bg-red-50 p-3 text-sm font-bold text-red-700">{error}</p> : null}

@@ -121,11 +121,12 @@ async function syncFootballData() {
 const MAX_DETAIL_FETCHES_PER_RUN = 6;
 
 async function syncGoalsForFinishedMatches(
-  matches: Array<{ id: number; status: string; goals?: Array<{ scorer?: { name?: string }; assist?: { name?: string } }> }>
-): Promise<{ matchesChecked: number; goalsFound: number }> {
+  matches: Array<{ id: number; status: string; goals?: Array<{ scorer?: { name?: string }; assist?: { name?: string } }> }>,
+  cap: number = MAX_DETAIL_FETCHES_PER_RUN
+): Promise<{ matchesChecked: number; goalsFound: number; remaining: number }> {
   const db = getDb();
   const finishedIds = matches.filter((m) => m.status === "FINISHED").map((m) => `football-data-${m.id}`);
-  if (finishedIds.length === 0) return { matchesChecked: 0, goalsFound: 0 };
+  if (finishedIds.length === 0) return { matchesChecked: 0, goalsFound: 0, remaining: 0 };
 
   // Only fetch detail for finished matches we haven't already synced.
   const placeholders = finishedIds.map(() => "?").join(",");
@@ -139,7 +140,7 @@ async function syncGoalsForFinishedMatches(
   const markSynced = db.prepare("UPDATE fixture_results SET goals_synced = 1 WHERE match_id = ?");
 
   for (const match of matches) {
-    if (matchesChecked >= MAX_DETAIL_FETCHES_PER_RUN) break;
+    if (matchesChecked >= cap) break;
     const matchId = `football-data-${match.id}`;
     if (!unsynced.has(matchId)) continue;
 
@@ -168,7 +169,35 @@ async function syncGoalsForFinishedMatches(
     markSynced.run(matchId);
   }
 
-  return { matchesChecked, goalsFound };
+  const remaining = (db
+    .prepare(`SELECT COUNT(*) AS c FROM fixture_results WHERE goals_synced = 0 AND match_id IN (${placeholders})`)
+    .get(...finishedIds) as { c: number }).c;
+
+  return { matchesChecked, goalsFound, remaining };
+}
+
+// Admin-triggered: pull scorer detail for finished matches with a higher cap
+// so past days catch up deterministically. Returns how many remain unsynced.
+export async function resyncFinishedGoals(): Promise<{ ok: boolean; matchesChecked: number; goalsFound: number; remaining: number; message: string }> {
+  if (!process.env.FOOTBALL_DATA_API_KEY) {
+    return { ok: false, matchesChecked: 0, goalsFound: 0, remaining: 0, message: "No FOOTBALL_DATA_API_KEY configured." };
+  }
+  const url = "https://api.football-data.org/v4/competitions/WC/matches?dateFrom=2026-06-11&dateTo=2026-07-19";
+  try {
+    const response = await fetch(url, { headers: { "X-Auth-Token": process.env.FOOTBALL_DATA_API_KEY }, cache: "no-store" });
+    if (!response.ok) {
+      return { ok: false, matchesChecked: 0, goalsFound: 0, remaining: 0, message: `Provider returned ${response.status}.` };
+    }
+    const payload = (await response.json()) as { matches?: Array<{ id: number; status: string }> };
+    const stats = await syncGoalsForFinishedMatches(payload.matches ?? [], 9);
+    return {
+      ok: true,
+      ...stats,
+      message: `Checked ${stats.matchesChecked} match${stats.matchesChecked === 1 ? "" : "es"}, found ${stats.goalsFound} scorer event${stats.goalsFound === 1 ? "" : "s"}. ${stats.remaining} finished match${stats.remaining === 1 ? "" : "es"} still to fetch.`
+    };
+  } catch (error) {
+    return { ok: false, matchesChecked: 0, goalsFound: 0, remaining: 0, message: error instanceof Error ? error.message : "Fetch failed." };
+  }
 }
 
 function upsertFixtures(fixtures: FixtureResult[]) {
