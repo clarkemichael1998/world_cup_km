@@ -1042,35 +1042,36 @@ function ResultsTab({ onForbidden }: { onForbidden: () => void }) {
   );
 }
 
-type AdminFixture = { match_id: string; home_team: string; away_team: string; match_date: string; status: string; winner: string | null };
 type BoostLogRow = { username: string; playerName: string; eventType: "goal" | "assist"; amount: number; match: string; createdAt: string };
+type Contributor = { id: number; playerId: number | null; name: string; count: number; status: string };
+type AdminGame = {
+  matchId: string;
+  homeTeam: string;
+  awayTeam: string;
+  matchDate: string;
+  kickoffAt: string;
+  winner: string | null;
+  confirmed: boolean;
+  scorers: Contributor[];
+  assists: Contributor[];
+};
 
 function GoalScorersTab({ onForbidden }: { onForbidden: () => void }) {
-  const [goals, setGoals] = useState<GoalScorerRow[]>([]);
-  const [assists, setAssists] = useState<GoalScorerRow[]>([]);
-  const [fixtures, setFixtures] = useState<AdminFixture[]>([]);
+  const [games, setGames] = useState<AdminGame[]>([]);
   const [boostLog, setBoostLog] = useState<BoostLogRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [eventType, setEventType] = useState<"goal" | "assist">("goal");
-  const [filter, setFilter] = useState<"all" | "pending" | "matched" | "ignored">("pending");
   const [playerPool, setPlayerPool] = useState<Player[]>(basePlayerPool);
-
-  const [addMatchId, setAddMatchId] = useState("");
-  const [playerQuery, setPlayerQuery] = useState("");
-  const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
-  const [addCount, setAddCount] = useState(1);
-  const [adding, setAdding] = useState(false);
-  const [addNotice, setAddNotice] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [reviewIndex, setReviewIndex] = useState(0);
+  const [showReviewed, setShowReviewed] = useState(false);
 
   async function load() {
     setLoading(true);
     try {
       const res = await fetch("/api/admin/goal-scorers", { credentials: "include" });
       if (res.status === 403) { onForbidden(); return; }
-      const data = (await res.json()) as { goalScorers: GoalScorerRow[]; assistScorers: GoalScorerRow[]; fixtures?: AdminFixture[]; boostLog?: BoostLogRow[] };
-      setGoals(data.goalScorers ?? []);
-      setAssists(data.assistScorers ?? []);
-      setFixtures(data.fixtures ?? []);
+      const data = (await res.json()) as { games?: AdminGame[]; boostLog?: BoostLogRow[] };
+      setGames(data.games ?? []);
       setBoostLog(data.boostLog ?? []);
     } finally {
       setLoading(false);
@@ -1082,122 +1083,75 @@ function GoalScorersTab({ onForbidden }: { onForbidden: () => void }) {
     loadPlayerPool().then(setPlayerPool);
   }, []);
 
-  async function resolve(id: number, playerId: number | null) {
-    await fetch("/api/admin/goal-scorers", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ action: "resolve", eventType, id, playerId }),
-    });
-    await load();
-  }
-
-  async function applyScorer(e: React.FormEvent) {
-    e.preventDefault();
-    if (!addMatchId || !selectedPlayer) return;
-    setAdding(true);
-    setAddNotice("");
+  async function post(body: Record<string, unknown>) {
+    setBusy(true);
     try {
       const res = await fetch("/api/admin/goal-scorers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ action: "addByPlayer", eventType, matchId: addMatchId, playerId: selectedPlayer.id, count: addCount }),
+        body: JSON.stringify(body)
       });
-      const data = (await res.json().catch(() => ({}))) as { usersSettled?: number; error?: string };
-      if (!res.ok) { setAddNotice(data.error ?? "Could not apply."); return; }
-      setAddNotice(`Recorded ${addCount} ${eventType}${addCount === 1 ? "" : "s"} for ${selectedPlayer.name}. Re-settled ${data.usersSettled ?? 0} users — boosts applied to anyone who had them locked that day.`);
-      setSelectedPlayer(null);
-      setPlayerQuery("");
-      setAddCount(1);
+      if (res.status === 403) { onForbidden(); return; }
       await load();
     } finally {
-      setAdding(false);
+      setBusy(false);
     }
   }
 
-  const active = eventType === "goal" ? goals : assists;
-  const filtered = active.filter((s) => filter === "all" || s.status === filter);
-  const pendingGoals = goals.filter((s) => s.status === "pending").length;
-  const pendingAssists = assists.filter((s) => s.status === "pending").length;
-
-  const playerMatches = playerQuery.trim().length >= 2
-    ? playerPool
-        .filter((p) => `${p.name} ${p.nation}`.toLowerCase().includes(playerQuery.trim().toLowerCase()))
-        .slice(0, 8)
-    : [];
+  const queue = [...games].filter((g) => !g.confirmed).sort((a, b) => a.kickoffAt.localeCompare(b.kickoffAt));
+  const reviewed = games.filter((g) => g.confirmed);
+  const pos = Math.min(reviewIndex, Math.max(0, queue.length - 1));
+  const current = queue[pos];
 
   return (
     <div className="space-y-6">
-      {/* Event type toggle */}
-      <div className="flex gap-2">
-        {(["goal", "assist"] as const).map((t) => (
-          <button key={t} onClick={() => setEventType(t)}
-            className={`rounded-md px-4 py-2 text-sm font-black transition-colors ${eventType === t ? "bg-green-950 text-white" : "bg-green-950/8 text-green-950 hover:bg-green-950/15"}`}>
-            {t === "goal" ? `Goals${pendingGoals > 0 ? ` (${pendingGoals} pending)` : ""}` : `Assists${pendingAssists > 0 ? ` (${pendingAssists} pending)` : ""}`}
+      <div className="rounded-lg border border-green-900/10 bg-green-950/5 p-4">
+        <p className="text-sm font-bold text-green-950">
+          {loading ? "Loading completed games…" : queue.length === 0 ? "✓ All completed games reviewed." : `${queue.length} completed game${queue.length === 1 ? "" : "s"} to review.`}
+        </p>
+        <p className="mt-1 text-xs font-semibold text-green-900/55">For each finished game, add the goalscorers and assists (KMXI-pool players only), then confirm to move to the next.</p>
+      </div>
+
+      {current ? (
+        <GameReview
+          key={current.matchId}
+          game={current}
+          position={pos + 1}
+          total={queue.length}
+          playerPool={playerPool}
+          busy={busy}
+          onAdd={(eventType, playerId, count) => post({ action: "addByPlayer", eventType, matchId: current.matchId, playerId, count })}
+          onRemove={(eventType, id) => post({ action: "remove", eventType, id })}
+          onConfirm={() => post({ action: "confirm", matchId: current.matchId })}
+          onSkip={() => setReviewIndex((i) => i + 1)}
+        />
+      ) : null}
+
+      {reviewed.length > 0 ? (
+        <div className="rounded-lg border border-green-900/10 bg-white p-4 shadow-sm">
+          <button onClick={() => setShowReviewed((v) => !v)} className="flex w-full items-center justify-between text-sm font-bold uppercase tracking-wide text-green-900/60">
+            <span>Reviewed games ({reviewed.length})</span>
+            <span>{showReviewed ? "Hide ▲" : "Show ▼"}</span>
           </button>
-        ))}
-      </div>
-
-      {/* Record a scorer: pick game → pick player → count */}
-      <div className="rounded-lg border border-green-900/10 bg-white p-5 shadow-sm">
-        <p className="mb-3 text-sm font-bold uppercase tracking-wide text-green-900/60">Record {eventType === "goal" ? "Goals" : "Assists"}</p>
-        <form onSubmit={applyScorer} className="space-y-3">
-          <div>
-            <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-green-900/55">1 · Match</label>
-            <select value={addMatchId} onChange={(e) => setAddMatchId(e.target.value)}
-              className="w-full rounded-md border border-green-900/20 bg-white px-3 py-2 text-sm font-semibold text-green-950 focus:outline-none focus:ring-2 focus:ring-green-800">
-              <option value="">Select a match…</option>
-              {fixtures.map((f) => (
-                <option key={f.match_id} value={f.match_id}>
-                  {f.match_date} · {f.home_team} v {f.away_team}{f.status === "FINISHED" ? "" : ` (${f.status})`}
-                </option>
+          {showReviewed ? (
+            <div className="mt-3 space-y-2">
+              {reviewed.map((g) => (
+                <div key={g.matchId} className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-green-950/5 px-3 py-2 text-sm">
+                  <span className="font-bold text-green-950">{g.matchDate} · {g.homeTeam} v {g.awayTeam}</span>
+                  <span className="text-xs font-semibold text-green-900/55">
+                    {g.scorers.reduce((s, c) => s + c.count, 0)} goals · {g.assists.reduce((s, c) => s + c.count, 0)} assists
+                  </span>
+                  <button onClick={() => post({ action: "reopen", matchId: g.matchId })} className="rounded-md bg-green-950/8 px-3 py-1 text-xs font-black text-green-950 hover:bg-green-950/15">
+                    Reopen
+                  </button>
+                </div>
               ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-green-900/55">2 · Player</label>
-            {selectedPlayer ? (
-              <div className="flex items-center justify-between gap-3 rounded-md border border-green-900/15 bg-green-50 px-3 py-2">
-                <span className="text-sm font-black text-green-950">{selectedPlayer.name} <span className="font-semibold text-green-900/60">· {selectedPlayer.rating} {selectedPlayer.rarity} · {selectedPlayer.nation}</span></span>
-                <button type="button" onClick={() => { setSelectedPlayer(null); setPlayerQuery(""); }} className="text-xs font-black uppercase text-green-900/50 hover:text-green-950">Change</button>
-              </div>
-            ) : (
-              <>
-                <input value={playerQuery} onChange={(e) => setPlayerQuery(e.target.value)} placeholder="Search player by name or nation…"
-                  className="w-full rounded-md border border-green-900/20 px-3 py-2 text-sm font-semibold text-green-950 focus:outline-none focus:ring-2 focus:ring-green-800" />
-                {playerMatches.length > 0 ? (
-                  <div className="mt-1 space-y-1 rounded-md border border-green-900/10 bg-white p-1 shadow-sm">
-                    {playerMatches.map((p) => (
-                      <button key={p.id} type="button" onClick={() => setSelectedPlayer(p)}
-                        className="flex w-full items-center justify-between rounded px-2 py-1.5 text-left text-sm font-bold text-green-950 hover:bg-green-950/5">
-                        <span>{p.name}</span>
-                        <span className="text-xs font-semibold text-green-900/55">{p.rating} {p.rarity} · {p.nation}</span>
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
-              </>
-            )}
-          </div>
-
-          <div className="flex items-end gap-3">
-            <div>
-              <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-green-900/55">3 · {eventType === "goal" ? "Goals" : "Assists"}</label>
-              <input type="number" min={1} max={10} value={addCount} onChange={(e) => setAddCount(Number(e.target.value))}
-                className="w-20 rounded-md border border-green-900/20 px-3 py-2 text-sm font-semibold text-green-950 focus:outline-none focus:ring-2 focus:ring-green-800" />
             </div>
-            <button type="submit" disabled={adding || !addMatchId || !selectedPlayer}
-              className="rounded-md bg-pitch px-5 py-2.5 text-sm font-black text-white hover:bg-green-800 disabled:opacity-40">
-              {adding ? "Applying…" : `Apply ${eventType === "goal" ? "Goals" : "Assists"} & Boost`}
-            </button>
-          </div>
-          {addNotice ? <p className="rounded-md bg-green-50 p-3 text-sm font-bold text-green-800">{addNotice}</p> : null}
-        </form>
-      </div>
+          ) : null}
+        </div>
+      ) : null}
 
-      {/* Boosts applied log */}
       <div className="rounded-lg border border-green-900/10 bg-white p-5 shadow-sm">
         <p className="mb-3 text-sm font-bold uppercase tracking-wide text-green-900/60">Boosts Applied</p>
         {boostLog.length === 0 ? (
@@ -1216,81 +1170,113 @@ function GoalScorersTab({ onForbidden }: { onForbidden: () => void }) {
           </div>
         )}
       </div>
-
-      {/* Filter + list of raw records (auto + manual) */}
-      <div>
-        <p className="mb-2 text-sm font-bold uppercase tracking-wide text-green-900/60">All {eventType === "goal" ? "Goal" : "Assist"} Records</p>
-        <div className="mb-4 flex items-center gap-3">
-          <div className="flex gap-2">
-            {(["all", "pending", "matched", "ignored"] as const).map((f) => (
-              <button key={f} onClick={() => setFilter(f)}
-                className={`rounded-md px-3 py-1.5 text-xs font-bold uppercase tracking-wide transition-colors ${filter === f ? "bg-green-950 text-white" : "bg-green-950/8 text-green-950 hover:bg-green-950/15"}`}>
-                {f}
-              </button>
-            ))}
-          </div>
-          <button onClick={load} className="ml-auto rounded-md bg-green-950/8 px-3 py-1.5 text-xs font-black text-green-950 hover:bg-green-950/15">Refresh</button>
-        </div>
-
-        {loading ? (
-          <p className="text-sm font-semibold text-green-900/60">Loading…</p>
-        ) : filtered.length === 0 ? (
-          <p className="text-sm font-semibold text-green-900/60">No records in this filter.</p>
-        ) : (
-          <div className="space-y-2">
-            {filtered.map((scorer) => (
-              <GoalScorerCard key={scorer.id} scorer={scorer} eventType={eventType} onResolve={resolve} />
-            ))}
-          </div>
-        )}
-      </div>
     </div>
   );
 }
 
-function GoalScorerCard({ scorer, eventType, onResolve }: { scorer: GoalScorerRow; eventType: "goal" | "assist"; onResolve: (id: number, playerId: number | null) => void }) {
-  const [playerIdInput, setPlayerIdInput] = useState(scorer.player_id?.toString() ?? "");
+function GameReview({ game, position, total, playerPool, busy, onAdd, onRemove, onConfirm, onSkip }: {
+  game: AdminGame;
+  position: number;
+  total: number;
+  playerPool: Player[];
+  busy: boolean;
+  onAdd: (eventType: "goal" | "assist", playerId: number, count: number) => void;
+  onRemove: (eventType: "goal" | "assist", id: number) => void;
+  onConfirm: () => void;
+  onSkip: () => void;
+}) {
+  return (
+    <div className="rounded-lg border border-green-900/10 bg-white p-5 shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-green-900/10 pb-3">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wide text-green-900/50">Reviewing {position} of {total}</p>
+          <p className="mt-1 text-lg font-black text-green-950">{game.homeTeam} v {game.awayTeam}</p>
+          <p className="text-xs font-semibold text-green-900/55">{game.matchDate}{game.winner ? ` · ${game.winner} won` : " · draw"}</p>
+        </div>
+        <button onClick={onSkip} disabled={busy} className="rounded-md bg-green-950/8 px-3 py-1.5 text-xs font-black text-green-950 hover:bg-green-950/15 disabled:opacity-40">Skip for now</button>
+      </div>
 
-  const statusColour =
-    scorer.status === "matched" ? "border-green-200 bg-green-50"
-    : scorer.status === "ignored" ? "border-slate-200 bg-slate-50"
-    : "border-amber-200 bg-amber-50";
+      <ContributorSection label="Goalscorers" eventType="goal" items={game.scorers} playerPool={playerPool} busy={busy} onAdd={onAdd} onRemove={onRemove} />
+      <ContributorSection label="Assists" eventType="assist" items={game.assists} playerPool={playerPool} busy={busy} onAdd={onAdd} onRemove={onRemove} />
+
+      <button onClick={onConfirm} disabled={busy} className="mt-4 w-full rounded-md bg-pitch px-5 py-3 font-black text-white hover:bg-green-800 disabled:opacity-40">
+        Confirm — scorers complete for this game
+      </button>
+    </div>
+  );
+}
+
+function ContributorSection({ label, eventType, items, playerPool, busy, onAdd, onRemove }: {
+  label: string;
+  eventType: "goal" | "assist";
+  items: Contributor[];
+  playerPool: Player[];
+  busy: boolean;
+  onAdd: (eventType: "goal" | "assist", playerId: number, count: number) => void;
+  onRemove: (eventType: "goal" | "assist", id: number) => void;
+}) {
+  return (
+    <div className="mt-4">
+      <p className="mb-2 text-xs font-bold uppercase tracking-wide text-green-900/55">{label}</p>
+      <div className="space-y-1.5">
+        {items.length === 0 ? <p className="text-sm font-semibold text-green-900/45">None added yet.</p> : null}
+        {items.map((c) => (
+          <div key={c.id} className="flex items-center justify-between gap-2 rounded-md bg-green-950/5 px-3 py-1.5 text-sm">
+            <span className="min-w-0 truncate font-bold text-green-950">
+              {c.name}{c.count > 1 ? <span className="ml-1 rounded bg-green-950/10 px-1.5 text-xs font-black">×{c.count}</span> : null}
+              {c.status === "pending" ? <span className="ml-1 rounded bg-amber-100 px-1.5 text-[10px] font-black uppercase text-amber-800">unmatched</span> : null}
+            </span>
+            <button onClick={() => onRemove(eventType, c.id)} disabled={busy} className="shrink-0 rounded-md bg-green-950/8 px-2 py-1 text-xs font-black text-green-900 hover:bg-red-100 hover:text-red-700 disabled:opacity-40">Remove</button>
+          </div>
+        ))}
+      </div>
+      <ScorerAdder playerPool={playerPool} busy={busy} eventLabel={eventType === "goal" ? "goals" : "assists"} onAdd={(playerId, count) => onAdd(eventType, playerId, count)} />
+    </div>
+  );
+}
+
+function ScorerAdder({ playerPool, busy, eventLabel, onAdd }: { playerPool: Player[]; busy: boolean; eventLabel: string; onAdd: (playerId: number, count: number) => void }) {
+  const [query, setQuery] = useState("");
+  const [selected, setSelected] = useState<Player | null>(null);
+  const [count, setCount] = useState(1);
+
+  const matches = query.trim().length >= 2
+    ? playerPool.filter((p) => `${p.name} ${p.nation}`.toLowerCase().includes(query.trim().toLowerCase())).slice(0, 8)
+    : [];
 
   return (
-    <div className={`rounded-lg border p-4 text-sm ${statusColour}`}>
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="font-black text-green-950">{scorer.scorer_name_raw}</p>
-          <p className="mt-0.5 text-xs font-semibold text-green-900/60">
-            {scorer.home_team ?? "?"} vs {scorer.away_team ?? "?"} · {scorer.match_date ?? scorer.match_id}
-          </p>
-          <p className="mt-0.5 text-xs font-semibold text-green-900/40">
-            Status: {scorer.status} · Source: {scorer.source} · {eventType === "goal" ? `Goals: ${scorer.goal_count}` : `Assists: ${scorer.goal_count}`}
-            {scorer.player_id != null ? ` · Player ID: ${scorer.player_id}` : ""}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <input
-            type="number"
-            value={playerIdInput}
-            onChange={(e) => setPlayerIdInput(e.target.value)}
-            placeholder="Player ID"
-            className="w-24 rounded-md border border-green-900/20 bg-white px-2 py-1.5 text-sm font-semibold text-green-950 focus:outline-none focus:ring-2 focus:ring-green-800"
-          />
+    <div className="mt-2 rounded-md border border-dashed border-green-900/20 p-2">
+      {selected ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm font-black text-green-950">{selected.name} <span className="font-semibold text-green-900/55">· {selected.rating} {selected.rarity} · {selected.nation}</span></span>
+          <input type="number" min={1} max={10} value={count} onChange={(e) => setCount(Number(e.target.value))} title={eventLabel}
+            className="w-16 rounded-md border border-green-900/20 px-2 py-1.5 text-sm font-semibold text-green-950 focus:outline-none focus:ring-2 focus:ring-green-800" />
           <button
-            onClick={() => onResolve(scorer.id, playerIdInput ? Number(playerIdInput) : null)}
-            className="rounded-md bg-green-950 px-3 py-1.5 text-xs font-black text-white hover:bg-green-800"
+            onClick={() => { onAdd(selected.id, Math.max(1, Math.min(10, count))); setSelected(null); setQuery(""); setCount(1); }}
+            disabled={busy}
+            className="rounded-md bg-green-950 px-3 py-1.5 text-sm font-black text-white hover:bg-green-800 disabled:opacity-40"
           >
-            Match
+            Add
           </button>
-          <button
-            onClick={() => onResolve(scorer.id, null)}
-            className="rounded-md bg-slate-200 px-3 py-1.5 text-xs font-black text-slate-700 hover:bg-slate-300"
-          >
-            Ignore
-          </button>
+          <button onClick={() => { setSelected(null); setQuery(""); }} className="text-xs font-black uppercase text-green-900/50 hover:text-green-950">Cancel</button>
         </div>
-      </div>
+      ) : (
+        <>
+          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={`Add a ${eventLabel === "goals" ? "goalscorer" : "assist"} — search player…`}
+            className="w-full rounded-md border border-green-900/20 px-3 py-2 text-sm font-semibold text-green-950 focus:outline-none focus:ring-2 focus:ring-green-800" />
+          {matches.length > 0 ? (
+            <div className="mt-1 space-y-1">
+              {matches.map((p) => (
+                <button key={p.id} type="button" onClick={() => setSelected(p)}
+                  className="flex w-full items-center justify-between rounded px-2 py-1.5 text-left text-sm font-bold text-green-950 hover:bg-green-950/5">
+                  <span>{p.name}</span>
+                  <span className="text-xs font-semibold text-green-900/55">{p.rating} {p.rarity} · {p.nation}</span>
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </>
+      )}
     </div>
   );
 }

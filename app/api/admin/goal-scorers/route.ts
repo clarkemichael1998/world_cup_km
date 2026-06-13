@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server";
 import {
   createAdminChatMessage,
-  getAdminFixtures,
+  deleteAssistScorer,
+  deleteGoalScorer,
   getBoostLog,
+  getCompletedGamesWithScorers,
   getCurrentUser,
   getPendingGoalScorers,
   resolveGoalScorer,
+  setScorersConfirmed,
   upsertGoalScorer,
   getPendingAssistScorers,
   resolveAssistScorer,
@@ -21,9 +24,9 @@ export async function GET() {
   if (!isAdminUsername(user.username)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   return NextResponse.json({
+    games: getCompletedGamesWithScorers(),
     goalScorers: getPendingGoalScorers(),
     assistScorers: getPendingAssistScorers(),
-    fixtures: getAdminFixtures(),
     boostLog: getBoostLog()
   });
 }
@@ -96,6 +99,19 @@ export async function POST(request: Request) {
     createAdminChatMessage(`Admin recorded ${count} ${eventLabel}${count === 1 ? "" : "s"} for ${player.name} (${body.matchId}).`);
     const settle = settleAllLiveAwards();
     return NextResponse.json({ ok: true, player: { id: player.id, name: player.name }, usersSettled: settle.usersSettled });
+  }
+
+  if (body.action === "remove") {
+    if (typeof body.id !== "number") return NextResponse.json({ error: "Missing id" }, { status: 400 });
+    const removed = isAssist ? deleteAssistScorer(body.id) : deleteGoalScorer(body.id);
+    if (removed) settleAllLiveAwards();
+    return NextResponse.json({ ok: removed });
+  }
+
+  if (body.action === "confirm" || body.action === "reopen") {
+    if (!body.matchId) return NextResponse.json({ error: "Missing matchId" }, { status: 400 });
+    setScorersConfirmed(body.matchId, body.action === "confirm");
+    return NextResponse.json({ ok: true });
   }
 
   return NextResponse.json({ error: "Unknown action" }, { status: 400 });

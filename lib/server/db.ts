@@ -943,6 +943,74 @@ export function getAdminFixtures() {
     .all() as Array<{ match_id: string; home_team: string; away_team: string; match_date: string; status: string; winner: string | null }>;
 }
 
+export type AdminContributor = { id: number; playerId: number | null; name: string; count: number; status: string };
+export type AdminCompletedGame = {
+  matchId: string;
+  homeTeam: string;
+  awayTeam: string;
+  matchDate: string;
+  kickoffAt: string;
+  winner: string | null;
+  confirmed: boolean;
+  scorers: AdminContributor[];
+  assists: AdminContributor[];
+};
+
+// Every finished game with its recorded goal/assist scorers, for the admin
+// review queue. Newest first.
+export function getCompletedGamesWithScorers(): AdminCompletedGame[] {
+  const db = getDb();
+  const games = db
+    .prepare("SELECT match_id, home_team, away_team, match_date, kickoff_at, winner, COALESCE(scorers_confirmed, 0) AS confirmed FROM fixture_results WHERE status = 'FINISHED' ORDER BY kickoff_at DESC, match_id DESC")
+    .all() as Array<{ match_id: string; home_team: string; away_team: string; match_date: string; kickoff_at: string; winner: string | null; confirmed: number }>;
+
+  const goalRows = db.prepare("SELECT id, match_id, player_id, scorer_name_raw, goal_count, status FROM goal_scorers").all() as Array<{ id: number; match_id: string; player_id: number | null; scorer_name_raw: string; goal_count: number; status: string }>;
+  const assistRows = db.prepare("SELECT id, match_id, player_id, scorer_name_raw, assist_count, status FROM assist_scorers").all() as Array<{ id: number; match_id: string; player_id: number | null; scorer_name_raw: string; assist_count: number; status: string }>;
+  const playerMap = new Map(getAllPlayers().map((p) => [p.id, p]));
+
+  const nameFor = (playerId: number | null, raw: string) => (playerId != null ? playerMap.get(playerId)?.name ?? raw : raw);
+
+  return games.map((g) => ({
+    matchId: g.match_id,
+    homeTeam: g.home_team,
+    awayTeam: g.away_team,
+    matchDate: g.match_date,
+    kickoffAt: g.kickoff_at,
+    winner: g.winner,
+    confirmed: g.confirmed === 1,
+    scorers: goalRows
+      .filter((r) => r.match_id === g.match_id)
+      .map((r) => ({ id: r.id, playerId: r.player_id, name: nameFor(r.player_id, r.scorer_name_raw), count: r.goal_count, status: r.status })),
+    assists: assistRows
+      .filter((r) => r.match_id === g.match_id)
+      .map((r) => ({ id: r.id, playerId: r.player_id, name: nameFor(r.player_id, r.scorer_name_raw), count: r.assist_count, status: r.status }))
+  }));
+}
+
+export function setScorersConfirmed(matchId: string, confirmed: boolean) {
+  getDb().prepare("UPDATE fixture_results SET scorers_confirmed = ? WHERE match_id = ?").run(confirmed ? 1 : 0, matchId);
+}
+
+// Delete a scorer record and reverse any boosts it awarded, so removal/correction
+// is clean. Returns whether a row was removed.
+export function deleteGoalScorer(id: number): boolean {
+  const db = getDb();
+  const row = db.prepare("SELECT match_id, player_id FROM goal_scorers WHERE id = ?").get(id) as { match_id: string; player_id: number | null } | undefined;
+  if (!row) return false;
+  db.prepare("DELETE FROM goal_scorers WHERE id = ?").run(id);
+  if (row.player_id != null) db.prepare("DELETE FROM goal_boosts WHERE player_id = ? AND match_id = ?").run(row.player_id, row.match_id);
+  return true;
+}
+
+export function deleteAssistScorer(id: number): boolean {
+  const db = getDb();
+  const row = db.prepare("SELECT match_id, player_id FROM assist_scorers WHERE id = ?").get(id) as { match_id: string; player_id: number | null } | undefined;
+  if (!row) return false;
+  db.prepare("DELETE FROM assist_scorers WHERE id = ?").run(id);
+  if (row.player_id != null) db.prepare("DELETE FROM goal_boosts WHERE player_id = ? AND match_id = ?").run(row.player_id, `${row.match_id}:assist`);
+  return true;
+}
+
 export function getBoostLog(limit = 40) {
   const db = getDb();
   const rows = db
@@ -2346,6 +2414,7 @@ function migrateFixtureResults(database: DatabaseSync) {
   if (!fixtureColumnNames.has("verified")) database.exec("ALTER TABLE fixture_results ADD COLUMN verified INTEGER NOT NULL DEFAULT 0");
   if (!fixtureColumnNames.has("updated_at")) database.exec("ALTER TABLE fixture_results ADD COLUMN updated_at TEXT");
   if (!fixtureColumnNames.has("goals_synced")) database.exec("ALTER TABLE fixture_results ADD COLUMN goals_synced INTEGER NOT NULL DEFAULT 0");
+  if (!fixtureColumnNames.has("scorers_confirmed")) database.exec("ALTER TABLE fixture_results ADD COLUMN scorers_confirmed INTEGER NOT NULL DEFAULT 0");
 
   database.prepare("UPDATE fixture_results SET verified = 1 WHERE source = 'seed' OR source = 'manual'").run();
   database.prepare("UPDATE fixture_results SET updated_at = CURRENT_TIMESTAMP WHERE updated_at IS NULL").run();
