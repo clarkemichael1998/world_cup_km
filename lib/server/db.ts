@@ -2354,10 +2354,15 @@ function migrateFixtureResults(database: DatabaseSync) {
   // nation strings so "playing today", win credits, and boosts all match.
   const nationFixes: Array<[string[], string]> = [
     [["Bosnia", "Bosnia-Herzegovina", "Bosnia & Herzegovina"], "Bosnia and Herzegovina"],
-    [["USA"], "United States"],
-    [["Korea Republic"], "South Korea"],
+    [["USA", "United States of America"], "United States"],
+    [["Korea Republic", "Republic of Korea"], "South Korea"],
     [["Czechia"], "Czech Republic"],
-    [["Congo DR"], "DR Congo"]
+    [["Congo DR"], "DR Congo"],
+    [["Côte d'Ivoire", "Cote d'Ivoire"], "Ivory Coast"],
+    [["Cabo Verde"], "Cape Verde"],
+    [["Türkiye", "Turkiye"], "Turkey"],
+    [["IR Iran", "Iran (Islamic Republic of)"], "Iran"],
+    [["Curacao"], "Curaçao"]
   ];
   for (const [variants, canonical] of nationFixes) {
     for (const variant of variants) {

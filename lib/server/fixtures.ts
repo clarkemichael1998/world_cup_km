@@ -24,14 +24,24 @@ export type ProviderStatus = {
 // used in the player data, so fixtures, win credits, and "playing today" all match.
 const footballDataTeamNames: Record<string, string> = {
   USA: "United States",
+  "United States of America": "United States",
   "Korea Republic": "South Korea",
+  "Republic of Korea": "South Korea",
   "Côte d'Ivoire": "Ivory Coast",
+  "Cote d'Ivoire": "Ivory Coast",
   "Czechia": "Czech Republic",
   "Congo DR": "DR Congo",
+  "DR Congo": "DR Congo",
   "Bosnia": "Bosnia and Herzegovina",
   "Bosnia-Herzegovina": "Bosnia and Herzegovina",
   "Bosnia & Herzegovina": "Bosnia and Herzegovina",
-  "Bosnia and Herzegovina": "Bosnia and Herzegovina"
+  "Bosnia and Herzegovina": "Bosnia and Herzegovina",
+  "Cabo Verde": "Cape Verde",
+  "Türkiye": "Turkey",
+  "Turkiye": "Turkey",
+  "IR Iran": "Iran",
+  "Iran (Islamic Republic of)": "Iran",
+  "Curacao": "Curaçao"
 };
 
 export async function syncFixtureResults() {
