@@ -9,6 +9,7 @@ type Entry = {
   username: string;
   total_km: number;
   games_won: number;
+  daily_wins: number;
   best_squad_rating: number;
   goal_bonus: number;
   assist_bonus: number;
@@ -16,9 +17,10 @@ type Entry = {
 };
 type Matchday = { date: string; entries: Array<{ username: string; credits: number; boost: number }> };
 
-type MetricKey = "rating" | "activity" | "goals" | "assists";
+type MetricKey = "rating" | "wins" | "activity" | "goals" | "assists";
 const METRICS: Record<MetricKey, { label: string; get: (e: Entry) => number; fmt: (v: number) => string }> = {
   rating: { label: "Squad Avg", get: (e) => e.best_squad_rating, fmt: (v) => (v > 0 ? v.toFixed(1) : "—") },
+  wins: { label: "Daily Wins", get: (e) => e.daily_wins, fmt: (v) => (v > 0 ? String(v) : "—") },
   activity: { label: "Activity", get: (e) => e.total_km, fmt: (v) => v.toFixed(1) },
   goals: { label: "Goals", get: (e) => e.goal_bonus, fmt: (v) => (v > 0 ? `+${v}` : v < 0 ? String(v) : "—") },
   assists: { label: "Assists", get: (e) => e.assist_bonus, fmt: (v) => (v > 0 ? `+${v}` : v < 0 ? String(v) : "—") }

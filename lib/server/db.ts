@@ -350,7 +350,8 @@ export function getNewsReel() {
 
 export function updateNewsReel(message: string, isActive: boolean, updatedBy: number) {
   const cleanMessage = message.trim().slice(0, 180);
-  getDb()
+  const database = getDb();
+  database
     .prepare(
       `INSERT INTO news_reel (id, message, is_active, updated_by, updated_at)
        VALUES (1, ?, ?, ?, CURRENT_TIMESTAMP)
@@ -361,6 +362,7 @@ export function updateNewsReel(message: string, isActive: boolean, updatedBy: nu
          updated_at = CURRENT_TIMESTAMP`
     )
     .run(cleanMessage, isActive ? 1 : 0, updatedBy);
+  createChatMessage(updatedBy, `News reel ${isActive ? "updated" : "paused"}: "${cleanMessage}"`);
   return getNewsReel();
 }
 
@@ -1523,6 +1525,11 @@ export function logActivityWithServerAwards({
 export function getKmLeaderboard() {
   const db = getDb();
   const adminUsernames = getAdminUsernames();
+  const dailyWins = new Map<string, number>();
+  for (const matchday of getMatchdayHeadToHead(1000)) {
+    const winner = matchday.entries[0]?.username;
+    if (winner) dailyWins.set(winner, (dailyWins.get(winner) ?? 0) + 1);
+  }
 
   const rows = db
     .prepare(
@@ -1579,6 +1586,7 @@ export function getKmLeaderboard() {
       username: row.username,
       total_km: row.total_km,
       games_won: row.games_won,
+      daily_wins: dailyWins.get(row.username) ?? 0,
       best_squad_rating: computeBestSquadRating(byUser.get(row.id) ?? [], playerBoostsByUser.get(row.id)),
       goal_bonus: boostByUser.get(row.id)?.goal_bonus ?? 0,
       assist_bonus: boostByUser.get(row.id)?.assist_bonus ?? 0
@@ -1592,6 +1600,7 @@ export function getKmLeaderboard() {
     username: row.username,
     total_km: row.total_km,
     games_won: row.games_won,
+    daily_wins: row.daily_wins,
     best_squad_rating: row.best_squad_rating,
     goal_bonus: row.goal_bonus,
     assist_bonus: row.assist_bonus,
