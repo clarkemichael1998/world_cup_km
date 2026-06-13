@@ -139,7 +139,11 @@ export function ChatFeed() {
                 <article id={`chat-message-${item.id}`} key={item.id} className={`rounded-md border px-3 py-2 shadow-sm transition ${highlightedMessageId === item.id ? "ring-2 ring-amber-400" : ""} ${tone.container}`}>
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex min-w-0 items-center gap-2">
-                      <Link className={`truncate text-sm font-black hover:underline ${tone.name}`} href={`/profile/${encodeURIComponent(item.username)}`}>{item.username}</Link>
+                      {item.username === "admin" ? (
+                        <span className={`truncate text-sm font-black ${tone.name}`}>KMXI</span>
+                      ) : (
+                        <Link className={`truncate text-sm font-black hover:underline ${tone.name}`} href={`/profile/${encodeURIComponent(item.username)}`}>{item.username}</Link>
+                      )}
                       {tone.badge ? <Badge tone={tone.badgeTone}>{tone.badge}</Badge> : null}
                     </div>
                     <time className="text-xs font-bold text-green-900/50">{formatDate(item.created_at)}</time>
@@ -147,7 +151,7 @@ export function ChatFeed() {
                   <p className={`mt-1 whitespace-pre-wrap break-words text-[13px] font-semibold leading-snug ${tone.text}`}>{item.message}</p>
                   {item.reply_to_message ? (
                     <button type="button" onClick={() => item.reply_to_message_id && jumpToMessage(item.reply_to_message_id)} className="mt-1.5 block w-full rounded border-l-2 border-green-800/25 bg-white/45 px-2 py-1 text-left text-[10px] font-semibold leading-snug text-green-900/55 hover:bg-white/70">
-                      <span className="font-black text-green-900/70">Reply to {item.reply_to_username ?? "someone"}:</span>{" "}
+                      <span className="font-black text-green-900/70">Reply to {item.reply_to_username === "admin" ? "KMXI" : item.reply_to_username ?? "someone"}:</span>{" "}
                       {truncate(item.reply_to_message, 120)}
                     </button>
                   ) : null}
