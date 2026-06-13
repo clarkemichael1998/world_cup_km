@@ -176,28 +176,109 @@ async function syncGoalsForFinishedMatches(
   return { matchesChecked, goalsFound, remaining };
 }
 
-// Admin-triggered: pull scorer detail for finished matches with a higher cap
-// so past days catch up deterministically. Returns how many remain unsynced.
-export async function resyncFinishedGoals(): Promise<{ ok: boolean; matchesChecked: number; goalsFound: number; remaining: number; message: string }> {
+// Admin-triggered: pull scorer detail for finished matches with a higher cap so
+// past days catch up. With force=true it clears the synced flag first so matches
+// that previously returned no goals are re-checked. Reports the API breakdown so
+// it's clear whether the provider is actually returning scorer data.
+export async function resyncFinishedGoals(force = false): Promise<{
+  ok: boolean;
+  matchesChecked: number;
+  goalsFound: number;
+  apiHadGoals: number;
+  remaining: number;
+  message: string;
+}> {
   if (!process.env.FOOTBALL_DATA_API_KEY) {
-    return { ok: false, matchesChecked: 0, goalsFound: 0, remaining: 0, message: "No FOOTBALL_DATA_API_KEY configured." };
+    return { ok: false, matchesChecked: 0, goalsFound: 0, apiHadGoals: 0, remaining: 0, message: "No FOOTBALL_DATA_API_KEY configured — fixtures/goals come from cache/manual only." };
   }
   const url = "https://api.football-data.org/v4/competitions/WC/matches?dateFrom=2026-06-11&dateTo=2026-07-19";
   try {
     const response = await fetch(url, { headers: { "X-Auth-Token": process.env.FOOTBALL_DATA_API_KEY }, cache: "no-store" });
     if (!response.ok) {
-      return { ok: false, matchesChecked: 0, goalsFound: 0, remaining: 0, message: `Provider returned ${response.status}.` };
+      return { ok: false, matchesChecked: 0, goalsFound: 0, apiHadGoals: 0, remaining: 0, message: `Provider returned HTTP ${response.status}.` };
     }
     const payload = (await response.json()) as { matches?: Array<{ id: number; status: string }> };
-    const stats = await syncGoalsForFinishedMatches(payload.matches ?? [], 9);
+    const matches = payload.matches ?? [];
+    const finished = matches.filter((m) => m.status === "FINISHED");
+
+    if (matches.length === 0) {
+      return { ok: true, matchesChecked: 0, goalsFound: 0, apiHadGoals: 0, remaining: 0, message: "API returned 0 World Cup matches for the window." };
+    }
+    if (finished.length === 0) {
+      return { ok: true, matchesChecked: 0, goalsFound: 0, apiHadGoals: 0, remaining: 0, message: `API has ${matches.length} matches but 0 are FINISHED yet — nothing to pull.` };
+    }
+
+    const db = getDb();
+    if (force) {
+      const ids = finished.map((m) => `football-data-${m.id}`);
+      const ph = ids.map(() => "?").join(",");
+      db.prepare(`UPDATE fixture_results SET goals_synced = 0 WHERE match_id IN (${ph})`).run(...ids);
+    }
+
+    const stats = await syncGoalsForFinishedMatchesDiag(matches, 9);
     return {
       ok: true,
-      ...stats,
-      message: `Checked ${stats.matchesChecked} match${stats.matchesChecked === 1 ? "" : "es"}, found ${stats.goalsFound} scorer event${stats.goalsFound === 1 ? "" : "s"}. ${stats.remaining} finished match${stats.remaining === 1 ? "" : "es"} still to fetch.`
+      matchesChecked: stats.matchesChecked,
+      goalsFound: stats.goalsFound,
+      apiHadGoals: stats.apiHadGoals,
+      remaining: stats.remaining,
+      message: `${finished.length} finished match${finished.length === 1 ? "" : "es"} in API. Checked ${stats.matchesChecked}; ${stats.apiHadGoals} returned goal data; matched ${stats.goalsFound} scorer event${stats.goalsFound === 1 ? "" : "s"}. ${stats.remaining} still to check.`
     };
   } catch (error) {
-    return { ok: false, matchesChecked: 0, goalsFound: 0, remaining: 0, message: error instanceof Error ? error.message : "Fetch failed." };
+    return { ok: false, matchesChecked: 0, goalsFound: 0, apiHadGoals: 0, remaining: 0, message: error instanceof Error ? error.message : "Fetch failed." };
   }
+}
+
+// Like syncGoalsForFinishedMatches but also reports how many matches the API
+// actually returned a non-empty goals array for (the key diagnostic).
+async function syncGoalsForFinishedMatchesDiag(
+  matches: Array<{ id: number; status: string; goals?: Array<{ scorer?: { name?: string }; assist?: { name?: string } }> }>,
+  cap: number
+): Promise<{ matchesChecked: number; goalsFound: number; apiHadGoals: number; remaining: number }> {
+  const db = getDb();
+  const finishedIds = matches.filter((m) => m.status === "FINISHED").map((m) => `football-data-${m.id}`);
+  const ph = finishedIds.map(() => "?").join(",");
+  const unsynced = new Set(
+    (db.prepare(`SELECT match_id FROM fixture_results WHERE goals_synced = 0 AND match_id IN (${ph})`).all(...finishedIds) as Array<{ match_id: string }>).map((r) => r.match_id)
+  );
+
+  let matchesChecked = 0;
+  let goalsFound = 0;
+  let apiHadGoals = 0;
+  const markSynced = db.prepare("UPDATE fixture_results SET goals_synced = 1 WHERE match_id = ?");
+
+  for (const match of matches) {
+    if (matchesChecked >= cap) break;
+    const matchId = `football-data-${match.id}`;
+    if (!unsynced.has(matchId)) continue;
+
+    let goals = match.goals;
+    if (!goals) {
+      try {
+        const response = await fetch(`https://api.football-data.org/v4/matches/${match.id}`, {
+          headers: { "X-Auth-Token": process.env.FOOTBALL_DATA_API_KEY ?? "" },
+          cache: "no-store"
+        });
+        if (!response.ok) continue;
+        const detail = (await response.json()) as { goals?: Array<{ scorer?: { name?: string }; assist?: { name?: string } }> };
+        goals = detail.goals ?? [];
+      } catch {
+        continue;
+      }
+    }
+
+    matchesChecked++;
+    if (goals.length > 0) apiHadGoals++;
+    const scorerNames = goals.map((g) => g.scorer?.name).filter((n): n is string => Boolean(n));
+    const assistNames = goals.map((g) => g.assist?.name).filter((n): n is string => Boolean(n));
+    goalsFound += scorerNames.length;
+    if (scorerNames.length > 0) processGoalScorers(matchId, scorerNames);
+    if (assistNames.length > 0) processAssistScorers(matchId, assistNames);
+    markSynced.run(matchId);
+  }
+
+  const remaining = (db.prepare(`SELECT COUNT(*) AS c FROM fixture_results WHERE goals_synced = 0 AND match_id IN (${ph})`).get(...finishedIds) as { c: number }).c;
+  return { matchesChecked, goalsFound, apiHadGoals, remaining };
 }
 
 function upsertFixtures(fixtures: FixtureResult[]) {

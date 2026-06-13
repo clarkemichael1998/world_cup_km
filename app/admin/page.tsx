@@ -272,13 +272,18 @@ function LiveSettleTab({ onForbidden }: { onForbidden: () => void }) {
     }
   }
 
-  async function resyncGoals() {
+  async function resyncGoals(force: boolean) {
     if (resyncBusy) return;
     setResyncBusy(true);
     setNotice("");
     setError("");
     try {
-      const res = await fetch("/api/admin/resync-goals", { method: "POST", credentials: "include" });
+      const res = await fetch("/api/admin/resync-goals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ force })
+      });
       if (res.status === 403) { onForbidden(); return; }
       const data = (await res.json().catch(() => ({}))) as {
         matchesChecked?: number;
@@ -319,13 +324,25 @@ function LiveSettleTab({ onForbidden }: { onForbidden: () => void }) {
         <p className="mt-2 text-sm font-semibold text-green-900/65">
           Pulls scorer detail for finished matches since the tournament start and re-applies goal/assist boosts to every user&apos;s past locked squads. Fetches a batch per click (API rate limit) — keep clicking until it reports 0 remaining.
         </p>
-        <button
-          onClick={resyncGoals}
-          disabled={resyncBusy}
-          className="mt-4 rounded-md bg-amber-600 px-5 py-3 font-black text-white hover:bg-amber-700 disabled:opacity-40"
-        >
-          {resyncBusy ? "Resyncing..." : "Resync Goals & Apply Boosts"}
-        </button>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button
+            onClick={() => resyncGoals(false)}
+            disabled={resyncBusy}
+            className="rounded-md bg-amber-600 px-5 py-3 font-black text-white hover:bg-amber-700 disabled:opacity-40"
+          >
+            {resyncBusy ? "Resyncing..." : "Resync Goals & Apply Boosts"}
+          </button>
+          <button
+            onClick={() => resyncGoals(true)}
+            disabled={resyncBusy}
+            className="rounded-md border border-amber-300 bg-white px-5 py-3 font-black text-amber-800 hover:bg-amber-50 disabled:opacity-40"
+          >
+            Force re-check all
+          </button>
+        </div>
+        <p className="mt-2 text-xs font-semibold text-green-900/55">
+          &quot;Force re-check all&quot; re-fetches finished matches even if they previously returned no goals — use it to diagnose whether the API is supplying scorer data at all.
+        </p>
       </div>
 
       {notice ? <p className="mt-4 rounded-md bg-green-50 p-3 text-sm font-bold text-green-800">{notice}</p> : null}
