@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { createChatMessage, getAllPlayers, getCurrentUser, getKmFeed, getKmLogsToday, getPersistedUserState, logActivityWithServerAwards } from "@/lib/server/db";
-import { activityDefinitions, calculateActivityCredits, calculateRewards, getKmMultiplier, getRandomPlayerFromPool, isActivityType } from "@/lib/rewardEngine";
+import { createChatMessage, getActivityMultiplier, getAllPlayers, getCurrentUser, getKmFeed, getKmLogsToday, getPersistedUserState, logActivityWithServerAwards } from "@/lib/server/db";
+import { activityDefinitions, calculateActivityCredits, calculateRewards, getRandomPlayerFromPool, isActivityType } from "@/lib/rewardEngine";
 
 const MAX_LOGS_PER_DAY = 3;
 const WC_FINAL_LOCKOUT = new Date("2026-07-19T18:00:00Z");
@@ -43,7 +43,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: `You've reached the limit of ${MAX_LOGS_PER_DAY} logs per day. Come back tomorrow!` }, { status: 400 });
   }
 
-  const multiplier = getKmMultiplier();
+  const multiplier = getActivityMultiplier();
   const activityCredits = calculateActivityCredits(activityType, amount);
   const currentState = getPersistedUserState(user.id);
   const preview = calculateRewards(activityCredits, currentState.kmBalance, multiplier);
@@ -60,6 +60,7 @@ export async function POST(request: Request) {
       amount,
       unit: activity.unit,
       activityCredits,
+      multiplier,
       activityCardsEarned,
       comment
     })
@@ -96,6 +97,7 @@ function buildActivityChatMessage({
   amount,
   unit,
   activityCredits,
+  multiplier,
   activityCardsEarned,
   comment
 }: {
@@ -104,13 +106,14 @@ function buildActivityChatMessage({
   amount: number;
   unit: string;
   activityCredits: number;
+  multiplier: number;
   activityCardsEarned: number;
   comment: string;
 }) {
   const amountText = `${Number(amount).toFixed(unit === "km" ? 1 : 0)} ${unit}`;
   const cardText = `${activityCardsEarned} card${activityCardsEarned === 1 ? "" : "s"}`;
   return [
-    `${username} logged ${activityLabel}: ${amountText}, earning ${activityCredits.toFixed(2)} activity credits and ${cardText}.`,
+    `${username} logged ${activityLabel}: ${amountText}, earning ${activityCredits.toFixed(2)} base activity credits at ${multiplier}x and ${cardText}.`,
     comment ? `“${comment}”` : ""
   ]
     .filter(Boolean)

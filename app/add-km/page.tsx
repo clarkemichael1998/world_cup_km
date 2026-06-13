@@ -8,7 +8,7 @@ import {
   activityDefinitions,
   calculateActivityCredits,
   calculateRewards,
-  getKmMultiplier
+  DEFAULT_ACTIVITY_MULTIPLIER
 } from "@/lib/rewardEngine";
 import { loadUserStateAsync } from "@/lib/storage";
 import type { ActivityType, UserState } from "@/lib/types";
@@ -26,7 +26,7 @@ export default function AddKmPage() {
   const [error, setError] = useState("");
   const [liveCredits, setLiveCredits] = useState(0);
   const [logsToday, setLogsToday] = useState<number | null>(null);
-  const multiplier = getKmMultiplier();
+  const [multiplier, setMultiplier] = useState(DEFAULT_ACTIVITY_MULTIPLIER);
   const activity = activityDefinitions[activityType];
   const numericAmount = Number(amount);
   const activityCredits = Number.isFinite(numericAmount) && numericAmount > 0 ? calculateActivityCredits(activityType, numericAmount) : 0;
@@ -50,6 +50,10 @@ export default function AddKmPage() {
       .then((r) => r.json())
       .then((d) => setLogsToday(d.count ?? 0))
       .catch(() => setLogsToday(0));
+    fetch("/api/activity-config")
+      .then((response) => response.json())
+      .then((payload) => setMultiplier(Number(payload.multiplier) || DEFAULT_ACTIVITY_MULTIPLIER))
+      .catch(() => {});
   }, []);
 
   async function submitActivity(event: FormEvent<HTMLFormElement>) {
@@ -145,7 +149,7 @@ export default function AddKmPage() {
         ) : (
           <p className="mt-3 text-xs font-semibold text-green-900/50">
             Max {activity.maxPerLog} {activity.unit} per log · {MAX_LOGS_PER_DAY} logs per day ·{" "}
-            <span className="font-black text-green-700">{multiplier}x stickers/activity credit this week</span>
+            <span className="font-black text-green-700">{multiplier}x stickers per activity credit</span>
           </p>
         )}
         <div className="mt-3 rounded-md bg-green-50 p-4 text-sm font-semibold text-green-950">

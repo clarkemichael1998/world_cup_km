@@ -54,6 +54,11 @@ type NewsReel = {
   updatedAt: string | null;
 };
 
+type ActivityMultiplierSetting = {
+  multiplier: number;
+  updatedAt: string | null;
+};
+
 type LateCallupPlayer = Player;
 
 type RatingAdjustmentRow = {
@@ -113,7 +118,7 @@ const WC_TEAMS = [
 const today = new Date().toISOString().slice(0, 10);
 
 export default function AdminPage() {
-  const [tab, setTab] = useState<"results" | "goalscorers" | "activity" | "news" | "players" | "ratings" | "settle" | "monitor">("results");
+  const [tab, setTab] = useState<"results" | "goalscorers" | "activity" | "boost" | "news" | "players" | "ratings" | "settle" | "monitor">("results");
   const [forbidden, setForbidden] = useState(false);
 
   if (forbidden) {
@@ -132,13 +137,13 @@ export default function AdminPage() {
       <PageTitle title="Admin" subtitle="Tournament management" />
 
       <div className="mb-6 flex flex-wrap gap-2">
-        {(["results", "monitor", "goalscorers", "activity", "news", "players", "ratings", "settle"] as const).map((t) => (
+        {(["results", "monitor", "goalscorers", "activity", "boost", "news", "players", "ratings", "settle"] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
             className={`rounded-md px-4 py-2 text-sm font-black transition-colors ${tab === t ? "bg-green-950 text-white" : "bg-green-950/8 text-green-950 hover:bg-green-950/15"}`}
           >
-            {t === "results" ? "Match Results" : t === "monitor" ? "Match Monitor" : t === "goalscorers" ? "Goal Scorers" : t === "activity" ? "Activity Review" : t === "news" ? "News Reel" : t === "players" ? "Late Call-Ups" : t === "ratings" ? "Viral Ratings" : "Live Settle"}
+            {t === "results" ? "Match Results" : t === "monitor" ? "Match Monitor" : t === "goalscorers" ? "Goal Scorers" : t === "activity" ? "Activity Review" : t === "boost" ? "Activity Boost" : t === "news" ? "News Reel" : t === "players" ? "Late Call-Ups" : t === "ratings" ? "Viral Ratings" : "Live Settle"}
           </button>
         ))}
       </div>
@@ -147,11 +152,88 @@ export default function AdminPage() {
       {tab === "monitor" && <MatchMonitorTab onForbidden={() => setForbidden(true)} />}
       {tab === "goalscorers" && <GoalScorersTab onForbidden={() => setForbidden(true)} />}
       {tab === "activity" && <ActivityReviewTab onForbidden={() => setForbidden(true)} />}
+      {tab === "boost" && <ActivityBoostTab onForbidden={() => setForbidden(true)} />}
       {tab === "news" && <NewsReelTab onForbidden={() => setForbidden(true)} />}
       {tab === "players" && <LateCallupsTab onForbidden={() => setForbidden(true)} />}
       {tab === "ratings" && <ViralRatingsTab onForbidden={() => setForbidden(true)} />}
       {tab === "settle" && <LiveSettleTab onForbidden={() => setForbidden(true)} />}
     </div>
+  );
+}
+
+function ActivityBoostTab({ onForbidden }: { onForbidden: () => void }) {
+  const [multiplier, setMultiplier] = useState(1.25);
+  const [updatedAt, setUpdatedAt] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [notice, setNotice] = useState("");
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    fetch("/api/admin/activity-config", { credentials: "include" })
+      .then(async (response) => {
+        if (response.status === 403) { onForbidden(); return null; }
+        const payload = (await response.json()) as { setting?: ActivityMultiplierSetting; error?: string };
+        if (!response.ok) throw new Error(payload.error ?? "Could not load activity boost.");
+        return payload.setting;
+      })
+      .then((setting) => {
+        if (!setting) return;
+        setMultiplier(setting.multiplier);
+        setUpdatedAt(setting.updatedAt);
+      })
+      .catch((err: Error) => setError(err.message))
+      .finally(() => setLoading(false));
+  }, [onForbidden]);
+
+  async function save(event: React.FormEvent) {
+    event.preventDefault();
+    if (saving) return;
+    setSaving(true);
+    setNotice("");
+    setError("");
+    try {
+      const response = await fetch("/api/admin/activity-config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ multiplier })
+      });
+      if (response.status === 403) { onForbidden(); return; }
+      const payload = (await response.json()) as { setting?: ActivityMultiplierSetting; error?: string };
+      if (!response.ok || !payload.setting) throw new Error(payload.error ?? "Could not save activity boost.");
+      setMultiplier(payload.setting.multiplier);
+      setUpdatedAt(payload.setting.updatedAt);
+      setNotice(`Activity rewards are now ${payload.setting.multiplier}x.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save activity boost.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (loading) return <p className="text-sm font-semibold text-green-900/60">Loading activity boost...</p>;
+
+  return (
+    <form onSubmit={save} className="max-w-2xl rounded-lg border border-green-900/10 bg-white p-6 shadow-sm">
+      <p className="text-sm font-bold uppercase tracking-wide text-green-900/60">Activity Reward Multiplier</p>
+      <p className="mt-2 text-sm font-semibold text-green-900/65">Applies immediately to new activity logs. Existing activity awards are not recalculated.</p>
+
+      <div className="mt-6 rounded-xl bg-green-950 p-5 text-white">
+        <div className="flex items-end justify-between gap-4">
+          <div><p className="text-xs font-black uppercase tracking-widest text-white/55">Current boost</p><p className="mt-1 text-4xl font-black">{multiplier.toFixed(2)}x</p></div>
+          <label className="text-right text-xs font-bold text-white/70">Exact value<input aria-label="Exact activity multiplier" type="number" min="0.25" max="10" step="0.05" value={multiplier} onChange={(event) => setMultiplier(Number(event.target.value))} className="mt-1 block w-28 rounded-md border border-white/20 bg-white px-3 py-2 text-right text-base font-black text-green-950" /></label>
+        </div>
+        <input aria-label="Activity multiplier" type="range" min="0.25" max="4" step="0.05" value={Math.min(multiplier, 4)} onChange={(event) => setMultiplier(Number(event.target.value))} className="mt-6 w-full accent-amber-400" />
+        <div className="mt-1 flex justify-between text-[10px] font-black text-white/45"><span>0.25x</span><span>1x</span><span>2x</span><span>3x</span><span>4x</span></div>
+      </div>
+
+      <div className="mt-4 rounded-md bg-amber-50 p-4 text-sm font-bold text-amber-950">Example: 4 activity credits at {multiplier.toFixed(2)}x contribute {(4 * multiplier).toFixed(2)} credits toward sticker pulls.</div>
+      {updatedAt ? <p className="mt-3 text-xs font-bold text-green-900/45">Last changed {new Date(updatedAt).toLocaleString("en-GB")}</p> : null}
+      {notice ? <p className="mt-4 rounded-md bg-green-50 p-3 text-sm font-bold text-green-800">{notice}</p> : null}
+      {error ? <p className="mt-4 rounded-md bg-red-50 p-3 text-sm font-bold text-red-700">{error}</p> : null}
+      <button type="submit" disabled={saving || !Number.isFinite(multiplier) || multiplier < 0.25 || multiplier > 10} className="mt-5 rounded-md bg-pitch px-5 py-3 font-black text-white hover:bg-green-800 disabled:opacity-40">{saving ? "Saving..." : "Save Activity Boost"}</button>
+    </form>
   );
 }
 

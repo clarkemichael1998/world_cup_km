@@ -6,6 +6,7 @@ import { DatabaseSync } from "node:sqlite";
 import players from "@/data/players.json";
 import { getAdminUsernames } from "@/lib/server/admin";
 import type { ActivityType, Player, Position, Rarity, SquadSlot } from "@/lib/types";
+import { DEFAULT_ACTIVITY_MULTIPLIER } from "@/lib/rewardEngine";
 
 const dbDir = path.join(process.cwd(), "data");
 const dbPath = process.env.SQLITE_DB_PATH ?? path.join(dbDir, "km-footy.sqlite");
@@ -171,6 +172,13 @@ export function getDb() {
       id INTEGER PRIMARY KEY CHECK (id = 1),
       message TEXT NOT NULL,
       is_active INTEGER NOT NULL DEFAULT 1,
+      updated_by INTEGER,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (updated_by) REFERENCES users(id)
+    );
+    CREATE TABLE IF NOT EXISTS tournament_settings (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      activity_multiplier REAL NOT NULL DEFAULT 1.25,
       updated_by INTEGER,
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (updated_by) REFERENCES users(id)
@@ -354,6 +362,34 @@ export function updateNewsReel(message: string, isActive: boolean, updatedBy: nu
     )
     .run(cleanMessage, isActive ? 1 : 0, updatedBy);
   return getNewsReel();
+}
+
+export function getActivityMultiplier(): number {
+  const row = getDb().prepare("SELECT activity_multiplier FROM tournament_settings WHERE id = 1").get() as { activity_multiplier: number } | undefined;
+  return row?.activity_multiplier ?? DEFAULT_ACTIVITY_MULTIPLIER;
+}
+
+export function getActivityMultiplierSetting() {
+  const row = getDb()
+    .prepare("SELECT activity_multiplier, updated_at FROM tournament_settings WHERE id = 1")
+    .get() as { activity_multiplier: number; updated_at: string } | undefined;
+  return { multiplier: row?.activity_multiplier ?? DEFAULT_ACTIVITY_MULTIPLIER, updatedAt: row?.updated_at ?? null };
+}
+
+export function updateActivityMultiplier(multiplier: number, updatedBy: number) {
+  const normalized = Math.round(multiplier * 100) / 100;
+  if (!Number.isFinite(normalized) || normalized < 0.25 || normalized > 10) throw new Error("Multiplier must be between 0.25 and 10.");
+  getDb()
+    .prepare(
+      `INSERT INTO tournament_settings (id, activity_multiplier, updated_by, updated_at)
+       VALUES (1, ?, ?, CURRENT_TIMESTAMP)
+       ON CONFLICT(id) DO UPDATE SET
+         activity_multiplier = excluded.activity_multiplier,
+         updated_by = excluded.updated_by,
+         updated_at = CURRENT_TIMESTAMP`
+    )
+    .run(normalized, updatedBy);
+  return getActivityMultiplierSetting();
 }
 
 type LateCallupRow = {

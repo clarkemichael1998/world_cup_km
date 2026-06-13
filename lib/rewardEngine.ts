@@ -41,8 +41,7 @@ export function getRandomPlayerFromPool(playerPool: Player[], rarity = rollRarit
   return fallbackPool[Math.floor(Math.random() * fallbackPool.length)];
 }
 
-const TOURNAMENT_START = new Date("2026-06-11T00:00:00Z");
-const KM_MULTIPLIERS = [1, 1.5, 2, 2.5, 3, 4]; // one per week of tournament
+export const DEFAULT_ACTIVITY_MULTIPLIER = 1.25;
 
 export const activityDefinitions: Record<ActivityType, { label: string; unit: "km" | "minutes"; creditsPerUnit: number; maxPerLog: number }> = {
   walk: { label: "Walk", unit: "km", creditsPerUnit: 1, maxPerLog: 50 },
@@ -59,13 +58,6 @@ export function isActivityType(value: unknown): value is ActivityType {
 
 export function calculateActivityCredits(activityType: ActivityType, amount: number) {
   return Number((amount * activityDefinitions[activityType].creditsPerUnit).toFixed(2));
-}
-
-export function getKmMultiplier(now = new Date()): number {
-  const daysSinceStart = Math.floor((now.getTime() - TOURNAMENT_START.getTime()) / 86400000);
-  if (daysSinceStart < 0) return 1;
-  const week = Math.floor(daysSinceStart / 7);
-  return KM_MULTIPLIERS[Math.min(week, KM_MULTIPLIERS.length - 1)];
 }
 
 export function calculateRewards(activityCredits: number, kmBalance: number, multiplier = 1) {

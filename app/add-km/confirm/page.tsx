@@ -9,7 +9,7 @@ import {
   activityDefinitions,
   calculateActivityCredits,
   calculateRewards,
-  getKmMultiplier,
+  DEFAULT_ACTIVITY_MULTIPLIER,
   isActivityType
 } from "@/lib/rewardEngine";
 import { cacheUserState, loadUserStateAsync, saveRevealPlayers } from "@/lib/storage";
@@ -30,7 +30,7 @@ export default function ConfirmActivityPage() {
   const [liveCredits, setLiveCredits] = useState(0);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const multiplier = getKmMultiplier();
+  const [multiplier, setMultiplier] = useState(DEFAULT_ACTIVITY_MULTIPLIER);
 
   useEffect(() => {
     const saved = window.sessionStorage.getItem(pendingActivityKey);
@@ -55,6 +55,10 @@ export default function ConfirmActivityPage() {
         const payload = await response.json();
         setLiveCredits(payload.live.rewardCredits ?? 0);
       })
+      .catch(() => {});
+    fetch("/api/activity-config")
+      .then((response) => response.json())
+      .then((payload) => setMultiplier(Number(payload.multiplier) || DEFAULT_ACTIVITY_MULTIPLIER))
       .catch(() => {});
   }, [router]);
 
