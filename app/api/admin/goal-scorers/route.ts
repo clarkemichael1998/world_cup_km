@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import {
   createAdminChatMessage,
+  getAdminFixtures,
+  getBoostLog,
   getCurrentUser,
   getPendingGoalScorers,
   resolveGoalScorer,
@@ -10,14 +12,20 @@ import {
   upsertAssistScorer
 } from "@/lib/server/db";
 import { isAdminUsername } from "@/lib/server/admin";
-import { findBestPlayerMatch } from "@/lib/server/goalScorers";
+import { findBestPlayerMatch, getPlayerById } from "@/lib/server/goalScorers";
+import { settleAllLiveAwards } from "@/lib/server/live";
 
 export async function GET() {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Login required" }, { status: 401 });
   if (!isAdminUsername(user.username)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  return NextResponse.json({ goalScorers: getPendingGoalScorers(), assistScorers: getPendingAssistScorers() });
+  return NextResponse.json({
+    goalScorers: getPendingGoalScorers(),
+    assistScorers: getPendingAssistScorers(),
+    fixtures: getAdminFixtures(),
+    boostLog: getBoostLog()
+  });
 }
 
 export async function POST(request: Request) {
@@ -69,7 +77,25 @@ export async function POST(request: Request) {
         match ? ` — matched to ${match.player.name}` : " — pending match"
       }.`
     );
+    if (match) settleAllLiveAwards();
     return NextResponse.json({ ok: true, matchedPlayer: match?.player ?? null });
+  }
+
+  // Pick the exact player from a dropdown — no fuzzy matching needed.
+  if (body.action === "addByPlayer") {
+    if (!body.matchId || typeof body.playerId !== "number") return NextResponse.json({ error: "Missing matchId or playerId" }, { status: 400 });
+    const player = getPlayerById(body.playerId);
+    if (!player) return NextResponse.json({ error: "Unknown player" }, { status: 400 });
+    const count = Math.max(1, Math.min(10, body.count ?? 1));
+    const eventLabel = isAssist ? "assist" : "goal";
+    if (isAssist) {
+      upsertAssistScorer(body.matchId, player.name, player.id, "matched", "manual", count);
+    } else {
+      upsertGoalScorer(body.matchId, player.name, player.id, "matched", "manual", count);
+    }
+    createAdminChatMessage(`Admin recorded ${count} ${eventLabel}${count === 1 ? "" : "s"} for ${player.name} (${body.matchId}).`);
+    const settle = settleAllLiveAwards();
+    return NextResponse.json({ ok: true, player: { id: player.id, name: player.name }, usersSettled: settle.usersSettled });
   }
 
   return NextResponse.json({ error: "Unknown action" }, { status: 400 });

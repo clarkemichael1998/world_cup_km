@@ -1042,31 +1042,45 @@ function ResultsTab({ onForbidden }: { onForbidden: () => void }) {
   );
 }
 
+type AdminFixture = { match_id: string; home_team: string; away_team: string; match_date: string; status: string; winner: string | null };
+type BoostLogRow = { username: string; playerName: string; eventType: "goal" | "assist"; amount: number; match: string; createdAt: string };
+
 function GoalScorersTab({ onForbidden }: { onForbidden: () => void }) {
   const [goals, setGoals] = useState<GoalScorerRow[]>([]);
   const [assists, setAssists] = useState<GoalScorerRow[]>([]);
+  const [fixtures, setFixtures] = useState<AdminFixture[]>([]);
+  const [boostLog, setBoostLog] = useState<BoostLogRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [eventType, setEventType] = useState<"goal" | "assist">("goal");
   const [filter, setFilter] = useState<"all" | "pending" | "matched" | "ignored">("pending");
+  const [playerPool, setPlayerPool] = useState<Player[]>(basePlayerPool);
+
   const [addMatchId, setAddMatchId] = useState("");
-  const [addScorerName, setAddScorerName] = useState("");
+  const [playerQuery, setPlayerQuery] = useState("");
+  const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
   const [addCount, setAddCount] = useState(1);
   const [adding, setAdding] = useState(false);
+  const [addNotice, setAddNotice] = useState("");
 
   async function load() {
     setLoading(true);
     try {
       const res = await fetch("/api/admin/goal-scorers", { credentials: "include" });
       if (res.status === 403) { onForbidden(); return; }
-      const data = (await res.json()) as { goalScorers: GoalScorerRow[]; assistScorers: GoalScorerRow[] };
+      const data = (await res.json()) as { goalScorers: GoalScorerRow[]; assistScorers: GoalScorerRow[]; fixtures?: AdminFixture[]; boostLog?: BoostLogRow[] };
       setGoals(data.goalScorers ?? []);
       setAssists(data.assistScorers ?? []);
+      setFixtures(data.fixtures ?? []);
+      setBoostLog(data.boostLog ?? []);
     } finally {
       setLoading(false);
     }
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    loadPlayerPool().then(setPlayerPool);
+  }, []);
 
   async function resolve(id: number, playerId: number | null) {
     await fetch("/api/admin/goal-scorers", {
@@ -1078,18 +1092,24 @@ function GoalScorersTab({ onForbidden }: { onForbidden: () => void }) {
     await load();
   }
 
-  async function addManual(e: React.FormEvent) {
+  async function applyScorer(e: React.FormEvent) {
     e.preventDefault();
-    if (!addMatchId || !addScorerName) return;
+    if (!addMatchId || !selectedPlayer) return;
     setAdding(true);
+    setAddNotice("");
     try {
-      await fetch("/api/admin/goal-scorers", {
+      const res = await fetch("/api/admin/goal-scorers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ action: "add", eventType, matchId: addMatchId, scorerName: addScorerName, count: addCount }),
+        body: JSON.stringify({ action: "addByPlayer", eventType, matchId: addMatchId, playerId: selectedPlayer.id, count: addCount }),
       });
-      setAddScorerName("");
+      const data = (await res.json().catch(() => ({}))) as { usersSettled?: number; error?: string };
+      if (!res.ok) { setAddNotice(data.error ?? "Could not apply."); return; }
+      setAddNotice(`Recorded ${addCount} ${eventType}${addCount === 1 ? "" : "s"} for ${selectedPlayer.name}. Re-settled ${data.usersSettled ?? 0} users — boosts applied to anyone who had them locked that day.`);
+      setSelectedPlayer(null);
+      setPlayerQuery("");
+      setAddCount(1);
       await load();
     } finally {
       setAdding(false);
@@ -1100,6 +1120,12 @@ function GoalScorersTab({ onForbidden }: { onForbidden: () => void }) {
   const filtered = active.filter((s) => filter === "all" || s.status === filter);
   const pendingGoals = goals.filter((s) => s.status === "pending").length;
   const pendingAssists = assists.filter((s) => s.status === "pending").length;
+
+  const playerMatches = playerQuery.trim().length >= 2
+    ? playerPool
+        .filter((p) => `${p.name} ${p.nation}`.toLowerCase().includes(playerQuery.trim().toLowerCase()))
+        .slice(0, 8)
+    : [];
 
   return (
     <div className="space-y-6">
@@ -1113,26 +1139,87 @@ function GoalScorersTab({ onForbidden }: { onForbidden: () => void }) {
         ))}
       </div>
 
-      {/* Add manual entry */}
+      {/* Record a scorer: pick game → pick player → count */}
       <div className="rounded-lg border border-green-900/10 bg-white p-5 shadow-sm">
-        <p className="mb-3 text-sm font-bold uppercase tracking-wide text-green-900/60">Add {eventType === "goal" ? "Goal Scorer" : "Assist"} Manually</p>
-        <form onSubmit={addManual} className="flex flex-wrap gap-3">
-          <input value={addMatchId} onChange={(e) => setAddMatchId(e.target.value)} placeholder="Match ID (e.g. football-data-123)"
-            className="flex-1 min-w-48 rounded-md border border-green-900/20 px-3 py-2 text-sm font-semibold text-green-950 focus:outline-none focus:ring-2 focus:ring-green-800" />
-          <input value={addScorerName} onChange={(e) => setAddScorerName(e.target.value)} placeholder="Player name (e.g. K. Mbappé)"
-            className="flex-1 min-w-48 rounded-md border border-green-900/20 px-3 py-2 text-sm font-semibold text-green-950 focus:outline-none focus:ring-2 focus:ring-green-800" />
-          <input type="number" min={1} max={10} value={addCount} onChange={(e) => setAddCount(Number(e.target.value))}
-            title={eventType === "goal" ? "Goals scored" : "Assists"}
-            className="w-16 rounded-md border border-green-900/20 px-3 py-2 text-sm font-semibold text-green-950 focus:outline-none focus:ring-2 focus:ring-green-800" />
-          <button type="submit" disabled={adding || !addMatchId || !addScorerName}
-            className="rounded-md bg-green-950 px-4 py-2 text-sm font-black text-white hover:bg-green-800 disabled:opacity-40">
-            {adding ? "Adding…" : "Add & Fuzzy Match"}
-          </button>
+        <p className="mb-3 text-sm font-bold uppercase tracking-wide text-green-900/60">Record {eventType === "goal" ? "Goals" : "Assists"}</p>
+        <form onSubmit={applyScorer} className="space-y-3">
+          <div>
+            <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-green-900/55">1 · Match</label>
+            <select value={addMatchId} onChange={(e) => setAddMatchId(e.target.value)}
+              className="w-full rounded-md border border-green-900/20 bg-white px-3 py-2 text-sm font-semibold text-green-950 focus:outline-none focus:ring-2 focus:ring-green-800">
+              <option value="">Select a match…</option>
+              {fixtures.map((f) => (
+                <option key={f.match_id} value={f.match_id}>
+                  {f.match_date} · {f.home_team} v {f.away_team}{f.status === "FINISHED" ? "" : ` (${f.status})`}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-green-900/55">2 · Player</label>
+            {selectedPlayer ? (
+              <div className="flex items-center justify-between gap-3 rounded-md border border-green-900/15 bg-green-50 px-3 py-2">
+                <span className="text-sm font-black text-green-950">{selectedPlayer.name} <span className="font-semibold text-green-900/60">· {selectedPlayer.rating} {selectedPlayer.rarity} · {selectedPlayer.nation}</span></span>
+                <button type="button" onClick={() => { setSelectedPlayer(null); setPlayerQuery(""); }} className="text-xs font-black uppercase text-green-900/50 hover:text-green-950">Change</button>
+              </div>
+            ) : (
+              <>
+                <input value={playerQuery} onChange={(e) => setPlayerQuery(e.target.value)} placeholder="Search player by name or nation…"
+                  className="w-full rounded-md border border-green-900/20 px-3 py-2 text-sm font-semibold text-green-950 focus:outline-none focus:ring-2 focus:ring-green-800" />
+                {playerMatches.length > 0 ? (
+                  <div className="mt-1 space-y-1 rounded-md border border-green-900/10 bg-white p-1 shadow-sm">
+                    {playerMatches.map((p) => (
+                      <button key={p.id} type="button" onClick={() => setSelectedPlayer(p)}
+                        className="flex w-full items-center justify-between rounded px-2 py-1.5 text-left text-sm font-bold text-green-950 hover:bg-green-950/5">
+                        <span>{p.name}</span>
+                        <span className="text-xs font-semibold text-green-900/55">{p.rating} {p.rarity} · {p.nation}</span>
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+              </>
+            )}
+          </div>
+
+          <div className="flex items-end gap-3">
+            <div>
+              <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-green-900/55">3 · {eventType === "goal" ? "Goals" : "Assists"}</label>
+              <input type="number" min={1} max={10} value={addCount} onChange={(e) => setAddCount(Number(e.target.value))}
+                className="w-20 rounded-md border border-green-900/20 px-3 py-2 text-sm font-semibold text-green-950 focus:outline-none focus:ring-2 focus:ring-green-800" />
+            </div>
+            <button type="submit" disabled={adding || !addMatchId || !selectedPlayer}
+              className="rounded-md bg-pitch px-5 py-2.5 text-sm font-black text-white hover:bg-green-800 disabled:opacity-40">
+              {adding ? "Applying…" : `Apply ${eventType === "goal" ? "Goals" : "Assists"} & Boost`}
+            </button>
+          </div>
+          {addNotice ? <p className="rounded-md bg-green-50 p-3 text-sm font-bold text-green-800">{addNotice}</p> : null}
         </form>
       </div>
 
-      {/* Filter + list */}
+      {/* Boosts applied log */}
+      <div className="rounded-lg border border-green-900/10 bg-white p-5 shadow-sm">
+        <p className="mb-3 text-sm font-bold uppercase tracking-wide text-green-900/60">Boosts Applied</p>
+        {boostLog.length === 0 ? (
+          <p className="text-sm font-semibold text-green-900/60">No boosts applied yet.</p>
+        ) : (
+          <div className="max-h-80 space-y-1 overflow-y-auto">
+            {boostLog.map((b, i) => (
+              <div key={i} className="flex items-center justify-between gap-3 rounded-md bg-green-950/5 px-3 py-1.5 text-sm">
+                <span className="min-w-0 truncate font-bold text-green-950">
+                  {b.eventType === "goal" ? "⚽" : "🅰️"} <span className="font-black">{b.playerName}</span> → {b.username}
+                </span>
+                <span className="shrink-0 text-xs font-semibold text-green-900/55">{b.match}</span>
+                <span className={`shrink-0 w-10 text-right font-black ${b.amount > 0 ? "text-green-700" : "text-red-600"}`}>{b.amount > 0 ? `+${b.amount}` : b.amount}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Filter + list of raw records (auto + manual) */}
       <div>
+        <p className="mb-2 text-sm font-bold uppercase tracking-wide text-green-900/60">All {eventType === "goal" ? "Goal" : "Assist"} Records</p>
         <div className="mb-4 flex items-center gap-3">
           <div className="flex gap-2">
             {(["all", "pending", "matched", "ignored"] as const).map((f) => (

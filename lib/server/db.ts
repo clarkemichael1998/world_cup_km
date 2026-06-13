@@ -937,6 +937,42 @@ export function resolveGoalScorer(id: number, playerId: number | null, status: "
     .run(playerId, status, id);
 }
 
+export function getAdminFixtures() {
+  return getDb()
+    .prepare("SELECT match_id, home_team, away_team, match_date, status, winner FROM fixture_results ORDER BY kickoff_at DESC, match_id DESC")
+    .all() as Array<{ match_id: string; home_team: string; away_team: string; match_date: string; status: string; winner: string | null }>;
+}
+
+export function getBoostLog(limit = 40) {
+  const db = getDb();
+  const rows = db
+    .prepare(
+      `SELECT gb.user_id, users.username, gb.player_id, gb.match_id, gb.boost_amount, gb.created_at
+       FROM goal_boosts gb JOIN users ON users.id = gb.user_id
+       ORDER BY gb.created_at DESC, gb.id DESC LIMIT ?`
+    )
+    .all(limit) as Array<{ user_id: number; username: string; player_id: number; match_id: string; boost_amount: number; created_at: string }>;
+
+  const playerMap = new Map(getAllPlayers().map((p) => [p.id, p]));
+  const fixtureMap = new Map(
+    (db.prepare("SELECT match_id, home_team, away_team FROM fixture_results").all() as Array<{ match_id: string; home_team: string; away_team: string }>).map((f) => [f.match_id, f])
+  );
+
+  return rows.map((row) => {
+    const isAssist = row.match_id.endsWith(":assist");
+    const baseMatch = isAssist ? row.match_id.slice(0, -7) : row.match_id;
+    const fixture = fixtureMap.get(baseMatch);
+    return {
+      username: row.username,
+      playerName: playerMap.get(row.player_id)?.name ?? `Player ${row.player_id}`,
+      eventType: isAssist ? ("assist" as const) : ("goal" as const),
+      amount: row.boost_amount,
+      match: fixture ? `${fixture.home_team} v ${fixture.away_team}` : baseMatch,
+      createdAt: row.created_at
+    };
+  });
+}
+
 export function getMatchedGoalScorers(matchId: string): Array<{ playerId: number; goalCount: number }> {
   const rows = getDb()
     .prepare("SELECT player_id, goal_count FROM goal_scorers WHERE match_id = ? AND status = 'matched' AND player_id IS NOT NULL")
