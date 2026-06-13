@@ -7,7 +7,7 @@ import { BrandLogo } from "@/components/BrandLogo";
 import { MobileNav } from "@/components/MobileNav";
 import { NavActions } from "@/components/NavActions";
 
-const GLOBAL_UPSIDE_DOWN_UNTIL = new Date("2026-06-10T23:21:00+01:00").getTime();
+const GLOBAL_UPSIDE_DOWN_UNTIL = new Date("2026-06-14T00:30:00Z").getTime();
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const [isAdmin, setIsAdmin] = useState(false);

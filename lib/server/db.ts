@@ -2309,6 +2309,7 @@ function migrateFixtureResults(database: DatabaseSync) {
   const fixtureColumnNames = new Set(fixtureColumns.map((column) => column.name));
   if (!fixtureColumnNames.has("verified")) database.exec("ALTER TABLE fixture_results ADD COLUMN verified INTEGER NOT NULL DEFAULT 0");
   if (!fixtureColumnNames.has("updated_at")) database.exec("ALTER TABLE fixture_results ADD COLUMN updated_at TEXT");
+  if (!fixtureColumnNames.has("goals_synced")) database.exec("ALTER TABLE fixture_results ADD COLUMN goals_synced INTEGER NOT NULL DEFAULT 0");
 
   database.prepare("UPDATE fixture_results SET verified = 1 WHERE source = 'seed' OR source = 'manual'").run();
   database.prepare("UPDATE fixture_results SET updated_at = CURRENT_TIMESTAMP WHERE updated_at IS NULL").run();

@@ -101,22 +101,74 @@ async function syncFootballData() {
 
     upsertFixtures(fixtures);
 
-    // Extract goal scorers from finished matches
-    for (const match of payload.matches ?? []) {
-      if (match.status === "FINISHED" && match.goals && match.goals.length > 0) {
-        const matchId = `football-data-${match.id}`;
-        const scorerNames = match.goals.map((g) => g.scorer?.name).filter((n): n is string => Boolean(n));
-        const assistNames = match.goals.map((g) => g.assist?.name).filter((n): n is string => Boolean(n));
-        if (scorerNames.length > 0) processGoalScorers(matchId, scorerNames);
-        if (assistNames.length > 0) processAssistScorers(matchId, assistNames);
-      }
-    }
-    recordProviderRun(provider, "ok", `Synced ${fixtures.length} World Cup fixtures.`);
+    // The competition list endpoint omits the goals[] array — scorer/assist
+    // detail only comes from the per-match endpoint. Pull details for finished
+    // matches we haven't synced yet (capped per run for rate limits).
+    const goalStats = await syncGoalsForFinishedMatches(payload.matches ?? []);
+
+    recordProviderRun(
+      provider,
+      "ok",
+      `Synced ${fixtures.length} fixtures. Goals: checked ${goalStats.matchesChecked} finished match${goalStats.matchesChecked === 1 ? "" : "es"}, found ${goalStats.goalsFound} scorer event${goalStats.goalsFound === 1 ? "" : "s"}.`
+    );
     return getProviderStatus();
   } catch (error) {
     recordProviderRun(provider, "fallback", `Provider fetch failed; kept verified cached/manual results. ${error instanceof Error ? error.message : ""}`.trim());
     return getProviderStatus();
   }
+}
+
+const MAX_DETAIL_FETCHES_PER_RUN = 6;
+
+async function syncGoalsForFinishedMatches(
+  matches: Array<{ id: number; status: string; goals?: Array<{ scorer?: { name?: string }; assist?: { name?: string } }> }>
+): Promise<{ matchesChecked: number; goalsFound: number }> {
+  const db = getDb();
+  const finishedIds = matches.filter((m) => m.status === "FINISHED").map((m) => `football-data-${m.id}`);
+  if (finishedIds.length === 0) return { matchesChecked: 0, goalsFound: 0 };
+
+  // Only fetch detail for finished matches we haven't already synced.
+  const placeholders = finishedIds.map(() => "?").join(",");
+  const unsyncedRows = db
+    .prepare(`SELECT match_id FROM fixture_results WHERE goals_synced = 0 AND match_id IN (${placeholders})`)
+    .all(...finishedIds) as Array<{ match_id: string }>;
+  const unsynced = new Set(unsyncedRows.map((r) => r.match_id));
+
+  let matchesChecked = 0;
+  let goalsFound = 0;
+  const markSynced = db.prepare("UPDATE fixture_results SET goals_synced = 1 WHERE match_id = ?");
+
+  for (const match of matches) {
+    if (matchesChecked >= MAX_DETAIL_FETCHES_PER_RUN) break;
+    const matchId = `football-data-${match.id}`;
+    if (!unsynced.has(matchId)) continue;
+
+    // Goals may already be on the match object (paid tiers); otherwise fetch detail.
+    let goals = match.goals;
+    if (!goals) {
+      try {
+        const response = await fetch(`https://api.football-data.org/v4/matches/${match.id}`, {
+          headers: { "X-Auth-Token": process.env.FOOTBALL_DATA_API_KEY ?? "" },
+          cache: "no-store"
+        });
+        if (!response.ok) continue; // leave unsynced; retry next run
+        const detail = (await response.json()) as { goals?: Array<{ scorer?: { name?: string }; assist?: { name?: string } }> };
+        goals = detail.goals ?? [];
+      } catch {
+        continue;
+      }
+    }
+
+    matchesChecked++;
+    const scorerNames = goals.map((g) => g.scorer?.name).filter((n): n is string => Boolean(n));
+    const assistNames = goals.map((g) => g.assist?.name).filter((n): n is string => Boolean(n));
+    goalsFound += scorerNames.length;
+    if (scorerNames.length > 0) processGoalScorers(matchId, scorerNames);
+    if (assistNames.length > 0) processAssistScorers(matchId, assistNames);
+    markSynced.run(matchId);
+  }
+
+  return { matchesChecked, goalsFound };
 }
 
 function upsertFixtures(fixtures: FixtureResult[]) {
