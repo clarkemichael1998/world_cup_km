@@ -295,10 +295,12 @@ function awardGoalBoosts(userId: number) {
 function announceBoost(matchId: string, player: Player, boost: number, count: number, type: "goal" | "assist") {
   if (!claimBoostAnnouncement(matchId, player.id, type)) return;
   const feat = featPhrase(count, type);
+  const base = player.rating;
+  const after = base + boost;
   if (boost > 0) {
-    createAdminChatMessage(`⚡ UPGRADE · ${player.name} ${feat}! Anyone who locked him gains +${boost} on his card. 📈`);
+    createAdminChatMessage(`⚡ UPGRADE · ${player.name} ${feat}! +${boost} on his card: ${base} → ${after} 📈`);
   } else {
-    createAdminChatMessage(`🤡 CLOWN TAX · ${player.name} ${feat} — every locked card loses ${Math.abs(boost)}. Oof. 📉`);
+    createAdminChatMessage(`🤡 CLOWN TAX · ${player.name} ${feat} — ${boost} on his card: ${base} → ${after} 📉`);
   }
 }
 
