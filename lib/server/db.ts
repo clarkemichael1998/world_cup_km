@@ -7,6 +7,7 @@ import players from "@/data/players.json";
 import { getAdminUsernames } from "@/lib/server/admin";
 import type { ActivityType, Player, Position, Rarity, SquadSlot } from "@/lib/types";
 import { DEFAULT_ACTIVITY_MULTIPLIER } from "@/lib/rewardEngine";
+import { getLondonMatchday } from "./matchday";
 
 const dbDir = path.join(process.cwd(), "data");
 const dbPath = process.env.SQLITE_DB_PATH ?? path.join(dbDir, "km-footy.sqlite");
@@ -1652,15 +1653,15 @@ export function getMatchdayHeadToHead(limit = 10) {
 
   const boostRows = db
     .prepare(
-      `SELECT users.username, fr.match_date AS date, SUM(gb.boost_amount) AS boost
+      `SELECT users.username, fr.kickoff_at, SUM(gb.boost_amount) AS boost
        FROM goal_boosts gb
        JOIN users ON users.id = gb.user_id
        JOIN fixture_results fr ON fr.match_id = CASE
          WHEN gb.match_id LIKE '%:assist' THEN substr(gb.match_id, 1, length(gb.match_id) - 7)
          ELSE gb.match_id END
-       GROUP BY gb.user_id, fr.match_date`
+       GROUP BY gb.user_id, fr.match_id`
     )
-    .all() as Array<{ username: string; date: string; boost: number }>;
+    .all() as Array<{ username: string; kickoff_at: string; boost: number }>;
 
   const byDate = new Map<string, Map<string, { credits: number; boost: number }>>();
   const entryFor = (date: string, username: string) => {
@@ -1676,7 +1677,7 @@ export function getMatchdayHeadToHead(limit = 10) {
     if (entry) entry.credits += row.credits;
   }
   for (const row of boostRows) {
-    const entry = entryFor(row.date, row.username);
+    const entry = entryFor(getLondonMatchday(new Date(row.kickoff_at)), row.username);
     if (entry) entry.boost += row.boost;
   }
 

@@ -2,11 +2,11 @@ import { getAllPlayers, getDb, awardGoalBoost, getMatchedGoalScorers, getMatched
 import { getProviderStatus, type ProviderStatus } from "./fixtures";
 import { GOAL_BOOST_BY_RARITY, ASSIST_BOOST_BY_RARITY, getPlayerById } from "./goalScorers";
 import type { Player, SquadSlot } from "@/lib/types";
+import { londonLockWindow } from "./matchday";
 
 const tournamentStart = "2026-06-11";
 const tournamentEnd = "2026-07-19";
 const creditValue = 1;
-const LOCK_HOUR = 15; // 3pm UK time
 
 export type LiveStatus = {
   tournamentActive: boolean;
@@ -330,44 +330,8 @@ function featPhrase(count: number, type: "goal" | "assist"): string {
   return `set up ${count} goals`;
 }
 
-function londonLockWindow(now: Date) {
-  const londonParts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Europe/London",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false
-  }).formatToParts(now);
-  const parts = Object.fromEntries(londonParts.map((part) => [part.type, part.value]));
-  const today = `${parts.year}-${parts.month}-${parts.day}`;
-  const currentMinutes = Number(parts.hour) * 60 + Number(parts.minute);
-  const lockDate = currentMinutes >= LOCK_HOUR * 60 ? today : addDays(today, -1);
-  const nextDate = addDays(lockDate, 1);
-
-  return {
-    lockDate,
-    lockAt: zonedLondonDate(lockDate, LOCK_HOUR),
-    unlockAt: zonedLondonDate(nextDate, LOCK_HOUR)
-  };
-}
-
 function addDays(date: string, days: number) {
   const value = new Date(`${date}T12:00:00.000Z`);
   value.setUTCDate(value.getUTCDate() + days);
   return value.toISOString().slice(0, 10);
-}
-
-function zonedLondonDate(date: string, hour: number) {
-  const utcGuess = new Date(`${date}T${String(hour).padStart(2, "0")}:00:00.000Z`);
-  const londonHour = Number(
-    new Intl.DateTimeFormat("en-GB", {
-      timeZone: "Europe/London",
-      hour: "2-digit",
-      hour12: false
-    }).format(utcGuess)
-  );
-  const offsetHours = londonHour - hour;
-  return new Date(utcGuess.getTime() - offsetHours * 60 * 60 * 1000);
 }
