@@ -2,7 +2,7 @@ import { getAllPlayers, getDb, awardGoalBoost, lockSquadForDate, claimBoostAnnou
 import { getProviderStatus, type ProviderStatus } from "./fixtures";
 import { GOAL_BOOST_BY_RARITY, ASSIST_BOOST_BY_RARITY, getPlayerById } from "./goalScorers";
 import type { Player, SquadSlot } from "@/lib/types";
-import { londonLockWindow } from "./matchday";
+import { londonLockWindow, londonLockWindowForDate } from "./matchday";
 
 const tournamentStart = "2026-06-11";
 const tournamentEnd = "2026-07-19";
@@ -96,6 +96,7 @@ export function getLiveStatus(userId: number, now = new Date()): LiveStatus {
 }
 
 export function settleAllLiveAwards() {
+  normalizeLockedSquadWindows();
   const rows = getDb().prepare("SELECT id FROM users").all() as Array<{ id: number }>;
   for (const row of rows) {
     settleUserLive(row.id);
@@ -111,6 +112,7 @@ export function settleUserLive(userId: number, now = new Date()) {
   const tournamentActive = window.lockDate >= tournamentStart && window.lockDate <= tournamentEnd;
   if (!tournamentActive) return;
   ensureCurrentWindowLock(userId, now);
+  normalizeLockedSquadWindows(userId);
   settleUserLiveAwards(userId);
 }
 
@@ -124,11 +126,21 @@ function ensureCurrentWindowLock(userId: number, now: Date) {
   const database = getDb();
   const existing = database.prepare("SELECT id FROM locked_squads WHERE user_id = ? AND lock_date = ?").get(userId, window.lockDate);
   if (existing) return;
-  // Auto-lock from the draft squad. locked_at is the auto-lock creation time
-  // (not the 3pm window start), so matches that kicked off before the user
-  // first showed up today cannot be claimed by editing the draft afterwards.
-  const lockedAt = now > window.lockAt ? now : window.lockAt;
-  lockSquadForDate(userId, window.lockDate, lockedAt.toISOString(), window.unlockAt.toISOString());
+  lockSquadForDate(userId, window.lockDate, window.lockAt.toISOString(), window.unlockAt.toISOString());
+}
+
+function normalizeLockedSquadWindows(userId?: number) {
+  const database = getDb();
+  const rows = userId == null
+    ? (database.prepare("SELECT id, lock_date, locked_at, unlock_at FROM locked_squads").all() as Array<{ id: number; lock_date: string; locked_at: string; unlock_at: string }>)
+    : (database.prepare("SELECT id, lock_date, locked_at, unlock_at FROM locked_squads WHERE user_id = ?").all(userId) as Array<{ id: number; lock_date: string; locked_at: string; unlock_at: string }>);
+  const update = database.prepare("UPDATE locked_squads SET locked_at = ?, unlock_at = ? WHERE id = ?");
+  for (const row of rows) {
+    const window = londonLockWindowForDate(row.lock_date);
+    const lockedAt = window.lockAt.toISOString();
+    const unlockAt = window.unlockAt.toISOString();
+    if (row.locked_at !== lockedAt || row.unlock_at !== unlockAt) update.run(lockedAt, unlockAt, row.id);
+  }
 }
 
 function settleUserLiveAwards(userId: number) {

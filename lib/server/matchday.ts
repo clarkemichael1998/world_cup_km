@@ -9,6 +9,10 @@ export function getLondonMatchday(now: Date): string {
 
 export function londonLockWindow(now: Date) {
   const lockDate = getLondonMatchday(now);
+  return londonLockWindowForDate(lockDate);
+}
+
+export function londonLockWindowForDate(lockDate: string) {
   const nextDate = addDays(lockDate, 1);
   return {
     lockDate,
