@@ -49,6 +49,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <NavLink href="/squad" label="Squad" badge={badges.squadNeedsLock ? "Lock" : undefined} />
             <NavLink href="/trade" label="Trade" />
             <NavLink href="/results" label="Results" />
+            <NavLink href="/cups" label="Cups" />
             <NavLink href="/leaderboard" label="Leaderboard" />
             <NavLink href="/squads" label="Rivals" />
             <span className="mx-1 h-5 w-px bg-green-900/10" />
@@ -73,6 +74,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </Link>
           <Link href="/rules" className="whitespace-nowrap rounded-md bg-green-950/5 px-2 py-1 text-xs font-bold uppercase tracking-wide text-green-900 hover:bg-green-950/10">
             Rules
+          </Link>
+          <Link href="/cups" className="whitespace-nowrap rounded-md bg-amber-100 px-2 py-1 text-xs font-bold uppercase tracking-wide text-amber-900 hover:bg-amber-200">
+            Cups
           </Link>
           {isAdmin ? (
             <Link href="/admin" className="whitespace-nowrap rounded-md bg-amber-100 px-2 py-1 text-xs font-bold uppercase tracking-wide text-amber-900 hover:bg-amber-200">

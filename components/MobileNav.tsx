@@ -57,6 +57,8 @@ const coreTabs = [
 ];
 
 const moreLinks = [
+  { href: "/cups", label: "Cups", emoji: "Cup" },
+  { href: "/cup-rules", label: "Cup Rules", emoji: "Rules" },
   { href: "/results", label: "Results", emoji: "📋" },
   { href: "/trade", label: "Trade", emoji: "🔁" },
   { href: "/squads", label: "Rivals", emoji: "🆚" },
