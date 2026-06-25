@@ -9,6 +9,7 @@ import { cupLegendPlayers } from "@/lib/cupLegends";
 import type { ActivityType, Player, Position, Rarity, SquadSlot } from "@/lib/types";
 import { DEFAULT_ACTIVITY_MULTIPLIER, rarityOdds } from "@/lib/rewardEngine";
 import { compareDailyScores, getDailyScore } from "@/lib/server/dailyScoring";
+import { getLondonMatchday } from "./matchday";
 
 const dbDir = path.join(process.cwd(), "data");
 const dbPath = process.env.SQLITE_DB_PATH ?? path.join(dbDir, "km-footy.sqlite");
@@ -1785,19 +1786,87 @@ function updateRankSnapshot(db: DatabaseSync, orderedUserIds: number[]): Map<num
 // Daily head-to-head standings, computed with the exact same formula used to
 // decide cup matches (see lib/server/dailyScoring.ts) — so the leaderboard's
 // daily crown and a cup match winner are never decided by different rules.
+// Days before today keep the daily win they were originally awarded under
+// the old credits+boost ranking — re-deriving them with the new formula
+// could flip who "won" a day that's already been announced. Only today and
+// future days use the new, transparent activity+football scoring shared
+// with cup matches.
 export function getMatchdayHeadToHead(limit = 10) {
   const db = getDb();
   const adminUsernames = getAdminUsernames();
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/London" });
 
-  // A "matchday happened" for a user if they had a locked squad that day —
-  // that's who is eligible to be scored for that day, win or lose.
+  const legacy = getLegacyHeadToHead(db, adminUsernames, today);
+  const live = getLiveHeadToHead(db, adminUsernames, today);
+
+  return [...legacy, ...live].sort((a, b) => b.date.localeCompare(a.date)).slice(0, limit);
+}
+
+// Exact pre-cutover logic: a day only appears if someone actually earned a
+// credit or a boost on it, ranked by credits then boost (no activity points).
+function getLegacyHeadToHead(db: ReturnType<typeof getDb>, adminUsernames: Set<string>, today: string) {
+  const creditRows = db
+    .prepare(
+      `SELECT ls.lock_date AS date, users.username, SUM(re.credits) AS credits
+       FROM reward_events re
+       JOIN locked_squads ls ON ls.id = re.locked_squad_id
+       JOIN users ON users.id = re.user_id
+       WHERE ls.lock_date < ?
+       GROUP BY ls.lock_date, re.user_id`
+    )
+    .all(today) as Array<{ date: string; username: string; credits: number }>;
+
+  const boostRows = db
+    .prepare(
+      `SELECT users.username, fr.kickoff_at, SUM(gb.boost_amount) AS boost
+       FROM goal_boosts gb
+       JOIN users ON users.id = gb.user_id
+       JOIN fixture_results fr ON fr.match_id = CASE
+         WHEN gb.match_id LIKE '%:assist' THEN substr(gb.match_id, 1, length(gb.match_id) - 7)
+         ELSE gb.match_id END
+       GROUP BY gb.user_id, fr.match_id`
+    )
+    .all() as Array<{ username: string; kickoff_at: string; boost: number }>;
+
+  const byDate = new Map<string, Map<string, { credits: number; boost: number }>>();
+  const entryFor = (date: string, username: string) => {
+    if (adminUsernames.has(username.toLowerCase())) return null;
+    const users = byDate.get(date) ?? new Map<string, { credits: number; boost: number }>();
+    byDate.set(date, users);
+    const entry = users.get(username) ?? { credits: 0, boost: 0 };
+    users.set(username, entry);
+    return entry;
+  };
+  for (const row of creditRows) {
+    const entry = entryFor(row.date, row.username);
+    if (entry) entry.credits += row.credits;
+  }
+  for (const row of boostRows) {
+    const date = getLondonMatchday(new Date(row.kickoff_at));
+    if (date >= today) continue;
+    const entry = entryFor(date, row.username);
+    if (entry) entry.boost += row.boost;
+  }
+
+  return Array.from(byDate.entries()).map(([date, users]) => ({
+    date,
+    entries: Array.from(users.entries())
+      .map(([username, totals]) => ({ method: "legacy" as const, username, credits: totals.credits, boost: totals.boost }))
+      .sort((a, b) => b.credits - a.credits || b.boost - a.boost || a.username.localeCompare(b.username))
+  }));
+}
+
+// New transparent scoring, shared with cup matches: a day only appears if
+// someone had a locked squad that day, win or lose.
+function getLiveHeadToHead(db: ReturnType<typeof getDb>, adminUsernames: Set<string>, today: string) {
   const participantRows = db
     .prepare(
       `SELECT DISTINCT ls.lock_date AS date, ls.user_id AS userId, users.username AS username
        FROM locked_squads ls
-       JOIN users ON users.id = ls.user_id`
+       JOIN users ON users.id = ls.user_id
+       WHERE ls.lock_date >= ?`
     )
-    .all() as Array<{ date: string; userId: number; username: string }>;
+    .all(today) as Array<{ date: string; userId: number; username: string }>;
 
   const byDate = new Map<string, Array<{ userId: number; username: string }>>();
   for (const row of participantRows) {
@@ -1807,15 +1876,12 @@ export function getMatchdayHeadToHead(limit = 10) {
     byDate.set(row.date, list);
   }
 
-  return Array.from(byDate.entries())
-    .sort((a, b) => b[0].localeCompare(a[0]))
-    .slice(0, limit)
-    .map(([date, participants]) => ({
-      date,
-      entries: participants
-        .map(({ userId, username }) => ({ username, ...getDailyScore(db, userId, date) }))
-        .sort((a, b) => compareDailyScores(a, b) || a.username.localeCompare(b.username))
-    }));
+  return Array.from(byDate.entries()).map(([date, participants]) => ({
+    date,
+    entries: participants
+      .map(({ userId, username }) => ({ method: "live" as const, username, ...getDailyScore(db, userId, date) }))
+      .sort((a, b) => compareDailyScores(a, b) || a.username.localeCompare(b.username))
+  }));
 }
 
 // Returns true only for the first caller per (match, player, event) so a

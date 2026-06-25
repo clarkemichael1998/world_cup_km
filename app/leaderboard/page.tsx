@@ -15,7 +15,8 @@ type Entry = {
   assist_bonus: number;
   movement: number | null;
 };
-type MatchdayEntry = {
+type LiveMatchdayEntry = {
+  method: "live";
   username: string;
   activityRaw: number;
   activityPoints: number;
@@ -26,6 +27,8 @@ type MatchdayEntry = {
   footballPoints: number;
   total: number;
 };
+type LegacyMatchdayEntry = { method: "legacy"; username: string; credits: number; boost: number };
+type MatchdayEntry = LiveMatchdayEntry | LegacyMatchdayEntry;
 type Matchday = { date: string; entries: MatchdayEntry[] };
 
 type MetricKey = "rating" | "wins" | "activity" | "goals" | "assists";
@@ -152,42 +155,77 @@ function MatchdayView({ matchdays, loading }: { matchdays: Matchday[]; loading: 
   if (matchdays.length === 0) {
     return <p className="rounded-lg border border-green-900/10 bg-white p-6 text-sm font-semibold text-green-900/60 shadow-sm">No matchdays scored yet — they appear here once games finish and rewards land.</p>;
   }
+  const hasLegacy = matchdays.some((day) => day.entries[0]?.method === "legacy");
+  const hasLive = matchdays.some((day) => day.entries[0]?.method === "live");
+
   return (
     <div>
-      <div className="mb-3 rounded-lg border border-green-900/10 bg-green-950/5 p-3 text-xs font-bold text-green-900/70">
-        Same formula as a cup match: <span className="text-green-950">Activity points</span> (1 per activity credit logged, capped at 40) +{" "}
-        <span className="text-green-950">Football points</span> (+2 per locked player whose nation won, plus goal/assist boost amounts, capped at 40) ={" "}
-        <span className="text-green-950">Total</span>. Tied totals are broken by whoever logged more uncapped activity that day.
+      <div className="mb-3 space-y-1.5 rounded-lg border border-green-900/10 bg-green-950/5 p-3 text-xs font-bold text-green-900/70">
+        {hasLive ? (
+          <p>
+            From today onward — same formula as a cup match: <span className="text-green-950">Activity points</span> (1 per activity credit logged, capped at 40) +{" "}
+            <span className="text-green-950">Football points</span> (+2 per locked player whose nation won, plus goal/assist boost amounts, capped at 40) ={" "}
+            <span className="text-green-950">Total</span>. Tied totals are broken by whoever logged more uncapped activity that day.
+          </p>
+        ) : null}
+        {hasLegacy ? (
+          <p>Days before today keep the crown they were originally awarded — ranked by pack credits earned, then boost amount, under the old rules.</p>
+        ) : null}
       </div>
       <div className="grid gap-3 md:grid-cols-2">
-        {matchdays.map((day, idx) => (
-          <div key={day.date} className={`rounded-lg border bg-white p-4 shadow-sm ${idx === 0 ? "border-pitch/30" : "border-green-900/10"}`}>
-            <div className="flex items-center justify-between gap-3 border-b border-green-900/10 pb-2">
-              <p className="flex items-center gap-2 text-sm font-black text-green-950">
-                {day.date}
-                {idx === 0 ? <span className="rounded-full bg-pitch px-2 py-0.5 text-[10px] font-black text-white">Latest</span> : null}
-              </p>
-              {day.entries[0] ? <p className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-black text-amber-900">👑 {day.entries[0].username}</p> : null}
+        {matchdays.map((day, idx) => {
+          const isLegacyDay = day.entries[0]?.method === "legacy";
+          return (
+            <div key={day.date} className={`rounded-lg border bg-white p-4 shadow-sm ${idx === 0 ? "border-pitch/30" : "border-green-900/10"}`}>
+              <div className="flex items-center justify-between gap-3 border-b border-green-900/10 pb-2">
+                <p className="flex items-center gap-2 text-sm font-black text-green-950">
+                  {day.date}
+                  {idx === 0 ? <span className="rounded-full bg-pitch px-2 py-0.5 text-[10px] font-black text-white">Latest</span> : null}
+                  {isLegacyDay ? <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-black uppercase text-slate-500">Legacy scoring</span> : null}
+                </p>
+                {day.entries[0] ? <p className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-black text-amber-900">👑 {day.entries[0].username}</p> : null}
+              </div>
+              {isLegacyDay ? (
+                <div className="mt-2 grid grid-cols-[20px_1fr_auto_auto] items-center gap-x-2 gap-y-1.5 text-sm">
+                  <span />
+                  <span />
+                  <span className="text-right text-[9px] font-black uppercase tracking-wide text-green-900/40">Credits</span>
+                  <span className="text-right text-[9px] font-black uppercase tracking-wide text-green-900/40">Boost</span>
+                  {day.entries.map((entry, i) => <LegacyMatchdayRow key={entry.username} entry={entry as LegacyMatchdayEntry} rank={i + 1} />)}
+                </div>
+              ) : (
+                <div className="mt-2 grid grid-cols-[20px_1fr_auto_auto_auto] items-center gap-x-2 gap-y-1.5 text-sm">
+                  <span />
+                  <span />
+                  <span className="text-right text-[9px] font-black uppercase tracking-wide text-green-900/40">Activity</span>
+                  <span className="text-right text-[9px] font-black uppercase tracking-wide text-green-900/40">Football</span>
+                  <span className="text-right text-[9px] font-black uppercase tracking-wide text-green-900/40">Total</span>
+                  {day.entries.map((entry, i) => <LiveMatchdayRow key={entry.username} entry={entry as LiveMatchdayEntry} rank={i + 1} />)}
+                </div>
+              )}
+              {day.entries.length === 0 ? <p className="mt-2 text-sm font-semibold text-green-900/50">No locked squads this matchday.</p> : null}
             </div>
-            <div className="mt-2 grid grid-cols-[20px_1fr_auto_auto_auto] items-center gap-x-2 gap-y-1.5 text-sm">
-              <span />
-              <span />
-              <span className="text-right text-[9px] font-black uppercase tracking-wide text-green-900/40">Activity</span>
-              <span className="text-right text-[9px] font-black uppercase tracking-wide text-green-900/40">Football</span>
-              <span className="text-right text-[9px] font-black uppercase tracking-wide text-green-900/40">Total</span>
-              {day.entries.map((entry, i) => (
-                <MatchdayRow key={entry.username} entry={entry} rank={i + 1} />
-              ))}
-              {day.entries.length === 0 ? <p className="col-span-5 text-sm font-semibold text-green-900/50">No locked squads this matchday.</p> : null}
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
 }
 
-function MatchdayRow({ entry, rank }: { entry: MatchdayEntry; rank: number }) {
+function LegacyMatchdayRow({ entry, rank }: { entry: LegacyMatchdayEntry; rank: number }) {
+  return (
+    <>
+      <span className="font-black text-green-900/40">{rank === 1 ? "🥇" : rank === 2 ? "🥈" : rank === 3 ? "🥉" : rank}</span>
+      <Link className="truncate font-bold text-green-950 hover:underline" href={`/profile/${encodeURIComponent(entry.username)}`}>{entry.username}</Link>
+      <span className="text-right font-black text-amber-700">{entry.credits > 0 ? `+${entry.credits}cr` : "—"}</span>
+      <span className={`text-right font-bold ${entry.boost > 0 ? "text-green-700" : entry.boost < 0 ? "text-red-600" : "text-green-900/30"}`}>
+        {entry.boost !== 0 ? (entry.boost > 0 ? `+${entry.boost}` : entry.boost) : "—"}
+      </span>
+    </>
+  );
+}
+
+function LiveMatchdayRow({ entry, rank }: { entry: LiveMatchdayEntry; rank: number }) {
   const activityCapped = entry.activityRaw > entry.activityPoints;
   const footballCapped = entry.footballRaw > entry.footballPoints;
   return (
