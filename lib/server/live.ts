@@ -173,7 +173,7 @@ function computeSettleKey(database: ReturnType<typeof getDb>, userId: number): s
   const assistSignature = assists.map((assist) => `${assist.id}.${assist.match_id}.${assist.player_id}.${assist.assist_count}`).join(",");
   // Version prefix: bump to force a one-time re-settle for all users after a
   // settlement-logic change (e.g. boosts now apply to draws/losses).
-  return `v4|f${fixtures.c}@${fixtures.m}|g${goalSignature}|a${assistSignature}|s${squadSignature}`;
+  return `v5|f${fixtures.c}@${fixtures.m}|g${goalSignature}|a${assistSignature}|s${squadSignature}`;
 }
 
 function getBestOwnedSquadLeaderboard(playerMap: Map<number, Player>) {
