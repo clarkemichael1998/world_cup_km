@@ -63,7 +63,8 @@ export async function POST(request: Request) {
         ? `Admin confirmed ${eventLabel}: ${existing?.scorer_name_raw ?? `record #${body.id}`} matched to player #${body.playerId}${existing?.match_id ? ` (${existing.match_id})` : ""}.`
         : `Admin ignored ${eventLabel} record: ${existing?.scorer_name_raw ?? `record #${body.id}`}${existing?.match_id ? ` (${existing.match_id})` : ""}.`
     );
-    return NextResponse.json({ ok: true });
+    const settle = settleAllLiveAwards();
+    return NextResponse.json({ ok: true, usersSettled: settle.usersSettled });
   }
 
   if (body.action === "add") {

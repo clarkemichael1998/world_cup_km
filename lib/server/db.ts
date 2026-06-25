@@ -1036,28 +1036,62 @@ export function getUserBoostDiagnostic(username: string): { found: boolean; line
   const locks = db.prepare("SELECT id, lock_date, locked_at, unlock_at FROM locked_squads WHERE user_id = ? ORDER BY lock_date").all(user.id) as Array<{ id: number; lock_date: string; locked_at: string; unlock_at: string }>;
   const applied = new Set((db.prepare("SELECT player_id, match_id FROM goal_boosts WHERE user_id = ?").all(user.id) as Array<{ player_id: number; match_id: string }>).map((r) => `${r.player_id}|${r.match_id}`));
 
-  const goalRows = db.prepare("SELECT gs.match_id, gs.player_id, gs.goal_count AS cnt, fr.home_team, fr.away_team, fr.kickoff_at, fr.status FROM goal_scorers gs LEFT JOIN fixture_results fr ON fr.match_id = gs.match_id WHERE gs.status = 'matched' AND gs.player_id IS NOT NULL").all() as Array<{ match_id: string; player_id: number; cnt: number; home_team: string | null; away_team: string | null; kickoff_at: string | null; status: string | null }>;
-  const assistRows = db.prepare("SELECT as2.match_id, as2.player_id, as2.assist_count AS cnt, fr.home_team, fr.away_team, fr.kickoff_at, fr.status FROM assist_scorers as2 LEFT JOIN fixture_results fr ON fr.match_id = as2.match_id WHERE as2.status = 'matched' AND as2.player_id IS NOT NULL").all() as Array<{ match_id: string; player_id: number; cnt: number; home_team: string | null; away_team: string | null; kickoff_at: string | null; status: string | null }>;
+  type MatchedRow = { match_id: string; player_id: number; scorer_name_raw: string; cnt: number; scorer_status: string; home_team: string | null; away_team: string | null; kickoff_at: string | null; status: string | null };
+  type PendingRow = { match_id: string; scorer_name_raw: string; cnt: number; scorer_status: string; home_team: string | null; away_team: string | null; kickoff_at: string | null; status: string | null };
+
+  const goalRows = db.prepare("SELECT gs.match_id, gs.player_id, gs.scorer_name_raw, gs.goal_count AS cnt, gs.status AS scorer_status, fr.home_team, fr.away_team, fr.kickoff_at, fr.status FROM goal_scorers gs LEFT JOIN fixture_results fr ON fr.match_id = gs.match_id WHERE gs.status = 'matched' AND gs.player_id IS NOT NULL").all() as MatchedRow[];
+  const assistRows = db.prepare("SELECT as2.match_id, as2.player_id, as2.scorer_name_raw, as2.assist_count AS cnt, as2.status AS scorer_status, fr.home_team, fr.away_team, fr.kickoff_at, fr.status FROM assist_scorers as2 LEFT JOIN fixture_results fr ON fr.match_id = as2.match_id WHERE as2.status = 'matched' AND as2.player_id IS NOT NULL").all() as MatchedRow[];
+  const pendingGoalRows = db.prepare("SELECT gs.match_id, gs.scorer_name_raw, gs.goal_count AS cnt, gs.status AS scorer_status, fr.home_team, fr.away_team, fr.kickoff_at, fr.status FROM goal_scorers gs LEFT JOIN fixture_results fr ON fr.match_id = gs.match_id WHERE gs.status <> 'matched' OR gs.player_id IS NULL").all() as PendingRow[];
+  const pendingAssistRows = db.prepare("SELECT as2.match_id, as2.scorer_name_raw, as2.assist_count AS cnt, as2.status AS scorer_status, fr.home_team, fr.away_team, fr.kickoff_at, fr.status FROM assist_scorers as2 LEFT JOIN fixture_results fr ON fr.match_id = as2.match_id WHERE as2.status <> 'matched' OR as2.player_id IS NULL").all() as PendingRow[];
 
   const lines: string[] = [`User "${user.username}" — ${locks.length} locked squad(s).`];
   if (locks.length === 0) lines.push("This user has no locked squads, so no boosts can apply.");
+  const allLockedIds = new Set<number>();
+
+  const fixtureLabel = (row: { home_team: string | null; away_team: string | null; status: string | null; kickoff_at: string | null; match_id: string }) =>
+    `${row.home_team ?? "?"} v ${row.away_team ?? "?"}, fixture ${row.status ?? "missing"}, kickoff ${row.kickoff_at ?? "missing"}, match ${row.match_id}`;
 
   for (const lock of locks) {
     const lockedIds = new Set((db.prepare("SELECT player_id FROM locked_squad_players WHERE locked_squad_id = ?").all(lock.id) as Array<{ player_id: number }>).map((r) => r.player_id));
-    lines.push(`\n[${lock.lock_date}] window ${lock.locked_at} → ${lock.unlock_at} · ${lockedIds.size} players locked`);
-    const report = (label: string, rows: typeof goalRows, assistKey: boolean) => {
+    lockedIds.forEach((id) => allLockedIds.add(id));
+    lines.push(`\n[${lock.lock_date}] window ${lock.locked_at} -> ${lock.unlock_at} - ${lockedIds.size} players locked`);
+    const report = (label: string, rows: MatchedRow[], assistKey: boolean) => {
       const inWindow = rows.filter((r) => r.kickoff_at && r.kickoff_at >= lock.locked_at && r.kickoff_at < lock.unlock_at);
       for (const r of inWindow) {
         const name = playerMap.get(r.player_id)?.name ?? `#${r.player_id}`;
         const isLocked = lockedIds.has(r.player_id);
         const key = `${r.player_id}|${assistKey ? `${r.match_id}:assist` : r.match_id}`;
-        lines.push(`  ${label} ${name} ×${r.cnt} (${r.home_team ?? "?"} v ${r.away_team ?? "?"}, ${r.status ?? "?"}) — in locked XI: ${isLocked ? "YES" : "no"} · boost applied: ${applied.has(key) ? "yes" : "NO"}`);
+        lines.push(`  ${label} ${name} (#${r.player_id}) x${r.cnt} [${fixtureLabel(r)}] - in locked XI: ${isLocked ? "YES" : "no"} - boost applied: ${applied.has(key) ? "yes" : "NO"}`);
       }
       if (inWindow.length === 0) lines.push(`  (no matched ${assistKey ? "assists" : "goals"} fell in this window)`);
     };
-    report("⚽", goalRows, false);
-    report("🅰️", assistRows, true);
+    report("goal", goalRows, false);
+    report("assist", assistRows, true);
+    const pendingGoalsInWindow = pendingGoalRows.filter((r) => r.kickoff_at && r.kickoff_at >= lock.locked_at && r.kickoff_at < lock.unlock_at);
+    const pendingAssistsInWindow = pendingAssistRows.filter((r) => r.kickoff_at && r.kickoff_at >= lock.locked_at && r.kickoff_at < lock.unlock_at);
+    for (const r of pendingGoalsInWindow) {
+      lines.push(`  pending goal "${r.scorer_name_raw}" x${r.cnt} [${fixtureLabel(r)}] - scorer status ${r.scorer_status}; not matched to a card, so no boost can apply`);
+    }
+    for (const r of pendingAssistsInWindow) {
+      lines.push(`  pending assist "${r.scorer_name_raw}" x${r.cnt} [${fixtureLabel(r)}] - scorer status ${r.scorer_status}; not matched to a card, so no boost can apply`);
+    }
   }
+
+  const outsideEveryWindow = (row: MatchedRow) => !row.kickoff_at || !locks.some((lock) => row.kickoff_at && row.kickoff_at >= lock.locked_at && row.kickoff_at < lock.unlock_at);
+  const relevantOutsideGoals = goalRows.filter((row) => allLockedIds.has(row.player_id) && outsideEveryWindow(row));
+  const relevantOutsideAssists = assistRows.filter((row) => allLockedIds.has(row.player_id) && outsideEveryWindow(row));
+  if (relevantOutsideGoals.length > 0 || relevantOutsideAssists.length > 0) {
+    lines.push("\nMatched scorer rows for players this user has locked, but outside every lock window:");
+    for (const r of relevantOutsideGoals) {
+      const name = playerMap.get(r.player_id)?.name ?? `#${r.player_id}`;
+      lines.push(`  goal ${name} (#${r.player_id}) x${r.cnt} [${fixtureLabel(r)}]`);
+    }
+    for (const r of relevantOutsideAssists) {
+      const name = playerMap.get(r.player_id)?.name ?? `#${r.player_id}`;
+      lines.push(`  assist ${name} (#${r.player_id}) x${r.cnt} [${fixtureLabel(r)}]`);
+    }
+  }
+
   return { found: true, lines };
 }
 
