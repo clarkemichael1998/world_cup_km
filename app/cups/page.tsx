@@ -5,10 +5,22 @@ import { useEffect, useMemo, useState } from "react";
 import { PageTitle } from "@/components/PageTitle";
 import { PlayerCard } from "@/components/PlayerCard";
 import { CupMotif } from "@/components/CupMotif";
-import { LegendSilhouette } from "@/components/LegendSilhouette";
+import { LegendPortrait } from "@/components/LegendPortrait";
 import { getCupLegendPlayer, getCupThemeById } from "@/lib/cupLegends";
 
-type CupMatch = { round: string; day: number; date: string; label: string; home: string; away: string };
+type CupMatch = {
+  id: string;
+  round: string;
+  day: number;
+  date: string;
+  label: string;
+  home: string;
+  away: string;
+  homeScore: number | null;
+  awayScore: number | null;
+  winner: string | null;
+  status: "scheduled" | "decided" | "bye";
+};
 type CupDefinition = {
   id: number;
   name: string;
@@ -96,7 +108,13 @@ function CupMenu({ cups, onSelect }: { cups: CupDefinition[]; onSelect: (id: num
           >
             <div className={`relative min-h-56 overflow-hidden bg-gradient-to-br ${theme.colours} p-4 text-white`}>
               <CupMotif cupId={cup.id} className="pointer-events-none absolute inset-0 h-full w-full" />
-              <LegendSilhouette shirtNumber={theme.shirtNumber} className="pointer-events-none absolute -bottom-2 -right-4 h-32 w-24 opacity-50" />
+              <LegendPortrait
+                imagePath={theme.imagePath}
+                shirtNumber={theme.shirtNumber}
+                alt={theme.legend}
+                className="pointer-events-none absolute -bottom-2 -right-4 h-32 w-24"
+                silhouetteOpacity="opacity-50"
+              />
               <div className="relative">
                 <p className="text-xs font-black uppercase tracking-[0.25em] text-white/70">Cup {cup.id}</p>
                 <p className="mt-2 text-2xl font-black leading-none drop-shadow">{cup.name}</p>
@@ -192,7 +210,13 @@ function HeroCup({ cup, theme, legendPlayer }: { cup: CupDefinition; theme: NonN
   return (
     <section className={`relative overflow-hidden rounded-3xl bg-gradient-to-br ${theme.colours} p-6 text-white shadow-xl`}>
       <CupMotif cupId={cup.id} className="pointer-events-none absolute -right-10 -top-16 h-72 w-72 opacity-90" />
-      <LegendSilhouette shirtNumber={theme.shirtNumber} className="pointer-events-none absolute -bottom-6 left-2 hidden h-64 w-48 opacity-40 sm:block" />
+      <LegendPortrait
+        imagePath={theme.imagePath}
+        shirtNumber={theme.shirtNumber}
+        alt={theme.legend}
+        className="pointer-events-none absolute -bottom-6 left-2 hidden h-64 w-48 sm:block"
+        silhouetteOpacity="opacity-40"
+      />
       <div className="relative grid gap-5 md:grid-cols-[1fr_0.8fr] md:items-end">
         <div className="md:pl-44">
           <p className="text-xs font-black uppercase tracking-[0.35em] text-white/70">{cup.country} Legend Theme</p>
@@ -224,11 +248,18 @@ function Bracket({ cup, theme }: { cup: CupDefinition; theme: NonNullable<Return
             <p className="mb-3 text-xs font-bold text-green-900/55">{formatDate(round.date)}</p>
             <div className="space-y-2">
               {matches.map((match) => (
-                <div key={`${match.round}-${match.label}`} className="rounded-md bg-white p-3 shadow-sm ring-1 ring-green-900/5">
-                  <p className="mb-2 text-[10px] font-black uppercase tracking-wide text-green-900/45">{match.label}</p>
-                  <Team name={match.home} theme={theme} />
+                <div key={match.id} className={`rounded-md bg-white p-3 shadow-sm ring-1 ${match.status === "decided" ? "ring-green-900/15" : "ring-green-900/5"}`}>
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <p className="text-[10px] font-black uppercase tracking-wide text-green-900/45">{match.label}</p>
+                    {match.status === "decided" ? (
+                      <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-black uppercase ${theme.accent}`}>Final</span>
+                    ) : match.status === "bye" ? (
+                      <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[9px] font-black uppercase text-slate-500">Bye</span>
+                    ) : null}
+                  </div>
+                  <Team name={match.home} score={match.homeScore} isWinner={match.winner === match.home} theme={theme} />
                   <p className="my-1 text-center text-[10px] font-black text-green-900/35">vs</p>
-                  <Team name={match.away} theme={theme} />
+                  <Team name={match.away} score={match.awayScore} isWinner={match.winner === match.away} theme={theme} />
                 </div>
               ))}
             </div>
@@ -239,9 +270,18 @@ function Bracket({ cup, theme }: { cup: CupDefinition; theme: NonNullable<Return
   );
 }
 
-function Team({ name, theme }: { name: string; theme: NonNullable<ReturnType<typeof getCupThemeById>> }) {
-  const placeholder = name.startsWith("Winner") || name.startsWith("Bye");
-  return <p className={`rounded px-2 py-1 text-sm font-black ${placeholder ? "bg-slate-100 text-slate-500" : `${theme.soft} ${theme.text}`}`}>{name}</p>;
+function Team({ name, score, isWinner, theme }: { name: string; score: number | null; isWinner: boolean; theme: NonNullable<ReturnType<typeof getCupThemeById>> }) {
+  const placeholder = name === "TBD" || name === "Bye";
+  return (
+    <p
+      className={`flex items-center justify-between gap-2 rounded px-2 py-1 text-sm font-black ${
+        placeholder ? "bg-slate-100 text-slate-400" : isWinner ? `${theme.soft} ${theme.text}` : "bg-slate-50 text-green-900/55"
+      }`}
+    >
+      <span className="truncate">{name}</span>
+      {score !== null ? <span className="shrink-0 tabular-nums">{score.toFixed(1)}</span> : null}
+    </p>
+  );
 }
 
 function InfoCard({ title, theme, children }: { title: string; theme: NonNullable<ReturnType<typeof getCupThemeById>>; children: React.ReactNode }) {

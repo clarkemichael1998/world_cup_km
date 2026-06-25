@@ -20,6 +20,12 @@ export type CupTheme = {
   text: string;
   /** Iconic shirt number, printed on the legend silhouette/card. */
   shirtNumber: number;
+  /**
+   * Optional real photo, e.g. "/legends/larsson.jpg" under /public. Drop a
+   * file at that path and LegendPortrait will use it automatically; until
+   * then it falls back to the faceless LegendSilhouette pictogram.
+   */
+  imagePath: string;
 };
 
 export const cupThemes: CupTheme[] = [
@@ -33,7 +39,8 @@ export const cupThemes: CupTheme[] = [
     border: "border-amber-300",
     soft: "bg-amber-50",
     text: "text-amber-700",
-    shirtNumber: 17
+    shirtNumber: 17,
+    imagePath: "/legends/larsson.jpg"
   },
   {
     cupId: 2,
@@ -45,7 +52,8 @@ export const cupThemes: CupTheme[] = [
     border: "border-sky-300",
     soft: "bg-sky-50",
     text: "text-sky-700",
-    shirtNumber: 7
+    shirtNumber: 7,
+    imagePath: "/legends/dalglish.jpg"
   },
   {
     cupId: 3,
@@ -57,7 +65,8 @@ export const cupThemes: CupTheme[] = [
     border: "border-sky-300",
     soft: "bg-sky-50",
     text: "text-sky-700",
-    shirtNumber: 10
+    shirtNumber: 10,
+    imagePath: "/legends/maradona.jpg"
   },
   {
     cupId: 4,
@@ -69,7 +78,8 @@ export const cupThemes: CupTheme[] = [
     border: "border-green-300",
     soft: "bg-green-50",
     text: "text-green-700",
-    shirtNumber: 10
+    shirtNumber: 10,
+    imagePath: "/legends/pele.jpg"
   }
 ];
 
@@ -79,6 +89,16 @@ const legendDob: Record<number, string> = {
   2: "1951-03-04",
   3: "1960-10-30",
   4: "1940-10-23"
+};
+// Commonly-cited senior international career figures — exact totals vary
+// slightly by source (caps especially), spot-check before relying on them.
+const legendCaps: Record<number, number> = { 1: 106, 2: 102, 3: 91, 4: 92 };
+const legendGoals: Record<number, number> = { 1: 37, 2: 30, 3: 34, 4: 77 };
+const legendWiki: Record<number, string> = {
+  1: "https://en.wikipedia.org/wiki/Henrik_Larsson",
+  2: "https://en.wikipedia.org/wiki/Kenny_Dalglish",
+  3: "https://en.wikipedia.org/wiki/Diego_Maradona",
+  4: "https://en.wikipedia.org/wiki/Pel%C3%A9"
 };
 
 // Cup Legend player ids live well above the real player pool so they can
@@ -95,10 +115,10 @@ export const cupLegendPlayers: Player[] = cupThemes.map((theme) => ({
   pos: "FW",
   rating: legendRatings[theme.cupId],
   rarity: "icon" as Rarity,
-  wiki: null,
+  wiki: legendWiki[theme.cupId],
   dob: legendDob[theme.cupId],
-  caps: null,
-  goals: null,
+  caps: legendCaps[theme.cupId],
+  goals: legendGoals[theme.cupId],
   clubWiki: null,
   clubCountry: theme.country,
   teamId: `cup-legend-${theme.cupId}`,

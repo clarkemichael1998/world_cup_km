@@ -2,7 +2,7 @@ import type { Player } from "@/lib/types";
 import { flagUrl } from "@/lib/flags";
 import { getCupThemeById } from "@/lib/cupLegends";
 import { CupMotif } from "@/components/CupMotif";
-import { LegendSilhouette } from "@/components/LegendSilhouette";
+import { LegendPortrait } from "@/components/LegendPortrait";
 
 const rarityStyles: Record<Player["rarity"], string> = {
   clowns: "border-red-400 bg-red-50 text-red-950",
@@ -80,9 +80,12 @@ export function PlayerCard({
       {cupTheme ? (
         <>
           <CupMotif cupId={cupTheme.cupId} className="pointer-events-none absolute inset-0 h-full w-full" />
-          <LegendSilhouette
+          <LegendPortrait
+            imagePath={cupTheme.imagePath}
             shirtNumber={cupTheme.shirtNumber}
-            className="pointer-events-none absolute -bottom-3 -right-3 h-28 w-20 opacity-25"
+            alt={cupTheme.legend}
+            className="pointer-events-none absolute -bottom-3 -right-3 h-28 w-20"
+            silhouetteOpacity="opacity-25"
           />
         </>
       ) : null}

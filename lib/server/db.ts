@@ -8,7 +8,7 @@ import { getAdminUsernames } from "@/lib/server/admin";
 import { cupLegendPlayers } from "@/lib/cupLegends";
 import type { ActivityType, Player, Position, Rarity, SquadSlot } from "@/lib/types";
 import { DEFAULT_ACTIVITY_MULTIPLIER, rarityOdds } from "@/lib/rewardEngine";
-import { getLondonMatchday } from "./matchday";
+import { compareDailyScores, getDailyScore } from "@/lib/server/dailyScoring";
 
 const dbDir = path.join(process.cwd(), "data");
 const dbPath = process.env.SQLITE_DB_PATH ?? path.join(dbDir, "km-footy.sqlite");
@@ -1782,58 +1782,39 @@ function updateRankSnapshot(db: DatabaseSync, orderedUserIds: number[]): Map<num
   return movement;
 }
 
+// Daily head-to-head standings, computed with the exact same formula used to
+// decide cup matches (see lib/server/dailyScoring.ts) — so the leaderboard's
+// daily crown and a cup match winner are never decided by different rules.
 export function getMatchdayHeadToHead(limit = 10) {
   const db = getDb();
   const adminUsernames = getAdminUsernames();
 
-  const creditRows = db
+  // A "matchday happened" for a user if they had a locked squad that day —
+  // that's who is eligible to be scored for that day, win or lose.
+  const participantRows = db
     .prepare(
-      `SELECT ls.lock_date AS date, users.username, SUM(re.credits) AS credits
-       FROM reward_events re
-       JOIN locked_squads ls ON ls.id = re.locked_squad_id
-       JOIN users ON users.id = re.user_id
-       GROUP BY ls.lock_date, re.user_id`
+      `SELECT DISTINCT ls.lock_date AS date, ls.user_id AS userId, users.username AS username
+       FROM locked_squads ls
+       JOIN users ON users.id = ls.user_id`
     )
-    .all() as Array<{ date: string; username: string; credits: number }>;
+    .all() as Array<{ date: string; userId: number; username: string }>;
 
-  const boostRows = db
-    .prepare(
-      `SELECT users.username, fr.kickoff_at, SUM(gb.boost_amount) AS boost
-       FROM goal_boosts gb
-       JOIN users ON users.id = gb.user_id
-       JOIN fixture_results fr ON fr.match_id = CASE
-         WHEN gb.match_id LIKE '%:assist' THEN substr(gb.match_id, 1, length(gb.match_id) - 7)
-         ELSE gb.match_id END
-       GROUP BY gb.user_id, fr.match_id`
-    )
-    .all() as Array<{ username: string; kickoff_at: string; boost: number }>;
-
-  const byDate = new Map<string, Map<string, { credits: number; boost: number }>>();
-  const entryFor = (date: string, username: string) => {
-    if (adminUsernames.has(username.toLowerCase())) return null;
-    const users = byDate.get(date) ?? new Map<string, { credits: number; boost: number }>();
-    byDate.set(date, users);
-    const entry = users.get(username) ?? { credits: 0, boost: 0 };
-    users.set(username, entry);
-    return entry;
-  };
-  for (const row of creditRows) {
-    const entry = entryFor(row.date, row.username);
-    if (entry) entry.credits += row.credits;
-  }
-  for (const row of boostRows) {
-    const entry = entryFor(getLondonMatchday(new Date(row.kickoff_at)), row.username);
-    if (entry) entry.boost += row.boost;
+  const byDate = new Map<string, Array<{ userId: number; username: string }>>();
+  for (const row of participantRows) {
+    if (adminUsernames.has(row.username.toLowerCase())) continue;
+    const list = byDate.get(row.date) ?? [];
+    list.push({ userId: row.userId, username: row.username });
+    byDate.set(row.date, list);
   }
 
   return Array.from(byDate.entries())
     .sort((a, b) => b[0].localeCompare(a[0]))
     .slice(0, limit)
-    .map(([date, users]) => ({
+    .map(([date, participants]) => ({
       date,
-      entries: Array.from(users.entries())
-        .map(([username, totals]) => ({ username, credits: totals.credits, boost: totals.boost }))
-        .sort((a, b) => b.credits - a.credits || b.boost - a.boost || a.username.localeCompare(b.username))
+      entries: participants
+        .map(({ userId, username }) => ({ username, ...getDailyScore(db, userId, date) }))
+        .sort((a, b) => compareDailyScores(a, b) || a.username.localeCompare(b.username))
     }));
 }
 

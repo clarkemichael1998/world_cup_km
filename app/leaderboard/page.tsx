@@ -15,7 +15,18 @@ type Entry = {
   assist_bonus: number;
   movement: number | null;
 };
-type Matchday = { date: string; entries: Array<{ username: string; credits: number; boost: number }> };
+type MatchdayEntry = {
+  username: string;
+  activityRaw: number;
+  activityPoints: number;
+  winCount: number;
+  winPoints: number;
+  boostRaw: number;
+  footballRaw: number;
+  footballPoints: number;
+  total: number;
+};
+type Matchday = { date: string; entries: MatchdayEntry[] };
 
 type MetricKey = "rating" | "wins" | "activity" | "goals" | "assists";
 const METRICS: Record<MetricKey, { label: string; get: (e: Entry) => number; fmt: (v: number) => string }> = {
@@ -143,7 +154,11 @@ function MatchdayView({ matchdays, loading }: { matchdays: Matchday[]; loading: 
   }
   return (
     <div>
-      <p className="mb-3 text-sm font-semibold text-green-900/60">Each day&apos;s winner takes the crown 👑 and sets the next day&apos;s news. Pack credits from wins, plus goal &amp; assist boosts.</p>
+      <div className="mb-3 rounded-lg border border-green-900/10 bg-green-950/5 p-3 text-xs font-bold text-green-900/70">
+        Same formula as a cup match: <span className="text-green-950">Activity points</span> (1 per activity credit logged, capped at 40) +{" "}
+        <span className="text-green-950">Football points</span> (+2 per locked player whose nation won, plus goal/assist boost amounts, capped at 40) ={" "}
+        <span className="text-green-950">Total</span>. Tied totals are broken by whoever logged more uncapped activity that day.
+      </div>
       <div className="grid gap-3 md:grid-cols-2">
         {matchdays.map((day, idx) => (
           <div key={day.date} className={`rounded-lg border bg-white p-4 shadow-sm ${idx === 0 ? "border-pitch/30" : "border-green-900/10"}`}>
@@ -154,23 +169,44 @@ function MatchdayView({ matchdays, loading }: { matchdays: Matchday[]; loading: 
               </p>
               {day.entries[0] ? <p className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-black text-amber-900">👑 {day.entries[0].username}</p> : null}
             </div>
-            <div className="mt-2 space-y-1.5">
-              {day.entries.slice(0, 6).map((entry, i) => (
-                <div key={entry.username} className="grid grid-cols-[24px_1fr_auto_auto] items-center gap-2 text-sm">
-                  <span className="font-black text-green-900/40">{i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : i + 1}</span>
-                  <Link className="truncate font-bold text-green-950 hover:underline" href={`/profile/${encodeURIComponent(entry.username)}`}>{entry.username}</Link>
-                  <span className="font-black text-amber-700">{entry.credits > 0 ? `+${entry.credits}cr` : "—"}</span>
-                  <span className={`w-12 text-right font-black ${entry.boost > 0 ? "text-green-700" : entry.boost < 0 ? "text-red-600" : "text-green-900/30"}`}>
-                    {entry.boost !== 0 ? (entry.boost > 0 ? `+${entry.boost}` : entry.boost) : "—"}
-                  </span>
-                </div>
+            <div className="mt-2 grid grid-cols-[20px_1fr_auto_auto_auto] items-center gap-x-2 gap-y-1.5 text-sm">
+              <span />
+              <span />
+              <span className="text-right text-[9px] font-black uppercase tracking-wide text-green-900/40">Activity</span>
+              <span className="text-right text-[9px] font-black uppercase tracking-wide text-green-900/40">Football</span>
+              <span className="text-right text-[9px] font-black uppercase tracking-wide text-green-900/40">Total</span>
+              {day.entries.map((entry, i) => (
+                <MatchdayRow key={entry.username} entry={entry} rank={i + 1} />
               ))}
-              {day.entries.length === 0 ? <p className="text-sm font-semibold text-green-900/50">No rewards earned this matchday.</p> : null}
+              {day.entries.length === 0 ? <p className="col-span-5 text-sm font-semibold text-green-900/50">No locked squads this matchday.</p> : null}
             </div>
           </div>
         ))}
       </div>
     </div>
+  );
+}
+
+function MatchdayRow({ entry, rank }: { entry: MatchdayEntry; rank: number }) {
+  const activityCapped = entry.activityRaw > entry.activityPoints;
+  const footballCapped = entry.footballRaw > entry.footballPoints;
+  return (
+    <>
+      <span className="font-black text-green-900/40">{rank === 1 ? "🥇" : rank === 2 ? "🥈" : rank === 3 ? "🥉" : rank}</span>
+      <Link className="truncate font-bold text-green-950 hover:underline" href={`/profile/${encodeURIComponent(entry.username)}`}>{entry.username}</Link>
+      <span className="text-right font-bold text-green-900/70" title={activityCapped ? `${entry.activityRaw.toFixed(1)} logged, capped at 40` : undefined}>
+        {entry.activityPoints.toFixed(1)}
+        {activityCapped ? <span className="text-green-900/35">*</span> : null}
+      </span>
+      <span
+        className={`text-right font-bold ${entry.footballPoints > 0 ? "text-amber-700" : entry.footballPoints < 0 ? "text-red-600" : "text-green-900/35"}`}
+        title={footballCapped ? `${entry.footballRaw} earned, capped at 40` : `${entry.winCount} nation win${entry.winCount === 1 ? "" : "s"}, ${entry.boostRaw >= 0 ? "+" : ""}${entry.boostRaw} boosts`}
+      >
+        {entry.footballPoints.toFixed(0)}
+        {footballCapped ? <span className="text-green-900/35">*</span> : null}
+      </span>
+      <span className="text-right font-black text-green-950">{entry.total.toFixed(1)}</span>
+    </>
   );
 }
 

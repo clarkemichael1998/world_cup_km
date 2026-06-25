@@ -1,5 +1,7 @@
+import type { DatabaseSync } from "node:sqlite";
 import { getAdminUsernames } from "@/lib/server/admin";
 import { getDb } from "@/lib/server/db";
+import { compareDailyScores, getDailyScore, isMatchdaySettled } from "@/lib/server/dailyScoring";
 import { cupThemes } from "@/lib/cupLegends";
 
 const cupSchedules = [
@@ -15,12 +17,19 @@ const roundLabels = ["Play-off", "Round of 16", "Quarter-finals", "Semi-finals",
 // shared lib/cupLegends.ts module, importable from both server and client.
 
 export type CupMatch = {
+  id: string;
   round: string;
   day: number;
   date: string;
   label: string;
   home: string;
   away: string;
+  /** Each side's total daily score once the match is decided, else null. */
+  homeScore: number | null;
+  awayScore: number | null;
+  /** Username of the decided winner, else null while still scheduled/TBD. */
+  winner: string | null;
+  status: "scheduled" | "decided" | "bye";
 };
 
 export type CupDefinition = {
@@ -43,10 +52,11 @@ function getLondonToday() {
 }
 
 export function getCupHubData() {
-  const participants = getCupParticipants();
+  const db = getDb();
+  const participants = getCupParticipants(db);
   const today = getLondonToday();
   const cups = cupSchedules.map((dates, index) => {
-    const cup = buildCup(index + 1, dates, participants);
+    const cup = buildCup(db, index + 1, dates, participants);
     // Each cup (after the first) stays locked until the previous cup begins,
     // so the next theme/draw is a surprise rather than visible from day one.
     const unlocksOn = index === 0 ? null : cupSchedules[index - 1][0];
@@ -54,7 +64,7 @@ export function getCupHubData() {
     return { ...cup, locked, unlocksOn };
   });
   return {
-    participants,
+    participants: participants.map((p) => p.username),
     cups,
     restDates,
     scoring: [
@@ -74,41 +84,66 @@ export function getCupHubData() {
   };
 }
 
-function getCupParticipants() {
+type Participant = { id: number; username: string };
+
+function getCupParticipants(db: DatabaseSync): Participant[] {
   const adminUsernames = getAdminUsernames();
-  const rows = getDb()
-    .prepare("SELECT username FROM users ORDER BY username")
-    .all() as Array<{ username: string }>;
-  return rows
-    .map((row) => row.username)
-    .filter((username) => !adminUsernames.has(username.toLowerCase()));
+  const rows = db.prepare("SELECT id, username FROM users ORDER BY username").all() as Participant[];
+  return rows.filter((row) => !adminUsernames.has(row.username.toLowerCase()));
 }
 
-function buildCup(id: number, dates: string[], participants: string[]): Omit<CupDefinition, "locked" | "unlocksOn"> {
+// A bracket slot is either a known participant, a bye (no opponent — the
+// other side auto-advances), or "whoever wins another specific match".
+type SlotSource = { type: "participant"; userId: number; username: string } | { type: "bye" } | { type: "winnerOf"; matchId: string };
+
+type BuildMatch = {
+  id: string;
+  round: string;
+  day: number;
+  date: string;
+  label: string;
+  homeSource: SlotSource;
+  awaySource: SlotSource;
+};
+
+function slotFor(participant: Participant | undefined): SlotSource {
+  return participant ? { type: "participant", userId: participant.id, username: participant.username } : { type: "bye" };
+}
+
+function buildCup(db: DatabaseSync, id: number, dates: string[], participants: Participant[]): Omit<CupDefinition, "locked" | "unlocksOn"> {
   const shuffled = deterministicShuffle(participants, id * 2026);
   const rounds = roundLabels.map((label, index) => ({ day: index + 1, date: dates[index], label }));
-  const matches: CupMatch[] = [];
+  const matches: BuildMatch[] = [];
 
-  const playInHome = shuffled[0] ?? "Player 16";
-  const playInAway = shuffled[1] ?? "Player 17";
-  matches.push({ round: "play-off", day: 1, date: rounds[0].date, label: "Play-off", home: playInHome, away: playInAway });
+  matches.push({
+    id: "playoff",
+    round: "play-off",
+    day: 1,
+    date: rounds[0].date,
+    label: "Play-off",
+    homeSource: slotFor(shuffled[0]),
+    awaySource: slotFor(shuffled[1])
+  });
 
-  const r16Entrants = [`Winner of ${playInHome} v ${playInAway}`, ...shuffled.slice(2, 17)];
-  while (r16Entrants.length < 16) r16Entrants.push(`Bye slot ${r16Entrants.length + 1}`);
+  // R16 slot 0 is "winner of the play-off"; slots 1-15 are the next 15
+  // shuffled participants (a bye if the group is smaller than 17).
+  const r16Rest = shuffled.slice(2, 17);
+  const r16Sources: SlotSource[] = [{ type: "winnerOf", matchId: "playoff" }, ...Array.from({ length: 15 }, (_, i) => slotFor(r16Rest[i]))];
   for (let i = 0; i < 8; i++) {
     matches.push({
+      id: `r16-${i + 1}`,
       round: "round-of-16",
       day: 2,
       date: rounds[1].date,
       label: `R16 Match ${i + 1}`,
-      home: r16Entrants[i * 2],
-      away: r16Entrants[i * 2 + 1]
+      homeSource: r16Sources[i * 2],
+      awaySource: r16Sources[i * 2 + 1]
     });
   }
 
-  addPlaceholderRound(matches, "quarter-finals", 3, rounds[2].date, "Quarter-final", 4);
-  addPlaceholderRound(matches, "semi-finals", 4, rounds[3].date, "Semi-final", 2);
-  addPlaceholderRound(matches, "final", 5, rounds[4].date, "Final", 1);
+  addPlaceholderRound(matches, "quarter-finals", "qf", "r16", 3, rounds[2].date, "Quarter-final", 4);
+  addPlaceholderRound(matches, "semi-finals", "sf", "qf", 4, rounds[3].date, "Semi-final", 2);
+  addPlaceholderRound(matches, "final", "final", "sf", 5, rounds[4].date, "Final", 1);
 
   const theme = cupThemes[id - 1];
   return {
@@ -123,31 +158,91 @@ function buildCup(id: number, dates: string[], participants: string[]): Omit<Cup
     legend: theme.legend,
     country: theme.country,
     rounds,
-    matches
+    matches: resolveBracket(db, matches)
   };
 }
 
-function addPlaceholderRound(matches: CupMatch[], round: string, day: number, date: string, label: string, count: number) {
+function addPlaceholderRound(matches: BuildMatch[], round: string, idPrefix: string, prevIdPrefix: string, day: number, date: string, label: string, count: number) {
   for (let i = 0; i < count; i++) {
     matches.push({
+      id: `${idPrefix}-${i + 1}`,
       round,
       day,
       date,
       label: `${label} ${count === 1 ? "" : i + 1}`.trim(),
-      home: `Winner ${previousRoundName(round)} ${i * 2 + 1}`,
-      away: `Winner ${previousRoundName(round)} ${i * 2 + 2}`
+      homeSource: { type: "winnerOf", matchId: `${prevIdPrefix}-${i * 2 + 1}` },
+      awaySource: { type: "winnerOf", matchId: `${prevIdPrefix}-${i * 2 + 2}` }
     });
   }
 }
 
-function previousRoundName(round: string) {
-  if (round === "quarter-finals") return "R16";
-  if (round === "semi-finals") return "QF";
-  if (round === "final") return "SF";
-  return "Match";
+type ResolvedSide = { display: string; userId: number | null; isBye: boolean };
+
+function resolveSide(source: SlotSource, decided: Map<string, { username: string; userId: number }>): ResolvedSide {
+  if (source.type === "participant") return { display: source.username, userId: source.userId, isBye: false };
+  if (source.type === "bye") return { display: "Bye", userId: null, isBye: true };
+  const winner = decided.get(source.matchId);
+  return winner ? { display: winner.username, userId: winner.userId, isBye: false } : { display: "TBD", userId: null, isBye: false };
 }
 
-function deterministicShuffle(values: string[], seed: number) {
+// Walks the bracket in round order, deciding each match the moment both
+// sides are known real participants and that round's matchday has closed —
+// using the exact same daily-score formula as the leaderboard's head-to-head.
+// Byes auto-advance immediately without waiting for the date.
+function resolveBracket(db: DatabaseSync, matches: BuildMatch[]): CupMatch[] {
+  const decided = new Map<string, { username: string; userId: number }>();
+  const results = new Map<string, CupMatch>();
+
+  for (const match of matches) {
+    const home = resolveSide(match.homeSource, decided);
+    const away = resolveSide(match.awaySource, decided);
+
+    let winner: { username: string; userId: number } | null = null;
+    let status: CupMatch["status"] = "scheduled";
+    let homeScore: number | null = null;
+    let awayScore: number | null = null;
+
+    if (home.isBye && !away.isBye && away.userId !== null) {
+      winner = { username: away.display, userId: away.userId };
+      status = "bye";
+    } else if (away.isBye && !home.isBye && home.userId !== null) {
+      winner = { username: home.display, userId: home.userId };
+      status = "bye";
+    } else if (home.userId !== null && away.userId !== null && isMatchdaySettled(match.date)) {
+      const homeDaily = getDailyScore(db, home.userId, match.date);
+      const awayDaily = getDailyScore(db, away.userId, match.date);
+      homeScore = homeDaily.total;
+      awayScore = awayDaily.total;
+      const cmp = compareDailyScores(homeDaily, awayDaily);
+      // Last-resort deterministic tie-break (identical total AND activity)
+      // so a match never gets stuck unresolved: lower username wins.
+      winner = cmp < 0 || (cmp === 0 && home.display.localeCompare(away.display) <= 0)
+        ? { username: home.display, userId: home.userId }
+        : { username: away.display, userId: away.userId };
+      status = "decided";
+    }
+
+    if (winner) decided.set(match.id, winner);
+
+    results.set(match.id, {
+      id: match.id,
+      round: match.round,
+      day: match.day,
+      date: match.date,
+      label: match.label,
+      home: home.display,
+      away: away.display,
+      homeScore,
+      awayScore,
+      winner: winner?.username ?? null,
+      status
+    });
+  }
+
+  return matches.map((match) => results.get(match.id)!);
+}
+
+function deterministicShuffle<T>(values: T[], seed: number): T[] {
   const items = [...values];
   let state = seed || 1;
   const random = () => {
