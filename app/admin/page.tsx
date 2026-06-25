@@ -48,6 +48,12 @@ type ActivityLogRow = {
   awards: Array<{ player_id: number }>;
 };
 
+type StickerAwardStats = {
+  total: number;
+  byRarity: Array<{ rarity: string; count: number; actualPct: number; expectedPct: number; deltaPct: number }>;
+  bySource: Array<{ source: string; count: number }>;
+};
+
 type NewsReel = {
   message: string;
   isActive: boolean;
@@ -980,6 +986,7 @@ function NewsReelPreviewGroup({ message, ariaHidden = false }: { message: string
 
 function ActivityReviewTab({ onForbidden }: { onForbidden: () => void }) {
   const [logs, setLogs] = useState<ActivityLogRow[]>([]);
+  const [stickerStats, setStickerStats] = useState<StickerAwardStats | null>(null);
   const [loading, setLoading] = useState(true);
 
   async function load() {
@@ -987,8 +994,9 @@ function ActivityReviewTab({ onForbidden }: { onForbidden: () => void }) {
     try {
       const res = await fetch("/api/admin/activity-logs", { credentials: "include" });
       if (res.status === 403) { onForbidden(); return; }
-      const data = (await res.json()) as { logs: ActivityLogRow[] };
+      const data = (await res.json()) as { logs: ActivityLogRow[]; stickerStats?: StickerAwardStats };
       setLogs(data.logs ?? []);
+      setStickerStats(data.stickerStats ?? null);
     } finally {
       setLoading(false);
     }
@@ -1011,6 +1019,7 @@ function ActivityReviewTab({ onForbidden }: { onForbidden: () => void }) {
 
   return (
     <div className="space-y-3">
+      {stickerStats ? <StickerAwardStatsCard stats={stickerStats} /> : null}
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm font-bold uppercase tracking-wide text-green-900/60">Recent Activity Submissions</p>
         <button onClick={load} className="rounded-md bg-green-950/8 px-3 py-1.5 text-xs font-black text-green-950 hover:bg-green-950/15">Refresh</button>
@@ -1021,6 +1030,50 @@ function ActivityReviewTab({ onForbidden }: { onForbidden: () => void }) {
         logs.map((log) => <ActivityLogCard key={log.id} log={log} onRemove={removeLog} />)
       )}
     </div>
+  );
+}
+
+function StickerAwardStatsCard({ stats }: { stats: StickerAwardStats }) {
+  return (
+    <section className="rounded-lg border border-green-900/10 bg-white p-4 shadow-sm">
+      <div className="flex flex-wrap items-end justify-between gap-2">
+        <div>
+          <p className="text-sm font-bold uppercase tracking-wide text-green-900/60">Sticker Award Distribution</p>
+          <p className="mt-1 text-2xl font-black text-green-950">{stats.total} stickers awarded</p>
+        </div>
+        {stats.bySource.length > 0 ? (
+          <p className="text-xs font-bold text-green-900/55">
+            {stats.bySource.map((source) => `${source.source}: ${source.count}`).join(" / ")}
+          </p>
+        ) : null}
+      </div>
+      <div className="mt-4 overflow-x-auto">
+        <table className="w-full min-w-[560px] text-left text-xs">
+          <thead className="text-[10px] uppercase tracking-wide text-green-900/55">
+            <tr>
+              <th className="py-2">Rarity</th>
+              <th className="py-2 text-right">Count</th>
+              <th className="py-2 text-right">Actual</th>
+              <th className="py-2 text-right">Expected</th>
+              <th className="py-2 text-right">Delta</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-green-900/10 font-bold text-green-950">
+            {stats.byRarity.map((row) => (
+              <tr key={row.rarity}>
+                <td className="py-2 capitalize">{row.rarity}</td>
+                <td className="py-2 text-right">{row.count}</td>
+                <td className="py-2 text-right">{row.actualPct.toFixed(2)}%</td>
+                <td className="py-2 text-right">{row.expectedPct.toFixed(2)}%</td>
+                <td className={`py-2 text-right ${row.deltaPct > 0 ? "text-green-700" : row.deltaPct < 0 ? "text-red-600" : "text-green-900/55"}`}>
+                  {row.deltaPct > 0 ? "+" : ""}{row.deltaPct.toFixed(2)}pp
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }
 

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createAdminChatMessage, getAdminActivityLogs, getCurrentUser, voidActivityLog } from "@/lib/server/db";
+import { createAdminChatMessage, getAdminActivityLogs, getCurrentUser, getStickerAwardStats, voidActivityLog } from "@/lib/server/db";
 import { isAdminUsername } from "@/lib/server/admin";
 
 export async function GET() {
@@ -7,7 +7,7 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: "Login required" }, { status: 401 });
   if (!isAdminUsername(user.username)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  return NextResponse.json({ logs: getAdminActivityLogs() });
+  return NextResponse.json({ logs: getAdminActivityLogs(), stickerStats: getStickerAwardStats() });
 }
 
 export async function POST(request: Request) {

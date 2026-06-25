@@ -6,7 +6,7 @@ import { DatabaseSync } from "node:sqlite";
 import players from "@/data/players.json";
 import { getAdminUsernames } from "@/lib/server/admin";
 import type { ActivityType, Player, Position, Rarity, SquadSlot } from "@/lib/types";
-import { DEFAULT_ACTIVITY_MULTIPLIER } from "@/lib/rewardEngine";
+import { DEFAULT_ACTIVITY_MULTIPLIER, rarityOdds } from "@/lib/rewardEngine";
 import { getLondonMatchday } from "./matchday";
 
 const dbDir = path.join(process.cwd(), "data");
@@ -2095,6 +2095,34 @@ export function getAdminActivityLogs(limit = 50) {
     ...log,
     awards: getLogAwards(log.id)
   }));
+}
+
+export function getStickerAwardStats() {
+  const db = getDb();
+  const total = (db.prepare("SELECT COUNT(*) AS count FROM card_awards").get() as { count: number }).count;
+  const rows = db
+    .prepare("SELECT rarity, COUNT(*) AS count FROM card_awards GROUP BY rarity")
+    .all() as Array<{ rarity: Rarity; count: number }>;
+  const counts = new Map<Rarity, number>(rows.map((row) => [row.rarity, row.count]));
+  let previousCeiling = 0;
+  const byRarity = rarityOdds.map((item) => {
+    const expectedPct = Math.round((item.ceiling - previousCeiling) * 10000) / 100;
+    previousCeiling = item.ceiling;
+    const count = counts.get(item.rarity) ?? 0;
+    const actualPct = total > 0 ? Math.round((count / total) * 10000) / 100 : 0;
+    return {
+      rarity: item.rarity,
+      count,
+      actualPct,
+      expectedPct,
+      deltaPct: Math.round((actualPct - expectedPct) * 100) / 100
+    };
+  });
+  const bySource = db
+    .prepare("SELECT source, COUNT(*) AS count FROM card_awards GROUP BY source ORDER BY count DESC")
+    .all() as Array<{ source: string; count: number }>;
+
+  return { total, byRarity, bySource };
 }
 
 function getLogAwards(logId: number) {

@@ -3,7 +3,7 @@ import type { ActivityType, Player, Position, Rarity, SquadSlot, UserState } fro
 
 export const allPlayers = players as Player[];
 
-const odds: Array<{ rarity: Rarity; ceiling: number }> = [
+export const rarityOdds: Array<{ rarity: Rarity; ceiling: number }> = [
   { rarity: "clowns", ceiling: 0.01 },
   { rarity: "common", ceiling: 0.70 },
   { rarity: "rare", ceiling: 0.95 },
@@ -28,7 +28,7 @@ const starterPlan: Array<{ slot: SquadSlot; positions: Position[] }> = [
 
 export function rollRarity(): Rarity {
   const roll = Math.random();
-  return odds.find((item) => roll < item.ceiling)?.rarity ?? "common";
+  return rarityOdds.find((item) => roll < item.ceiling)?.rarity ?? "common";
 }
 
 export function getRandomPlayerByRarity(rarity = rollRarity()): Player {
