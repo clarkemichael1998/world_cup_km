@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createLateCallupPlayer, getCurrentUser, getLateCallupPlayers } from "@/lib/server/db";
+import { createLateCallupPlayer, getCurrentUser, getLateCallupPlayers, MAX_PLAYER_RATING } from "@/lib/server/db";
 import { isAdminUsername } from "@/lib/server/admin";
 import type { Position } from "@/lib/types";
 
@@ -46,7 +46,7 @@ function validateLateCallup(body: Record<string, unknown> | null) {
   if (!club) return { error: "Club is required." };
   if (!nation) return { error: "Nation is required." };
   if (!positions.includes(pos)) return { error: "Position must be GK, DF, MF, or FW." };
-  if (rating === null || rating < 1 || rating > 99) return { error: "Rating must be a whole number from 1 to 99." };
+  if (rating === null || rating < 1 || rating > MAX_PLAYER_RATING) return { error: `Rating must be a whole number from 1 to ${MAX_PLAYER_RATING}.` };
   if (!isValidDateOnly(dob)) return { error: "Date of birth must be a valid date." };
   if (caps === "invalid" || goals === "invalid") return { error: "Caps and goals must be whole numbers of 0 or more." };
   if (wiki === "invalid" || clubWiki === "invalid") return { error: "Wiki links must start with http:// or https://." };

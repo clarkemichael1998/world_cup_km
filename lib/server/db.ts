@@ -13,6 +13,7 @@ const dbDir = path.join(process.cwd(), "data");
 const dbPath = process.env.SQLITE_DB_PATH ?? path.join(dbDir, "km-footy.sqlite");
 const sessionCookie = "km_footy_session";
 const basePlayers = players as Player[];
+export const MAX_PLAYER_RATING = 199;
 const goalBoostByRarity: Record<Rarity, number> = {
   icon: 2,
   legend: 2,
@@ -603,7 +604,7 @@ function getRatingAdjustmentTotalBefore(playerId: number, adjustmentId: number) 
 }
 
 function clampRating(value: number) {
-  return Math.max(1, Math.min(99, value));
+  return Math.max(1, Math.min(MAX_PLAYER_RATING, value));
 }
 
 function playerFromLateCallupRow(row: LateCallupRow): Player {

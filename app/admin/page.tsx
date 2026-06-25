@@ -613,7 +613,7 @@ function LateCallupsTab({ onForbidden }: { onForbidden: () => void }) {
 
         <div className="grid gap-4 sm:grid-cols-3">
           <Field label="Rating">
-            <input type="number" min={1} max={99} step={1} value={form.rating} onChange={(e) => update("rating", e.target.value)}
+            <input type="number" min={1} max={199} step={1} value={form.rating} onChange={(e) => update("rating", e.target.value)}
               className="w-full rounded-md border border-green-900/20 px-3 py-3 text-base font-semibold text-green-950 focus:outline-none focus:ring-2 focus:ring-green-800" required />
           </Field>
           <Field label="DOB">

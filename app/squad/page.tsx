@@ -376,6 +376,7 @@ function LockSummary({ label, value }: { label: string; value: string }) {
 
 function SquadToken({ slot, selected, active, playingToday, onClick }: { slot: SquadSlot; selected?: Player; active: boolean; playingToday: boolean; onClick: () => void }) {
   const rating = selected?.rating ?? 0;
+  const ratingPercent = selected ? Math.max(8, Math.min(100, (selected.rating / 199) * 100)) : 0;
   const ratingTone = rating >= 90 ? "from-amber-200 to-yellow-500" : rating >= 82 ? "from-fuchsia-200 to-fuchsia-500" : rating >= 74 ? "from-sky-200 to-sky-500" : "from-slate-100 to-slate-300";
   const position = slotAllowedPositions(slot)[0];
 
@@ -393,10 +394,10 @@ function SquadToken({ slot, selected, active, playingToday, onClick }: { slot: S
         role="progressbar"
         aria-valuenow={selected?.rating ?? 0}
         aria-valuemin={0}
-        aria-valuemax={100}
+        aria-valuemax={199}
         aria-label={selected ? `${selected.name} rating` : "No player"}
       >
-        <div className={`h-full rounded-full bg-gradient-to-r ${ratingTone}`} style={{ width: `${selected ? Math.max(8, selected.rating) : 0}%` }} />
+        <div className={`h-full rounded-full bg-gradient-to-r ${ratingTone}`} style={{ width: `${ratingPercent}%` }} />
       </div>
     </button>
   );
