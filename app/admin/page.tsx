@@ -383,6 +383,7 @@ function LiveSettleTab({ onForbidden }: { onForbidden: () => void }) {
       if (res.status === 403) { onForbidden(); return; }
       const data = (await res.json().catch(() => ({}))) as {
         usersSettled?: number;
+        reconciledBoosts?: number;
         providerStatus?: { status: string; message: string };
         error?: string;
       };
@@ -390,7 +391,7 @@ function LiveSettleTab({ onForbidden }: { onForbidden: () => void }) {
         setError(data.error ?? "Could not settle live awards.");
         return;
       }
-      setNotice(`Settled ${data.usersSettled ?? 0} users. Fixture sync: ${data.providerStatus?.status ?? "unknown"} - ${data.providerStatus?.message ?? "No provider message."}`);
+      setNotice(`Settled ${data.usersSettled ?? 0} users. Reconciled ${data.reconciledBoosts ?? 0} boost rows. Fixture sync: ${data.providerStatus?.status ?? "unknown"} - ${data.providerStatus?.message ?? "No provider message."}`);
     } finally {
       setBusy(false);
     }
@@ -414,6 +415,7 @@ function LiveSettleTab({ onForbidden }: { onForbidden: () => void }) {
         goalsFound?: number;
         remaining?: number;
         usersSettled?: number;
+        reconciledBoosts?: number;
         message?: string;
         error?: string;
       };
@@ -422,7 +424,7 @@ function LiveSettleTab({ onForbidden }: { onForbidden: () => void }) {
         return;
       }
       const more = (data.remaining ?? 0) > 0 ? ` Run again to fetch the remaining ${data.remaining}.` : "";
-      setNotice(`${data.message ?? ""} Re-settled ${data.usersSettled ?? 0} users.${more}`);
+      setNotice(`${data.message ?? ""} Re-settled ${data.usersSettled ?? 0} users and reconciled ${data.reconciledBoosts ?? 0} boost rows.${more}`);
     } finally {
       setResyncBusy(false);
     }

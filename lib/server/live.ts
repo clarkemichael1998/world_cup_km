@@ -100,7 +100,8 @@ export function settleAllLiveAwards() {
   for (const row of rows) {
     settleUserLive(row.id);
   }
-  return { usersSettled: rows.length };
+  const reconciledBoosts = reconcileMissingGoalBoosts();
+  return { usersSettled: rows.length, reconciledBoosts };
 }
 
 // Settle entry point for any authenticated request: auto-locks the current
@@ -316,6 +317,64 @@ function awardGoalBoosts(userId: number) {
       }
     }
   }
+}
+
+function reconcileMissingGoalBoosts() {
+  const database = getDb();
+  const players = new Map(getAllPlayers().map((player) => [player.id, player]));
+  let applied = 0;
+
+  const goalCandidates = database
+    .prepare(
+      `SELECT ls.user_id, lsp.player_id, gs.match_id, gs.goal_count
+       FROM locked_squads ls
+       JOIN locked_squad_players lsp ON lsp.locked_squad_id = ls.id
+       JOIN goal_scorers gs ON gs.player_id = lsp.player_id
+       JOIN fixture_results fr ON fr.match_id = gs.match_id
+       WHERE gs.status = 'matched'
+         AND gs.player_id IS NOT NULL
+         AND fr.status = 'FINISHED'
+         AND fr.kickoff_at >= ls.locked_at
+         AND fr.kickoff_at < ls.unlock_at`
+    )
+    .all() as Array<{ user_id: number; player_id: number; match_id: string; goal_count: number }>;
+
+  const assistCandidates = database
+    .prepare(
+      `SELECT ls.user_id, lsp.player_id, as2.match_id, as2.assist_count
+       FROM locked_squads ls
+       JOIN locked_squad_players lsp ON lsp.locked_squad_id = ls.id
+       JOIN assist_scorers as2 ON as2.player_id = lsp.player_id
+       JOIN fixture_results fr ON fr.match_id = as2.match_id
+       WHERE as2.status = 'matched'
+         AND as2.player_id IS NOT NULL
+         AND fr.status = 'FINISHED'
+         AND fr.kickoff_at >= ls.locked_at
+         AND fr.kickoff_at < ls.unlock_at`
+    )
+    .all() as Array<{ user_id: number; player_id: number; match_id: string; assist_count: number }>;
+
+  for (const row of goalCandidates) {
+    const player = players.get(row.player_id);
+    if (!player) continue;
+    const amount = (GOAL_BOOST_BY_RARITY[player.rarity] ?? 0) * row.goal_count;
+    if (amount === 0) continue;
+    const inserted = awardGoalBoost(row.user_id, row.player_id, row.match_id, amount);
+    if (inserted) applied++;
+    announceBoost(row.match_id, player, amount, row.goal_count, "goal");
+  }
+
+  for (const row of assistCandidates) {
+    const player = players.get(row.player_id);
+    if (!player) continue;
+    const amount = (ASSIST_BOOST_BY_RARITY[player.rarity] ?? 0) * row.assist_count;
+    if (amount === 0) continue;
+    const inserted = awardGoalBoost(row.user_id, row.player_id, `${row.match_id}:assist`, amount);
+    if (inserted) applied++;
+    announceBoost(row.match_id, player, amount, row.assist_count, "assist");
+  }
+
+  return applied;
 }
 
 // Announced once game-wide per (match, player, event) — the boost amount is

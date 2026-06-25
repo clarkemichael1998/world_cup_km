@@ -24,6 +24,7 @@ export async function POST(request: Request) {
     apiHadGoals: goals.apiHadGoals,
     remaining: goals.remaining,
     usersSettled: settle.usersSettled,
+    reconciledBoosts: settle.reconciledBoosts,
     message: goals.message
   });
 }
