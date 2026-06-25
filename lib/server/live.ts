@@ -148,11 +148,11 @@ function computeSettleKey(database: ReturnType<typeof getDb>, userId: number): s
     .prepare("SELECT COUNT(*) AS c, COALESCE(MAX(updated_at), '') AS m FROM fixture_results WHERE status = 'FINISHED'")
     .get() as { c: number; m: string };
   const goals = database
-    .prepare("SELECT COUNT(*) AS c, COALESCE(SUM(id), 0) AS s, COALESCE(SUM(goal_count), 0) AS n FROM goal_scorers WHERE status = 'matched' AND player_id IS NOT NULL")
-    .get() as { c: number; s: number; n: number };
+    .prepare("SELECT id, match_id, player_id, goal_count FROM goal_scorers WHERE status = 'matched' AND player_id IS NOT NULL ORDER BY id")
+    .all() as Array<{ id: number; match_id: string; player_id: number; goal_count: number }>;
   const assists = database
-    .prepare("SELECT COUNT(*) AS c, COALESCE(SUM(id), 0) AS s, COALESCE(SUM(assist_count), 0) AS n FROM assist_scorers WHERE status = 'matched' AND player_id IS NOT NULL")
-    .get() as { c: number; s: number; n: number };
+    .prepare("SELECT id, match_id, player_id, assist_count FROM assist_scorers WHERE status = 'matched' AND player_id IS NOT NULL ORDER BY id")
+    .all() as Array<{ id: number; match_id: string; player_id: number; assist_count: number }>;
   const squads = database
     .prepare("SELECT id, locked_at, unlock_at FROM locked_squads WHERE user_id = ? ORDER BY id")
     .all(userId) as Array<{ id: number; locked_at: string; unlock_at: string }>;
@@ -169,9 +169,11 @@ function computeSettleKey(database: ReturnType<typeof getDb>, userId: number): s
     ...squads.map((squad) => `${squad.id}@${squad.locked_at}-${squad.unlock_at}`),
     ...squadPlayers.map((player) => `${player.locked_squad_id}.${player.slot}.${player.player_id}`)
   ].join(",");
+  const goalSignature = goals.map((goal) => `${goal.id}.${goal.match_id}.${goal.player_id}.${goal.goal_count}`).join(",");
+  const assistSignature = assists.map((assist) => `${assist.id}.${assist.match_id}.${assist.player_id}.${assist.assist_count}`).join(",");
   // Version prefix: bump to force a one-time re-settle for all users after a
   // settlement-logic change (e.g. boosts now apply to draws/losses).
-  return `v3|f${fixtures.c}@${fixtures.m}|g${goals.c}.${goals.s}.${goals.n}|a${assists.c}.${assists.s}.${assists.n}|s${squadSignature}`;
+  return `v4|f${fixtures.c}@${fixtures.m}|g${goalSignature}|a${assistSignature}|s${squadSignature}`;
 }
 
 function getBestOwnedSquadLeaderboard(playerMap: Map<number, Player>) {
