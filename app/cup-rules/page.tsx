@@ -1,12 +1,9 @@
 import Link from "next/link";
 import { PageTitle } from "@/components/PageTitle";
 
-const cupLegendCards = [
-  { name: "Henrik Larsson", rating: 105 },
-  { name: "Kenny Dalglish", rating: 110 },
-  { name: "Diego Maradona", rating: 115 },
-  { name: "Pele", rating: 120 }
-];
+// Ratings are deliberately not listed here — they stay a surprise for
+// whoever actually wins the cup.
+const cupLegendCards = ["Henrik Larsson", "Kenny Dalglish", "Diego Maradona", "Pele"];
 
 const rounds = [
   ["Day 1", "Play-off", "Two randomly drawn players fight for the final Round of 16 place. Winner gets 10 stickers."],
@@ -80,10 +77,10 @@ export default function CupRulesPage() {
               <p className="text-xs font-black uppercase tracking-wide text-amber-800/60">Cup Winner</p>
               <p className="mt-1 text-lg font-black text-amber-950">35 stickers + Cup Legend card</p>
               <div className="mt-3 grid gap-2">
-                {cupLegendCards.map((card) => (
-                  <div key={card.name} className="flex items-center justify-between rounded-md bg-white px-3 py-2 text-sm font-black text-green-950">
-                    <span>{card.name}</span>
-                    <span>{card.rating}</span>
+                {cupLegendCards.map((name) => (
+                  <div key={name} className="flex items-center justify-between rounded-md bg-white px-3 py-2 text-sm font-black text-green-950">
+                    <span>{name}</span>
+                    <span className="text-xs font-bold uppercase tracking-wide text-green-900/40">Rating hidden</span>
                   </div>
                 ))}
               </div>

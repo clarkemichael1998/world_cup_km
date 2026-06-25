@@ -1,6 +1,6 @@
 import { getAdminUsernames } from "@/lib/server/admin";
 import { getDb } from "@/lib/server/db";
-import { cupThemes, getCupLegendPlayer } from "@/lib/cupLegends";
+import { cupThemes } from "@/lib/cupLegends";
 
 const cupSchedules = [
   ["2026-06-26", "2026-06-27", "2026-06-28", "2026-06-29", "2026-06-30"],
@@ -69,7 +69,7 @@ export function getCupHubData() {
       { place: "Quarter-final elimination", reward: "15 stickers" },
       { place: "Semi-final elimination", reward: "25 stickers" },
       { place: "Runner-up", reward: "30 stickers plus a guaranteed Icon card" },
-      { place: "Cup winner", reward: "35 stickers plus that cup's 100+ Cup Legend card" }
+      { place: "Cup winner", reward: "35 stickers plus that cup's Cup Legend card" }
     ]
   };
 }
@@ -111,13 +111,14 @@ function buildCup(id: number, dates: string[], participants: string[]): Omit<Cup
   addPlaceholderRound(matches, "final", 5, rounds[4].date, "Final", 1);
 
   const theme = cupThemes[id - 1];
-  const legendPlayer = getCupLegendPlayer(id);
   return {
     id,
     name: theme.cupName,
     startDate: rounds[0].date,
     endDate: rounds[4].date,
-    prize: `${theme.legend} ${legendPlayer?.rating ?? ""}`.trim(),
+    // Deliberately no rating here — the exact stat stays a surprise for
+    // whoever wins the cup; see PlayerCard's hideRating preview.
+    prize: `${theme.legend} Cup Legend Card`,
     runnerUpPrize: "30 stickers plus guaranteed Icon",
     legend: theme.legend,
     country: theme.country,

@@ -49,13 +49,16 @@ export function PlayerCard({
   duplicateCount = 0,
   large = false,
   ratingBoost = 0,
-  variant = "default"
+  variant = "default",
+  hideRating = false
 }: {
   player: Player;
   duplicateCount?: number;
   large?: boolean;
   ratingBoost?: number;
   variant?: "default" | "album";
+  /** Used for unowned cup-prize previews — keeps the exact rating a surprise. */
+  hideRating?: boolean;
 }) {
   const detailClass = large ? "grid-cols-2" : "grid-cols-1";
   const flag = flagUrl(player.nation);
@@ -106,19 +109,25 @@ export function PlayerCard({
             {cupTheme ? <p className="text-xs font-bold opacity-80">{cupTheme.cupName} · {cupTheme.country}</p> : null}
           </div>
           <div className={`shrink-0 rounded-lg border px-3 py-2 text-center shadow-sm ${cupTheme ? "border-white/30 bg-white/15 text-white" : "border-black/5 bg-white/80 text-green-950"}`}>
-            <div className={`${large ? "text-3xl" : "text-xl"} font-black`}>{effectiveRating}</div>
+            <div className={`${large ? "text-3xl" : "text-xl"} font-black`}>{hideRating ? "??" : effectiveRating}</div>
             <div className="text-xs font-bold">{player.pos}</div>
-            {ratingBoost > 0 && <div className={`text-[10px] font-black ${cupTheme ? "text-amber-200" : "text-green-600"}`}>+{ratingBoost} ⚽</div>}
+            {!hideRating && ratingBoost > 0 && <div className={`text-[10px] font-black ${cupTheme ? "text-amber-200" : "text-green-600"}`}>+{ratingBoost} ⚽</div>}
           </div>
         </div>
 
-        <div className={`mt-5 grid ${detailClass} gap-2 text-xs font-semibold`}>
-          <Detail label="Nation" value={player.nation} flag={flag} />
-          <Detail label="Club" value={player.club} href={player.clubWiki} />
-          <Detail label="DOB" value={player.dob} />
-          <Detail label="Caps" value={formatNumber(player.caps)} />
-          <Detail label="Goals" value={formatNumber(player.goals)} />
-        </div>
+        {hideRating ? (
+          <p className="mt-5 rounded-md bg-black/10 px-3 py-2 text-center text-xs font-black uppercase tracking-wide opacity-80">
+            Rating revealed only to the cup winner
+          </p>
+        ) : (
+          <div className={`mt-5 grid ${detailClass} gap-2 text-xs font-semibold`}>
+            <Detail label="Nation" value={player.nation} flag={flag} />
+            <Detail label="Club" value={player.club} href={player.clubWiki} />
+            <Detail label="DOB" value={player.dob} />
+            <Detail label="Caps" value={formatNumber(player.caps)} />
+            <Detail label="Goals" value={formatNumber(player.goals)} />
+          </div>
+        )}
 
         {player.wiki ? (
           <a className="mt-4 inline-flex max-w-full break-words rounded-md bg-black/10 px-2 py-1 text-xs font-black hover:bg-black/15" href={player.wiki} target="_blank" rel="noreferrer">

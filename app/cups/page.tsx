@@ -202,7 +202,7 @@ function HeroCup({ cup, theme, legendPlayer }: { cup: CupDefinition; theme: NonN
           <p className="mb-2 text-xs font-black uppercase tracking-wide text-white/70">Prize Card</p>
           {legendPlayer ? (
             <div className="max-w-xs">
-              <PlayerCard player={legendPlayer} variant="album" />
+              <PlayerCard player={legendPlayer} variant="album" hideRating />
             </div>
           ) : null}
           <p className="mt-2 text-xs font-bold text-white/80">Cup winner also receives 35 stickers. Runner-up receives 30 stickers plus a guaranteed Icon.</p>
