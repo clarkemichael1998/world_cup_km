@@ -1,4 +1,4 @@
-import { getAllPlayers, getDb, awardGoalBoost, getMatchedGoalScorers, getMatchedAssistScorers, lockSquadForDate, claimBoostAnnouncement, createAdminChatMessage } from "./db";
+import { getAllPlayers, getDb, awardGoalBoost, lockSquadForDate, claimBoostAnnouncement, createAdminChatMessage } from "./db";
 import { getProviderStatus, type ProviderStatus } from "./fixtures";
 import { GOAL_BOOST_BY_RARITY, ASSIST_BOOST_BY_RARITY, getPlayerById } from "./goalScorers";
 import type { Player, SquadSlot } from "@/lib/types";
@@ -173,7 +173,7 @@ function computeSettleKey(database: ReturnType<typeof getDb>, userId: number): s
   const assistSignature = assists.map((assist) => `${assist.id}.${assist.match_id}.${assist.player_id}.${assist.assist_count}`).join(",");
   // Version prefix: bump to force a one-time re-settle for all users after a
   // settlement-logic change (e.g. boosts now apply to draws/losses).
-  return `v5|f${fixtures.c}@${fixtures.m}|g${goalSignature}|a${assistSignature}|s${squadSignature}`;
+  return `v6|f${fixtures.c}@${fixtures.m}|g${goalSignature}|a${assistSignature}|s${squadSignature}`;
 }
 
 function getBestOwnedSquadLeaderboard(playerMap: Map<number, Player>) {
@@ -266,39 +266,53 @@ function awardGoalBoosts(userId: number) {
   const allLocked = database
     .prepare("SELECT id, locked_at, unlock_at FROM locked_squads WHERE user_id = ?")
     .all(userId) as Array<{ id: number; locked_at: string; unlock_at: string }>;
+  const goalRows = database
+    .prepare(
+      `SELECT gs.match_id, gs.player_id, gs.goal_count, fr.kickoff_at
+       FROM goal_scorers gs
+       JOIN fixture_results fr ON fr.match_id = gs.match_id
+       WHERE gs.status = 'matched'
+         AND gs.player_id IS NOT NULL
+         AND fr.status = 'FINISHED'`
+    )
+    .all() as Array<{ match_id: string; player_id: number; goal_count: number; kickoff_at: string }>;
+  const assistRows = database
+    .prepare(
+      `SELECT as2.match_id, as2.player_id, as2.assist_count, fr.kickoff_at
+       FROM assist_scorers as2
+       JOIN fixture_results fr ON fr.match_id = as2.match_id
+       WHERE as2.status = 'matched'
+         AND as2.player_id IS NOT NULL
+         AND fr.status = 'FINISHED'`
+    )
+    .all() as Array<{ match_id: string; player_id: number; assist_count: number; kickoff_at: string }>;
 
   for (const locked of allLocked) {
-    // Boosts apply for goals/assists in any FINISHED match — a draw or loss
-    // still counts (verified is only set for wins, so don't require it here).
-    const matches = database
-      .prepare("SELECT match_id FROM fixture_results WHERE status = 'FINISHED' AND kickoff_at >= ? AND kickoff_at < ?")
-      .all(locked.locked_at, locked.unlock_at) as Array<{ match_id: string }>;
-
     const lockedPlayerIds = new Set(
       (database.prepare("SELECT player_id FROM locked_squad_players WHERE locked_squad_id = ?").all(locked.id) as Array<{ player_id: number }>).map((r) => r.player_id)
     );
 
-    for (const match of matches) {
-      const scorers = getMatchedGoalScorers(match.match_id);
-      for (const { playerId, goalCount } of scorers) {
-        if (!lockedPlayerIds.has(playerId)) continue;
-        const player = getPlayerById(playerId);
-        if (!player) continue;
-        const boostPerGoal = GOAL_BOOST_BY_RARITY[player.rarity] ?? 0;
-        if (boostPerGoal !== 0 && awardGoalBoost(userId, playerId, match.match_id, boostPerGoal * goalCount)) {
-          announceBoost(match.match_id, player, boostPerGoal * goalCount, goalCount, "goal");
-        }
+    // Boosts apply for goals/assists in any FINISHED match inside this lock
+    // window. A draw or loss still counts, so do not require verified/winner.
+    for (const row of goalRows) {
+      if (row.kickoff_at < locked.locked_at || row.kickoff_at >= locked.unlock_at) continue;
+      if (!lockedPlayerIds.has(row.player_id)) continue;
+      const player = getPlayerById(row.player_id);
+      if (!player) continue;
+      const boostPerGoal = GOAL_BOOST_BY_RARITY[player.rarity] ?? 0;
+      if (boostPerGoal !== 0 && awardGoalBoost(userId, row.player_id, row.match_id, boostPerGoal * row.goal_count)) {
+        announceBoost(row.match_id, player, boostPerGoal * row.goal_count, row.goal_count, "goal");
       }
+    }
 
-      const assisters = getMatchedAssistScorers(match.match_id);
-      for (const { playerId, assistCount } of assisters) {
-        if (!lockedPlayerIds.has(playerId)) continue;
-        const player = getPlayerById(playerId);
-        if (!player) continue;
-        const boostPerAssist = ASSIST_BOOST_BY_RARITY[player.rarity] ?? 0;
-        if (boostPerAssist !== 0 && awardGoalBoost(userId, playerId, `${match.match_id}:assist`, boostPerAssist * assistCount)) {
-          announceBoost(match.match_id, player, boostPerAssist * assistCount, assistCount, "assist");
-        }
+    for (const row of assistRows) {
+      if (row.kickoff_at < locked.locked_at || row.kickoff_at >= locked.unlock_at) continue;
+      if (!lockedPlayerIds.has(row.player_id)) continue;
+      const player = getPlayerById(row.player_id);
+      if (!player) continue;
+      const boostPerAssist = ASSIST_BOOST_BY_RARITY[player.rarity] ?? 0;
+      if (boostPerAssist !== 0 && awardGoalBoost(userId, row.player_id, `${row.match_id}:assist`, boostPerAssist * row.assist_count)) {
+        announceBoost(row.match_id, player, boostPerAssist * row.assist_count, row.assist_count, "assist");
       }
     }
   }
