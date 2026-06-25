@@ -1,4 +1,4 @@
-import type { Player, Rarity } from "@/lib/types";
+import type { Player, Position, Rarity } from "@/lib/types";
 
 // Shared, client-safe cup theme + legend-card data. No server-only imports
 // here on purpose — both lib/server/cups.ts and client components (PlayerCard,
@@ -84,6 +84,9 @@ export const cupThemes: CupTheme[] = [
 ];
 
 const legendRatings: Record<number, number> = { 1: 105, 2: 110, 3: 115, 4: 120 };
+// Larsson, Dalglish, and Pele were out-and-out forwards; Maradona is slotted
+// as a midfielder, true to his deep-lying playmaker role.
+const legendPositions: Record<number, Position> = { 1: "FW", 2: "FW", 3: "MF", 4: "FW" };
 const legendDob: Record<number, string> = {
   1: "1971-09-20",
   2: "1951-03-04",
@@ -112,7 +115,7 @@ export const cupLegendPlayers: Player[] = cupThemes.map((theme) => ({
   sortName: theme.legend,
   club: `${theme.cupName} Legend`,
   nation: theme.country,
-  pos: "FW",
+  pos: legendPositions[theme.cupId],
   rating: legendRatings[theme.cupId],
   rarity: "icon" as Rarity,
   wiki: legendWiki[theme.cupId],
