@@ -80,13 +80,11 @@ export function PlayerCard({
       {cupTheme ? (
         <>
           <CupMotif cupId={cupTheme.cupId} className="pointer-events-none absolute inset-0 h-full w-full" />
-          <LegendPortrait
-            imagePath={cupTheme.imagePath}
-            shirtNumber={cupTheme.shirtNumber}
-            alt={cupTheme.legend}
-            className="pointer-events-none absolute -bottom-3 -right-3 h-28 w-20"
-            silhouetteOpacity="opacity-25"
-          />
+          {/* Decorative corner accent only — dimmed even when a real photo
+              exists, so it never competes with the card's own text/footer. */}
+          <div className="pointer-events-none absolute -bottom-3 -right-3 h-28 w-20 opacity-30">
+            <LegendPortrait imagePath={cupTheme.imagePath} shirtNumber={cupTheme.shirtNumber} alt={cupTheme.legend} className="h-full w-full" rounded="rounded-lg" silhouetteOpacity="opacity-100" />
+          </div>
         </>
       ) : null}
 

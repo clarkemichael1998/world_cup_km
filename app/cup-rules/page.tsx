@@ -38,7 +38,7 @@ export default function CupRulesPage() {
           <div className="mt-4 grid gap-2 sm:grid-cols-4">
             {["Cup 1", "Cup 2", "Cup 3", "Cup 4"].map((cup, index) => (
               <div key={cup} className="rounded-lg bg-green-950/5 p-3">
-                <p className="text-xs font-black uppercase tracking-wide text-green-900/50">{cup}</p>
+                <p className="text-xs font-bold uppercase tracking-wide text-green-900/50">{cup}</p>
                 <p className="mt-1 font-black text-green-950">5 matchdays</p>
                 <p className="text-xs font-bold text-green-900/60">Random draw #{index + 1}</p>
               </div>
@@ -50,7 +50,7 @@ export default function CupRulesPage() {
           <div className="grid gap-2">
             {rounds.map(([day, title, body]) => (
               <div key={day} className="rounded-lg border border-green-900/10 bg-white p-3">
-                <p className="text-xs font-black uppercase tracking-wide text-green-900/45">{day}</p>
+                <p className="text-xs font-bold uppercase tracking-wide text-green-900/45">{day}</p>
                 <p className="font-black text-green-950">{title}</p>
                 <p className="text-sm font-semibold text-green-900/70">{body}</p>
               </div>
@@ -74,7 +74,7 @@ export default function CupRulesPage() {
         <Section title="Prizes">
           <div className="grid gap-3 lg:grid-cols-2">
             <div className="rounded-xl border border-amber-300 bg-amber-50 p-4">
-              <p className="text-xs font-black uppercase tracking-wide text-amber-800/60">Cup Winner</p>
+              <p className="text-xs font-bold uppercase tracking-wide text-amber-800/60">Cup Winner</p>
               <p className="mt-1 text-lg font-black text-amber-950">35 stickers + Cup Legend card</p>
               <div className="mt-3 grid gap-2">
                 {cupLegendCards.map((name) => (
@@ -86,7 +86,7 @@ export default function CupRulesPage() {
               </div>
             </div>
             <div className="rounded-xl border border-green-900/10 bg-white p-4">
-              <p className="text-xs font-black uppercase tracking-wide text-green-900/50">Runner-Up</p>
+              <p className="text-xs font-bold uppercase tracking-wide text-green-900/50">Runner-Up</p>
               <p className="mt-1 text-lg font-black text-green-950">30 stickers + guaranteed Icon</p>
               <p className="mt-2 text-sm font-semibold text-green-900/70">The losing finalist still walks away with a massive pack hit and a guaranteed Icon card.</p>
             </div>
@@ -111,7 +111,7 @@ export default function CupRulesPage() {
 function Reward({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-lg bg-green-950/5 p-3">
-      <p className="text-xs font-black uppercase tracking-wide text-green-900/50">{label}</p>
+      <p className="text-xs font-bold uppercase tracking-wide text-green-900/50">{label}</p>
       <p className="mt-1 font-black text-green-950">{value}</p>
     </div>
   );
