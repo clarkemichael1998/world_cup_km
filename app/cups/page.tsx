@@ -23,6 +23,7 @@ type CupDefinition = {
 type CupHubData = {
   participants: string[];
   cups: CupDefinition[];
+  restDates: string[];
   scoring: Array<{ label: string; value: string }>;
   prizes: Array<{ place: string; reward: string }>;
 };
@@ -35,7 +36,7 @@ export default function CupsPage() {
     fetch("/api/cups", { credentials: "include" })
       .then((response) => response.json())
       .then((payload) => setData(payload))
-      .catch(() => setData({ participants: [], cups: [], scoring: [], prizes: [] }));
+      .catch(() => setData({ participants: [], cups: [], restDates: [], scoring: [], prizes: [] }));
   }, []);
 
   const selectedCup = useMemo(() => data?.cups.find((cup) => cup.id === selectedCupId) ?? data?.cups[0], [data, selectedCupId]);
@@ -45,7 +46,7 @@ export default function CupsPage() {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <PageTitle
           title="KMXI Cups"
-          subtitle="Four five-day knockout cups. Random fixtures, activity-heavy daily head-to-heads, and 100+ Cup Legend cards for the winners."
+          subtitle="Four five-round knockout cups across the remaining World Cup matchdays. Random fixtures, activity-heavy head-to-heads, and 100+ Cup Legend cards for the winners."
         />
         <Link href="/cup-rules" className="rounded-md bg-amber-100 px-4 py-2 text-sm font-black text-amber-900 hover:bg-amber-200">
           Cup Rules
@@ -105,6 +106,14 @@ export default function CupsPage() {
                     <p className="mt-1 text-sm font-bold text-green-950">{item.value}</p>
                   </div>
                 ))}
+              </InfoCard>
+              <InfoCard title="Rest Days">
+                <div className="rounded-lg bg-slate-100 p-3">
+                  <p className="text-sm font-bold text-slate-700">
+                    No cup fixtures or cup scoring on {data.restDates.map(formatDate).join(", ")}.
+                  </p>
+                  <p className="mt-1 text-xs font-bold text-slate-500">Cup 4 final is scheduled for 19 July.</p>
+                </div>
               </InfoCard>
               <InfoCard title="Prizes">
                 {data.prizes.map((item) => (

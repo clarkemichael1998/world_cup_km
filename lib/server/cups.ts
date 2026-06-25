@@ -1,7 +1,13 @@
 import { getAdminUsernames } from "@/lib/server/admin";
 import { getDb } from "@/lib/server/db";
 
-const cupStarts = ["2026-06-26", "2026-07-01", "2026-07-06", "2026-07-11"];
+const cupSchedules = [
+  ["2026-06-26", "2026-06-27", "2026-06-28", "2026-06-29", "2026-06-30"],
+  ["2026-07-01", "2026-07-02", "2026-07-03", "2026-07-04", "2026-07-05"],
+  ["2026-07-06", "2026-07-07", "2026-07-09", "2026-07-10", "2026-07-11"],
+  ["2026-07-12", "2026-07-14", "2026-07-15", "2026-07-18", "2026-07-19"]
+];
+const restDates = ["2026-07-08", "2026-07-13", "2026-07-16", "2026-07-17"];
 const roundLabels = ["Play-off", "Round of 16", "Quarter-finals", "Semi-finals", "Final"];
 const cupNames = ["Larsson Cup", "Dalglish Cup", "Maradona Cup", "Pele Cup"];
 const legendPrizes = ["Henrik Larsson 105", "Kenny Dalglish 110", "Diego Maradona 115", "Pele 120"];
@@ -63,10 +69,11 @@ export type CupDefinition = {
 
 export function getCupHubData() {
   const participants = getCupParticipants();
-  const cups = cupStarts.map((startDate, index) => buildCup(index + 1, startDate, participants));
+  const cups = cupSchedules.map((dates, index) => buildCup(index + 1, dates, participants));
   return {
     participants,
     cups,
+    restDates,
     scoring: [
       { label: "Activity points", value: "1 point per activity credit logged that matchday, capped at 40" },
       { label: "Football points", value: "Nation wins, goals, and assists also score, capped at 40" },
@@ -94,9 +101,9 @@ function getCupParticipants() {
     .filter((username) => !adminUsernames.has(username.toLowerCase()));
 }
 
-function buildCup(id: number, startDate: string, participants: string[]): CupDefinition {
+function buildCup(id: number, dates: string[], participants: string[]): CupDefinition {
   const shuffled = deterministicShuffle(participants, id * 2026);
-  const rounds = roundLabels.map((label, index) => ({ day: index + 1, date: addDays(startDate, index), label }));
+  const rounds = roundLabels.map((label, index) => ({ day: index + 1, date: dates[index], label }));
   const matches: CupMatch[] = [];
 
   const playInHome = shuffled[0] ?? "Player 16";
@@ -123,7 +130,7 @@ function buildCup(id: number, startDate: string, participants: string[]): CupDef
   return {
     id,
     name: cupNames[id - 1],
-    startDate,
+    startDate: rounds[0].date,
     endDate: rounds[4].date,
     prize: legendPrizes[id - 1],
     runnerUpPrize: "30 stickers plus guaranteed Icon",
@@ -169,10 +176,4 @@ function deterministicShuffle(values: string[], seed: number) {
     [items[i], items[j]] = [items[j], items[i]];
   }
   return items;
-}
-
-function addDays(date: string, days: number) {
-  const value = new Date(`${date}T12:00:00.000Z`);
-  value.setUTCDate(value.getUTCDate() + days);
-  return value.toISOString().slice(0, 10);
 }

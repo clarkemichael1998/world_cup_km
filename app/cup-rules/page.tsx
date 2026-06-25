@@ -22,7 +22,7 @@ export default function CupRulesPage() {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <PageTitle
           title="Cup Rules"
-          subtitle="Four back-to-back knockout cups to close the tournament: random head-to-head fixtures, daily scores, and Cup Legend prizes."
+          subtitle="Four knockout cups across the remaining World Cup matchdays: random head-to-head fixtures, daily scores, and Cup Legend prizes."
         />
         <Link href="/cups" className="rounded-md bg-pitch px-4 py-2 text-sm font-black text-white hover:bg-green-800">
           View Cup Draw
@@ -32,7 +32,11 @@ export default function CupRulesPage() {
       <div className="grid gap-5">
         <Section title="The Setup">
           <p>
-            There are four separate five-day cups. Every cup starts with a random draw. With 17 players, Day 1 is a play-off match, then the winner joins the Round of 16.
+            There are four separate five-round cups. Every cup starts with a random draw. With 17 players, Round 1 is a play-off match, then the winner joins the Round of 16.
+            Cup rounds only run on World Cup matchdays, so the no-game dates are skipped.
+          </p>
+          <p className="mt-3 rounded-lg bg-slate-100 p-3 text-slate-700">
+            No cup fixtures or cup scoring on 8 July, 13 July, 16 July, or 17 July. The final cup ends on the World Cup final: 19 July 2026.
           </p>
           <div className="mt-4 grid gap-2 sm:grid-cols-4">
             {["Cup 1", "Cup 2", "Cup 3", "Cup 4"].map((cup, index) => (
