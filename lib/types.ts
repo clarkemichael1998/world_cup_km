@@ -23,6 +23,8 @@ export type Player = {
   clubWiki: string | null;
   clubCountry: string;
   teamId: string;
+  /** Set only for the four Cup Legend cards — drives themed card styling. */
+  cupId?: number;
 };
 
 export type UserState = {

@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 import { DatabaseSync } from "node:sqlite";
 import players from "@/data/players.json";
 import { getAdminUsernames } from "@/lib/server/admin";
+import { cupLegendPlayers } from "@/lib/cupLegends";
 import type { ActivityType, Player, Position, Rarity, SquadSlot } from "@/lib/types";
 import { DEFAULT_ACTIVITY_MULTIPLIER, rarityOdds } from "@/lib/rewardEngine";
 import { getLondonMatchday } from "./matchday";
@@ -452,7 +453,7 @@ export type PlayerRatingAdjustment = {
 };
 
 export function getAllPlayers(): Player[] {
-  return applyGlobalRatingAdjustments([...basePlayers, ...getLateCallupPlayers()]);
+  return applyGlobalRatingAdjustments([...basePlayers, ...getLateCallupPlayers(), ...cupLegendPlayers]);
 }
 
 export function getLateCallupPlayers(): Player[] {
@@ -465,7 +466,7 @@ export function getLateCallupPlayers(): Player[] {
 export function createLateCallupPlayer(input: LateCallupInput, createdBy: number): Player {
   const database = getDb();
   const latestLate = database.prepare("SELECT MAX(id) AS maxId FROM late_callup_players").get() as { maxId: number | null };
-  const maxBaseId = basePlayers.reduce((max, player) => Math.max(max, player.id), 0);
+  const maxBaseId = [...basePlayers, ...cupLegendPlayers].reduce((max, player) => Math.max(max, player.id), 0);
   const id = Math.max(maxBaseId, latestLate.maxId ?? 0) + 1;
   const slug = uniquePlayerSlug(database, slugify(`${input.name}-${input.nation}`), id);
   const player: Player = {
@@ -561,7 +562,7 @@ export function createPlayerRatingAdjustment(playerId: number, adjustment: numbe
 }
 
 function getRawPlayerPool(): Player[] {
-  return [...basePlayers, ...getLateCallupPlayers()];
+  return [...basePlayers, ...getLateCallupPlayers(), ...cupLegendPlayers];
 }
 
 function applyGlobalRatingAdjustments(playerPool: Player[]): Player[] {

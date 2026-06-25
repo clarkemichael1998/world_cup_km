@@ -11,7 +11,8 @@ export async function POST(request: Request) {
   const body = (await request.json().catch(() => null)) as { amount?: number } | null;
   const amount = Math.min(Math.max(1, Math.floor(body?.amount ?? 1)), MAX_REDEEM_PER_REQUEST);
 
-  const allPlayers = getAllPlayers();
+  // Cup Legend cards (cupId set) are exclusive prizes, never randomly pullable.
+  const allPlayers = getAllPlayers().filter((player) => !player.cupId);
   const players = Array.from({ length: amount }, () => getRandomPlayerFromPool(allPlayers));
   const playerIds = players.map((p) => p.id);
 

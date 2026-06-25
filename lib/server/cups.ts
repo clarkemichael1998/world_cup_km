@@ -1,5 +1,6 @@
 import { getAdminUsernames } from "@/lib/server/admin";
 import { getDb } from "@/lib/server/db";
+import { cupThemes, getCupLegendPlayer } from "@/lib/cupLegends";
 
 const cupSchedules = [
   ["2026-06-26", "2026-06-27", "2026-06-28", "2026-06-29", "2026-06-30"],
@@ -9,38 +10,9 @@ const cupSchedules = [
 ];
 const restDates = ["2026-07-08", "2026-07-13", "2026-07-16", "2026-07-17"];
 const roundLabels = ["Play-off", "Round of 16", "Quarter-finals", "Semi-finals", "Final"];
-const cupNames = ["Larsson Cup", "Dalglish Cup", "Maradona Cup", "Pele Cup"];
-const legendPrizes = ["Henrik Larsson 105", "Kenny Dalglish 110", "Diego Maradona 115", "Pele 120"];
-const cupThemes = [
-  {
-    legend: "Henrik Larsson",
-    country: "Sweden",
-    colours: "from-blue-900 via-blue-600 to-yellow-300",
-    accent: "bg-yellow-300 text-blue-950",
-    motif: "braided gold arcs, cold blue floodlights, ruthless movement in the box"
-  },
-  {
-    legend: "Kenny Dalglish",
-    country: "Scotland",
-    colours: "from-blue-950 via-sky-700 to-white",
-    accent: "bg-white text-blue-950",
-    motif: "saltire shards, royal blue smoke, old-school finishing instinct"
-  },
-  {
-    legend: "Diego Maradona",
-    country: "Argentina",
-    colours: "from-sky-300 via-white to-yellow-300",
-    accent: "bg-sky-200 text-sky-950",
-    motif: "sunburst halos, sky-blue stripes, impossible left-foot chaos"
-  },
-  {
-    legend: "Pele",
-    country: "Brazil",
-    colours: "from-green-700 via-yellow-300 to-blue-700",
-    accent: "bg-yellow-300 text-green-950",
-    motif: "samba waves, gold flares, green-and-blue final boss energy"
-  }
-];
+
+// Visual theming (colours, motifs, the legend card itself) lives in the
+// shared lib/cupLegends.ts module, importable from both server and client.
 
 export type CupMatch = {
   round: string;
@@ -60,9 +32,6 @@ export type CupDefinition = {
   runnerUpPrize: string;
   legend: string;
   country: string;
-  colours: string;
-  accent: string;
-  motif: string;
   locked: boolean;
   unlocksOn: string | null;
   rounds: Array<{ day: number; date: string; label: string }>;
@@ -141,18 +110,17 @@ function buildCup(id: number, dates: string[], participants: string[]): Omit<Cup
   addPlaceholderRound(matches, "semi-finals", 4, rounds[3].date, "Semi-final", 2);
   addPlaceholderRound(matches, "final", 5, rounds[4].date, "Final", 1);
 
+  const theme = cupThemes[id - 1];
+  const legendPlayer = getCupLegendPlayer(id);
   return {
     id,
-    name: cupNames[id - 1],
+    name: theme.cupName,
     startDate: rounds[0].date,
     endDate: rounds[4].date,
-    prize: legendPrizes[id - 1],
+    prize: `${theme.legend} ${legendPlayer?.rating ?? ""}`.trim(),
     runnerUpPrize: "30 stickers plus guaranteed Icon",
-    legend: cupThemes[id - 1].legend,
-    country: cupThemes[id - 1].country,
-    colours: cupThemes[id - 1].colours,
-    accent: cupThemes[id - 1].accent,
-    motif: cupThemes[id - 1].motif,
+    legend: theme.legend,
+    country: theme.country,
     rounds,
     matches
   };

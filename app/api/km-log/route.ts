@@ -47,7 +47,8 @@ export async function POST(request: Request) {
   const activityCredits = calculateActivityCredits(activityType, amount);
   const currentState = getPersistedUserState(user.id);
   const preview = calculateRewards(activityCredits, currentState.kmBalance, multiplier);
-  const allPlayers = getAllPlayers();
+  // Cup Legend cards (cupId set) are exclusive prizes, never randomly pullable.
+  const allPlayers = getAllPlayers().filter((player) => !player.cupId);
   const activityPlayerIds = Array.from({ length: preview.rewards }, () => getRandomPlayerFromPool(allPlayers).id);
   const comment = typeof body.comment === "string" ? body.comment.trim().slice(0, 240) : "";
   const rewardCreditValue = Number((activityCredits * multiplier).toFixed(2));
