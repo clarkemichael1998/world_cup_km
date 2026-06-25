@@ -63,13 +63,27 @@ export type CupDefinition = {
   colours: string;
   accent: string;
   motif: string;
+  locked: boolean;
+  unlocksOn: string | null;
   rounds: Array<{ day: number; date: string; label: string }>;
   matches: CupMatch[];
 };
 
+function getLondonToday() {
+  return new Date().toLocaleDateString("en-CA", { timeZone: "Europe/London" });
+}
+
 export function getCupHubData() {
   const participants = getCupParticipants();
-  const cups = cupSchedules.map((dates, index) => buildCup(index + 1, dates, participants));
+  const today = getLondonToday();
+  const cups = cupSchedules.map((dates, index) => {
+    const cup = buildCup(index + 1, dates, participants);
+    // Each cup (after the first) stays locked until the previous cup begins,
+    // so the next theme/draw is a surprise rather than visible from day one.
+    const unlocksOn = index === 0 ? null : cupSchedules[index - 1][0];
+    const locked = unlocksOn !== null && today < unlocksOn;
+    return { ...cup, locked, unlocksOn };
+  });
   return {
     participants,
     cups,
@@ -101,7 +115,7 @@ function getCupParticipants() {
     .filter((username) => !adminUsernames.has(username.toLowerCase()));
 }
 
-function buildCup(id: number, dates: string[], participants: string[]): CupDefinition {
+function buildCup(id: number, dates: string[], participants: string[]): Omit<CupDefinition, "locked" | "unlocksOn"> {
   const shuffled = deterministicShuffle(participants, id * 2026);
   const rounds = roundLabels.map((label, index) => ({ day: index + 1, date: dates[index], label }));
   const matches: CupMatch[] = [];
