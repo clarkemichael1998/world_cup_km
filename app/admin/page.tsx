@@ -331,6 +331,8 @@ function LiveSettleTab({ onForbidden }: { onForbidden: () => void }) {
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [diagUser, setDiagUser] = useState("");
+  const [diagPlayerId, setDiagPlayerId] = useState("1125");
+  const [diagMatchDate, setDiagMatchDate] = useState("2026-06-23");
   const [diagLines, setDiagLines] = useState<string[] | null>(null);
   const [diagBusy, setDiagBusy] = useState(false);
 
@@ -343,6 +345,29 @@ function LiveSettleTab({ onForbidden }: { onForbidden: () => void }) {
       if (res.status === 403) { onForbidden(); return; }
       const data = (await res.json().catch(() => ({}))) as { lines?: string[]; error?: string };
       setDiagLines(data.lines ?? [data.error ?? "No result."]);
+    } finally {
+      setDiagBusy(false);
+    }
+  }
+
+  async function repairBoost() {
+    if (diagBusy || !diagUser.trim() || !diagPlayerId.trim()) return;
+    setDiagBusy(true);
+    setDiagLines(null);
+    try {
+      const res = await fetch("/api/admin/boost-diagnostic", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          username: diagUser.trim(),
+          playerId: Number(diagPlayerId),
+          matchDate: diagMatchDate.trim() || undefined
+        })
+      });
+      if (res.status === 403) { onForbidden(); return; }
+      const data = (await res.json().catch(() => ({}))) as { lines?: string[]; repaired?: number; error?: string };
+      setDiagLines(data.lines ? [`Repaired rows: ${data.repaired ?? 0}`, ...data.lines] : [data.error ?? "No result."]);
     } finally {
       setDiagBusy(false);
     }
@@ -456,6 +481,16 @@ function LiveSettleTab({ onForbidden }: { onForbidden: () => void }) {
           <button onClick={runDiagnostic} disabled={diagBusy || !diagUser.trim()}
             className="rounded-md bg-green-950 px-5 py-2 font-black text-white hover:bg-green-800 disabled:opacity-40">
             {diagBusy ? "Checking…" : "Check"}
+          </button>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <input value={diagPlayerId} onChange={(e) => setDiagPlayerId(e.target.value)} placeholder="player id"
+            className="w-28 rounded-md border border-green-900/20 px-3 py-2 text-sm font-semibold text-green-950 focus:outline-none focus:ring-2 focus:ring-green-800" />
+          <input value={diagMatchDate} onChange={(e) => setDiagMatchDate(e.target.value)} placeholder="match date"
+            className="w-40 rounded-md border border-green-900/20 px-3 py-2 text-sm font-semibold text-green-950 focus:outline-none focus:ring-2 focus:ring-green-800" />
+          <button onClick={repairBoost} disabled={diagBusy || !diagUser.trim() || !diagPlayerId.trim()}
+            className="rounded-md bg-amber-600 px-5 py-2 font-black text-white hover:bg-amber-700 disabled:opacity-40">
+            Audit & Repair Player Boost
           </button>
         </div>
         {diagLines ? (

@@ -13,6 +13,14 @@ const dbDir = path.join(process.cwd(), "data");
 const dbPath = process.env.SQLITE_DB_PATH ?? path.join(dbDir, "km-footy.sqlite");
 const sessionCookie = "km_footy_session";
 const basePlayers = players as Player[];
+const goalBoostByRarity: Record<Rarity, number> = {
+  icon: 2,
+  legend: 2,
+  epic: 3,
+  rare: 5,
+  common: 10,
+  clowns: -5
+};
 
 type UserRow = {
   id: number;
@@ -1093,6 +1101,107 @@ export function getUserBoostDiagnostic(username: string): { found: boolean; line
   }
 
   return { found: true, lines };
+}
+
+export function repairUserGoalBoost(username: string, playerId: number, matchDate?: string): { found: boolean; repaired: number; lines: string[] } {
+  const db = getDb();
+  const normalizedUsername = username.trim().toLowerCase();
+  const user = db.prepare("SELECT id, username FROM users WHERE username = ?").get(normalizedUsername) as { id: number; username: string } | undefined;
+  if (!user) return { found: false, repaired: 0, lines: [`No user named "${username}".`] };
+
+  const player = getAllPlayers().find((item) => item.id === playerId);
+  if (!player) return { found: true, repaired: 0, lines: [`No player with id #${playerId}.`] };
+
+  const owned = db.prepare("SELECT player_id FROM user_players WHERE user_id = ? AND player_id = ?").get(user.id, playerId);
+  const locks = db
+    .prepare(
+      `SELECT ls.id, ls.lock_date, ls.locked_at, ls.unlock_at, lsp.slot
+       FROM locked_squads ls
+       JOIN locked_squad_players lsp ON lsp.locked_squad_id = ls.id
+       WHERE ls.user_id = ? AND lsp.player_id = ?
+       ORDER BY ls.lock_date`
+    )
+    .all(user.id, playerId) as Array<{ id: number; lock_date: string; locked_at: string; unlock_at: string; slot: string }>;
+  const scorerRows = db
+    .prepare(
+      `SELECT gs.id, gs.match_id, gs.scorer_name_raw, gs.goal_count, gs.status AS scorer_status,
+              fr.match_date, fr.kickoff_at, fr.home_team, fr.away_team, fr.status AS fixture_status
+       FROM goal_scorers gs
+       LEFT JOIN fixture_results fr ON fr.match_id = gs.match_id
+       WHERE gs.player_id = ?
+         AND (? IS NULL OR fr.match_date = ?)
+       ORDER BY fr.kickoff_at, gs.id`
+    )
+    .all(playerId, matchDate ?? null, matchDate ?? null) as Array<{
+      id: number;
+      match_id: string;
+      scorer_name_raw: string;
+      goal_count: number;
+      scorer_status: string;
+      match_date: string | null;
+      kickoff_at: string | null;
+      home_team: string | null;
+      away_team: string | null;
+      fixture_status: string | null;
+    }>;
+  const existingBoosts = new Set(
+    (db.prepare("SELECT match_id FROM goal_boosts WHERE user_id = ? AND player_id = ?").all(user.id, playerId) as Array<{ match_id: string }>).map((row) => row.match_id)
+  );
+
+  const lines = [
+    `Target: ${user.username} / ${player.name} (#${player.id}, ${player.rarity})${matchDate ? ` / ${matchDate}` : ""}`,
+    `Owned card: ${owned ? "YES" : "NO"}`,
+    `Locked squads containing player: ${locks.length}`,
+    `Matched scorer rows for player: ${scorerRows.length}`
+  ];
+  for (const lock of locks) {
+    lines.push(`  lock ${lock.lock_date} ${lock.locked_at} -> ${lock.unlock_at}, slot ${lock.slot}`);
+  }
+  for (const row of scorerRows) {
+    lines.push(
+      `  scorer row #${row.id}: ${row.scorer_name_raw} x${row.goal_count}, scorer ${row.scorer_status}, fixture ${row.fixture_status ?? "missing"}, ` +
+        `${row.home_team ?? "?"} v ${row.away_team ?? "?"}, date ${row.match_date ?? "?"}, kickoff ${row.kickoff_at ?? "missing"}, match ${row.match_id}`
+    );
+  }
+
+  let repaired = 0;
+  for (const row of scorerRows) {
+    if (row.scorer_status !== "matched") {
+      lines.push(`  skip ${row.match_id}: scorer status is ${row.scorer_status}, not matched.`);
+      continue;
+    }
+    if (row.fixture_status !== "FINISHED") {
+      lines.push(`  skip ${row.match_id}: fixture status is ${row.fixture_status ?? "missing"}, not FINISHED.`);
+      continue;
+    }
+    if (!row.kickoff_at) {
+      lines.push(`  skip ${row.match_id}: missing kickoff_at.`);
+      continue;
+    }
+    const matchingLocks = locks.filter((lock) => row.kickoff_at && row.kickoff_at >= lock.locked_at && row.kickoff_at < lock.unlock_at);
+    if (matchingLocks.length === 0) {
+      lines.push(`  skip ${row.match_id}: no locked squad containing ${player.name} covered kickoff ${row.kickoff_at}.`);
+      continue;
+    }
+    const boostPerGoal = goalBoostByRarity[player.rarity] ?? 0;
+    const amount = boostPerGoal * row.goal_count;
+    if (amount === 0) {
+      lines.push(`  skip ${row.match_id}: ${player.rarity} goal boost is 0.`);
+      continue;
+    }
+    const result = db
+      .prepare(
+        `INSERT INTO goal_boosts (user_id, player_id, match_id, boost_amount)
+         VALUES (?, ?, ?, ?)
+         ON CONFLICT(user_id, player_id, match_id) DO UPDATE SET
+           boost_amount = excluded.boost_amount`
+      )
+      .run(user.id, playerId, row.match_id, amount);
+    repaired += result.changes > 0 && !existingBoosts.has(row.match_id) ? 1 : 0;
+    lines.push(`  applied ${amount > 0 ? `+${amount}` : amount} for ${row.match_id} (${matchingLocks.map((lock) => lock.lock_date).join(", ")}).`);
+  }
+
+  return { found: true, repaired, lines };
 }
 
 export function setScorersConfirmed(matchId: string, confirmed: boolean) {
