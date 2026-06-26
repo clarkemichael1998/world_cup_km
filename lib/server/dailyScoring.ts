@@ -39,8 +39,15 @@ export function getDailyScore(db: DatabaseSync, userId: number, date: string): D
   const lockAtIso = lockAt.toISOString();
   const unlockAtIso = unlockAt.toISOString();
 
+  // km_log.created_at comes from SQLite's CURRENT_TIMESTAMP ("YYYY-MM-DD
+  // HH:MM:SS", space-separated, no Z) while lockAtIso/unlockAtIso are
+  // .toISOString() ("...THH:MM:SS.sssZ"). Comparing those two formats as raw
+  // strings silently breaks for the first half of every window — a space
+  // (0x20) sorts before "T" (0x54), so e.g. "2026-06-25 16:00:00" reads as
+  // LESS than "2026-06-25T15:00:00.000Z" even though 16:00 is later. Wrap
+  // both sides in datetime() so SQLite normalizes them before comparing.
   const activityRow = db
-    .prepare(`SELECT COALESCE(SUM(distance_km), 0) AS total FROM km_log WHERE user_id = ? AND voided_at IS NULL AND created_at >= ? AND created_at < ?`)
+    .prepare(`SELECT COALESCE(SUM(distance_km), 0) AS total FROM km_log WHERE user_id = ? AND voided_at IS NULL AND datetime(created_at) >= datetime(?) AND datetime(created_at) < datetime(?)`)
     .get(userId, lockAtIso, unlockAtIso) as { total: number };
 
   const winRow = db
