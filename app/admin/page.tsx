@@ -341,6 +341,24 @@ function LiveSettleTab({ onForbidden }: { onForbidden: () => void }) {
   const [diagMatchDate, setDiagMatchDate] = useState("2026-06-23");
   const [diagLines, setDiagLines] = useState<string[] | null>(null);
   const [diagBusy, setDiagBusy] = useState(false);
+  const [scoreUser, setScoreUser] = useState("");
+  const [scoreDate, setScoreDate] = useState("2026-06-25");
+  const [scoreLines, setScoreLines] = useState<string[] | null>(null);
+  const [scoreBusy, setScoreBusy] = useState(false);
+
+  async function runScoreDiagnostic() {
+    if (scoreBusy || !scoreUser.trim() || !scoreDate.trim()) return;
+    setScoreBusy(true);
+    setScoreLines(null);
+    try {
+      const res = await fetch(`/api/admin/daily-score-diagnostic?username=${encodeURIComponent(scoreUser.trim())}&date=${encodeURIComponent(scoreDate.trim())}`, { credentials: "include" });
+      if (res.status === 403) { onForbidden(); return; }
+      const data = (await res.json().catch(() => ({}))) as { lines?: string[]; error?: string };
+      setScoreLines(data.lines ?? [data.error ?? "No result."]);
+    } finally {
+      setScoreBusy(false);
+    }
+  }
 
   async function runDiagnostic() {
     if (diagBusy || !diagUser.trim()) return;
@@ -503,6 +521,27 @@ function LiveSettleTab({ onForbidden }: { onForbidden: () => void }) {
         </div>
         {diagLines ? (
           <pre className="mt-3 max-h-96 overflow-auto whitespace-pre-wrap rounded-md bg-green-950/5 p-3 text-xs font-semibold text-green-950">{diagLines.join("\n")}</pre>
+        ) : null}
+      </div>
+
+      <div className="mt-6 border-t border-green-900/10 pt-5">
+        <p className="text-sm font-bold uppercase tracking-wide text-green-900/60">Daily Score Diagnostic</p>
+        <p className="mt-2 text-sm font-semibold text-green-900/65">
+          Shows every km_log row, nation win, and goal/assist boost that feeds a user&apos;s matchday score for one date, plus the computed activity/football/total —
+          the exact same numbers the leaderboard and cup matches use. Useful for checking a manual recalculation line-by-line.
+        </p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <input value={scoreUser} onChange={(e) => setScoreUser(e.target.value)} placeholder="username"
+            className="min-w-48 flex-1 rounded-md border border-green-900/20 px-3 py-2 text-sm font-semibold text-green-950 focus:outline-none focus:ring-2 focus:ring-green-800" />
+          <input value={scoreDate} onChange={(e) => setScoreDate(e.target.value)} placeholder="YYYY-MM-DD"
+            className="w-40 rounded-md border border-green-900/20 px-3 py-2 text-sm font-semibold text-green-950 focus:outline-none focus:ring-2 focus:ring-green-800" />
+          <button onClick={runScoreDiagnostic} disabled={scoreBusy || !scoreUser.trim() || !scoreDate.trim()}
+            className="rounded-md bg-green-950 px-5 py-2 font-black text-white hover:bg-green-800 disabled:opacity-40">
+            {scoreBusy ? "Checking…" : "Check"}
+          </button>
+        </div>
+        {scoreLines ? (
+          <pre className="mt-3 max-h-96 overflow-auto whitespace-pre-wrap rounded-md bg-green-950/5 p-3 text-xs font-semibold text-green-950">{scoreLines.join("\n")}</pre>
         ) : null}
       </div>
     </section>

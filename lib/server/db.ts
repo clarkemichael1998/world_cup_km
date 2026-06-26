@@ -8,8 +8,8 @@ import { getAdminUsernames } from "@/lib/server/admin";
 import { cupLegendPlayers } from "@/lib/cupLegends";
 import type { ActivityType, Player, Position, Rarity, SquadSlot } from "@/lib/types";
 import { DEFAULT_ACTIVITY_MULTIPLIER, rarityOdds } from "@/lib/rewardEngine";
-import { compareDailyScores, getDailyScore } from "@/lib/server/dailyScoring";
-import { getLondonMatchday } from "./matchday";
+import { compareDailyScores, getDailyScore, NATION_WIN_POINTS } from "@/lib/server/dailyScoring";
+import { getLondonMatchday, londonLockWindowForDate } from "./matchday";
 
 const dbDir = path.join(process.cwd(), "data");
 const dbPath = process.env.SQLITE_DB_PATH ?? path.join(dbDir, "km-footy.sqlite");
@@ -1038,6 +1038,85 @@ export function getCompletedGamesWithScorers(): AdminCompletedGame[] {
 // Explains, for a user, why each matched scorer did or didn't boost them:
 // whether the match fell inside one of their lock windows, whether the player
 // was in that locked XI, and whether a boost row exists.
+// Full breakdown of getDailyScore() for one user+date — every contributing
+// row, not just the totals — so a manual recalculation can be checked
+// line-by-line against exactly what the leaderboard/cup matches use.
+export function getDailyScoreDiagnostic(username: string, date: string): { found: boolean; lines: string[] } {
+  const db = getDb();
+  const user = db.prepare("SELECT id, username FROM users WHERE username = ?").get(username.trim().toLowerCase()) as { id: number; username: string } | undefined;
+  if (!user) return { found: false, lines: [`No user named "${username}".`] };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { found: false, lines: [`"${date}" isn't a YYYY-MM-DD date.`] };
+
+  const { lockAt, unlockAt } = londonLockWindowForDate(date);
+  const lockAtIso = lockAt.toISOString();
+  const unlockAtIso = unlockAt.toISOString();
+  const lines: string[] = [
+    `User "${user.username}" — matchday ${date}`,
+    `Window: ${lockAtIso} → ${unlockAtIso} (3pm UK → 3pm UK)`,
+    ""
+  ];
+
+  lines.push("--- Activity (km_log) ---");
+  const activityRows = db
+    .prepare(
+      `SELECT id, distance_km, activity_type, created_at, voided_at
+       FROM km_log
+       WHERE user_id = ? AND datetime(created_at) >= datetime(?) AND datetime(created_at) < datetime(?)
+       ORDER BY created_at`
+    )
+    .all(user.id, lockAtIso, unlockAtIso) as Array<{ id: number; distance_km: number; activity_type: string; created_at: string; voided_at: string | null }>;
+  if (activityRows.length === 0) lines.push("  (no km_log rows in this window)");
+  for (const row of activityRows) {
+    const voided = row.voided_at ? " — VOIDED, excluded" : "";
+    lines.push(`  #${row.id} ${row.activity_type} +${row.distance_km} credits @ ${row.created_at}${voided}`);
+  }
+
+  lines.push("", "--- Nation wins (reward_events) ---");
+  const winRows = db
+    .prepare(
+      `SELECT re.player_id, re.match_id, re.credits
+       FROM reward_events re
+       JOIN locked_squads ls ON ls.id = re.locked_squad_id
+       WHERE re.user_id = ? AND ls.lock_date = ?
+       ORDER BY re.id`
+    )
+    .all(user.id, date) as Array<{ player_id: number; match_id: string; credits: number }>;
+  if (winRows.length === 0) lines.push("  (no reward_events rows for this lock_date)");
+  const playerMap = new Map(getAllPlayers().map((p) => [p.id, p]));
+  for (const row of winRows) {
+    lines.push(`  ${playerMap.get(row.player_id)?.name ?? `#${row.player_id}`} won (${row.match_id}) — +${NATION_WIN_POINTS} pts`);
+  }
+
+  lines.push("", "--- Goal/assist boosts (goal_boosts) ---");
+  const boostRows = db
+    .prepare(
+      `SELECT gb.player_id, gb.match_id, gb.boost_amount, fr.kickoff_at, fr.home_team, fr.away_team
+       FROM goal_boosts gb
+       JOIN fixture_results fr ON fr.match_id = (
+         CASE WHEN gb.match_id LIKE '%:assist' THEN substr(gb.match_id, 1, length(gb.match_id) - 7) ELSE gb.match_id END
+       )
+       WHERE gb.user_id = ? AND fr.kickoff_at >= ? AND fr.kickoff_at < ?
+       ORDER BY fr.kickoff_at`
+    )
+    .all(user.id, lockAtIso, unlockAtIso) as Array<{ player_id: number; match_id: string; boost_amount: number; kickoff_at: string; home_team: string; away_team: string }>;
+  if (boostRows.length === 0) lines.push("  (no goal_boosts rows with a kickoff in this window)");
+  for (const row of boostRows) {
+    const isAssist = row.match_id.endsWith(":assist");
+    lines.push(`  ${playerMap.get(row.player_id)?.name ?? `#${row.player_id}`} ${isAssist ? "assist" : "goal"} boost ${row.boost_amount >= 0 ? "+" : ""}${row.boost_amount} (${row.home_team} v ${row.away_team} @ ${row.kickoff_at})`);
+  }
+
+  const score = getDailyScore(db, user.id, date);
+  lines.push(
+    "",
+    "--- Computed (what the leaderboard/cup match actually uses) ---",
+    `Activity: raw ${score.activityRaw} → points ${score.activityPoints}${score.activityRaw > score.activityPoints ? " (capped at 40)" : ""}`,
+    `Football: ${score.winCount} win(s) = ${score.winPoints} pts, boosts = ${score.boostRaw} pts → raw ${score.footballRaw} → points ${score.footballPoints}${score.footballRaw > score.footballPoints ? " (capped at 40)" : ""}`,
+    `Total: ${score.total}`
+  );
+
+  return { found: true, lines };
+}
+
 export function getUserBoostDiagnostic(username: string): { found: boolean; lines: string[] } {
   const db = getDb();
   const user = db.prepare("SELECT id, username FROM users WHERE username = ?").get(username.trim().toLowerCase()) as { id: number; username: string } | undefined;
