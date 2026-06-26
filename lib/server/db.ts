@@ -1786,25 +1786,28 @@ function updateRankSnapshot(db: DatabaseSync, orderedUserIds: number[]): Map<num
 // Daily head-to-head standings, computed with the exact same formula used to
 // decide cup matches (see lib/server/dailyScoring.ts) — so the leaderboard's
 // daily crown and a cup match winner are never decided by different rules.
-// Days before today keep the daily win they were originally awarded under
-// the old credits+boost ranking — re-deriving them with the new formula
-// could flip who "won" a day that's already been announced. Only today and
-// future days use the new, transparent activity+football scoring shared
-// with cup matches.
+// The day the new transparent activity+football scoring shipped. Days from
+// here onward ALWAYS use it; days before it ALWAYS keep the old
+// credits+boost ranking they were originally awarded under. This must stay
+// a fixed date, not "today" recomputed on each request — otherwise a day
+// that was live while it was happening would silently demote to legacy the
+// moment the calendar rolls past it, flipping who "won" an already-decided
+// day.
+const SCORING_CUTOVER_DATE = "2026-06-25";
+
 export function getMatchdayHeadToHead(limit = 10) {
   const db = getDb();
   const adminUsernames = getAdminUsernames();
-  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/London" });
 
-  const legacy = getLegacyHeadToHead(db, adminUsernames, today);
-  const live = getLiveHeadToHead(db, adminUsernames, today);
+  const legacy = getLegacyHeadToHead(db, adminUsernames, SCORING_CUTOVER_DATE);
+  const live = getLiveHeadToHead(db, adminUsernames, SCORING_CUTOVER_DATE);
 
   return [...legacy, ...live].sort((a, b) => b.date.localeCompare(a.date)).slice(0, limit);
 }
 
 // Exact pre-cutover logic: a day only appears if someone actually earned a
 // credit or a boost on it, ranked by credits then boost (no activity points).
-function getLegacyHeadToHead(db: ReturnType<typeof getDb>, adminUsernames: Set<string>, today: string) {
+function getLegacyHeadToHead(db: ReturnType<typeof getDb>, adminUsernames: Set<string>, cutoverDate: string) {
   const creditRows = db
     .prepare(
       `SELECT ls.lock_date AS date, users.username, SUM(re.credits) AS credits
@@ -1814,7 +1817,7 @@ function getLegacyHeadToHead(db: ReturnType<typeof getDb>, adminUsernames: Set<s
        WHERE ls.lock_date < ?
        GROUP BY ls.lock_date, re.user_id`
     )
-    .all(today) as Array<{ date: string; username: string; credits: number }>;
+    .all(cutoverDate) as Array<{ date: string; username: string; credits: number }>;
 
   const boostRows = db
     .prepare(
@@ -1843,7 +1846,7 @@ function getLegacyHeadToHead(db: ReturnType<typeof getDb>, adminUsernames: Set<s
   }
   for (const row of boostRows) {
     const date = getLondonMatchday(new Date(row.kickoff_at));
-    if (date >= today) continue;
+    if (date >= cutoverDate) continue;
     const entry = entryFor(date, row.username);
     if (entry) entry.boost += row.boost;
   }
@@ -1858,7 +1861,7 @@ function getLegacyHeadToHead(db: ReturnType<typeof getDb>, adminUsernames: Set<s
 
 // New transparent scoring, shared with cup matches: a day only appears if
 // someone had a locked squad that day, win or lose.
-function getLiveHeadToHead(db: ReturnType<typeof getDb>, adminUsernames: Set<string>, today: string) {
+function getLiveHeadToHead(db: ReturnType<typeof getDb>, adminUsernames: Set<string>, cutoverDate: string) {
   const participantRows = db
     .prepare(
       `SELECT DISTINCT ls.lock_date AS date, ls.user_id AS userId, users.username AS username
@@ -1866,7 +1869,7 @@ function getLiveHeadToHead(db: ReturnType<typeof getDb>, adminUsernames: Set<str
        JOIN users ON users.id = ls.user_id
        WHERE ls.lock_date >= ?`
     )
-    .all(today) as Array<{ date: string; userId: number; username: string }>;
+    .all(cutoverDate) as Array<{ date: string; userId: number; username: string }>;
 
   const byDate = new Map<string, Array<{ userId: number; username: string }>>();
   for (const row of participantRows) {

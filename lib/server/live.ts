@@ -102,6 +102,9 @@ export function settleAllLiveAwards() {
     settleUserLive(row.id);
   }
   const reconciledBoosts = reconcileMissingGoalBoosts();
+  // Announce only after every eligible user above has been awarded, so the
+  // message lists every recipient rather than just whoever was processed first.
+  announcePendingBoosts();
   return { usersSettled: rows.length, reconciledBoosts };
 }
 
@@ -313,9 +316,7 @@ function awardGoalBoosts(userId: number) {
       const player = getPlayerById(row.player_id);
       if (!player) continue;
       const boostPerGoal = GOAL_BOOST_BY_RARITY[player.rarity] ?? 0;
-      if (boostPerGoal !== 0 && awardGoalBoost(userId, row.player_id, row.match_id, boostPerGoal * row.goal_count)) {
-        announceBoost(row.match_id, player, boostPerGoal * row.goal_count, row.goal_count, "goal");
-      }
+      if (boostPerGoal !== 0) awardGoalBoost(userId, row.player_id, row.match_id, boostPerGoal * row.goal_count);
     }
 
     for (const row of assistRows) {
@@ -324,9 +325,7 @@ function awardGoalBoosts(userId: number) {
       const player = getPlayerById(row.player_id);
       if (!player) continue;
       const boostPerAssist = ASSIST_BOOST_BY_RARITY[player.rarity] ?? 0;
-      if (boostPerAssist !== 0 && awardGoalBoost(userId, row.player_id, `${row.match_id}:assist`, boostPerAssist * row.assist_count)) {
-        announceBoost(row.match_id, player, boostPerAssist * row.assist_count, row.assist_count, "assist");
-      }
+      if (boostPerAssist !== 0) awardGoalBoost(userId, row.player_id, `${row.match_id}:assist`, boostPerAssist * row.assist_count);
     }
   }
 }
@@ -371,9 +370,7 @@ function reconcileMissingGoalBoosts() {
     if (!player) continue;
     const amount = (GOAL_BOOST_BY_RARITY[player.rarity] ?? 0) * row.goal_count;
     if (amount === 0) continue;
-    const inserted = awardGoalBoost(row.user_id, row.player_id, row.match_id, amount);
-    if (inserted) applied++;
-    announceBoost(row.match_id, player, amount, row.goal_count, "goal");
+    if (awardGoalBoost(row.user_id, row.player_id, row.match_id, amount)) applied++;
   }
 
   for (const row of assistCandidates) {
@@ -381,12 +378,55 @@ function reconcileMissingGoalBoosts() {
     if (!player) continue;
     const amount = (ASSIST_BOOST_BY_RARITY[player.rarity] ?? 0) * row.assist_count;
     if (amount === 0) continue;
-    const inserted = awardGoalBoost(row.user_id, row.player_id, `${row.match_id}:assist`, amount);
-    if (inserted) applied++;
-    announceBoost(row.match_id, player, amount, row.assist_count, "assist");
+    if (awardGoalBoost(row.user_id, row.player_id, `${row.match_id}:assist`, amount)) applied++;
   }
 
   return applied;
+}
+
+// Final pass after ALL recipients for this settlement run have already been
+// inserted (so the announcement lists everyone, not just whoever happened to
+// be processed first). Only fires once per (match, player, event) ever,
+// and only for combos that actually have at least one locked recipient.
+function announcePendingBoosts() {
+  const database = getDb();
+  const players = new Map(getAllPlayers().map((player) => [player.id, player]));
+
+  const goalRows = database
+    .prepare(
+      `SELECT gs.match_id, gs.player_id, gs.goal_count
+       FROM goal_scorers gs
+       WHERE gs.status = 'matched' AND gs.player_id IS NOT NULL
+         AND EXISTS (SELECT 1 FROM goal_boosts gb WHERE gb.match_id = gs.match_id AND gb.player_id = gs.player_id)
+         AND NOT EXISTS (SELECT 1 FROM boost_announcements ba WHERE ba.match_id = gs.match_id AND ba.player_id = gs.player_id AND ba.event_type = 'goal')`
+    )
+    .all() as Array<{ match_id: string; player_id: number; goal_count: number }>;
+
+  const assistRows = database
+    .prepare(
+      `SELECT as2.match_id, as2.player_id, as2.assist_count
+       FROM assist_scorers as2
+       WHERE as2.status = 'matched' AND as2.player_id IS NOT NULL
+         AND EXISTS (SELECT 1 FROM goal_boosts gb WHERE gb.match_id = as2.match_id || ':assist' AND gb.player_id = as2.player_id)
+         AND NOT EXISTS (SELECT 1 FROM boost_announcements ba WHERE ba.match_id = as2.match_id AND ba.player_id = as2.player_id AND ba.event_type = 'assist')`
+    )
+    .all() as Array<{ match_id: string; player_id: number; assist_count: number }>;
+
+  for (const row of goalRows) {
+    const player = players.get(row.player_id);
+    if (!player) continue;
+    const amount = (GOAL_BOOST_BY_RARITY[player.rarity] ?? 0) * row.goal_count;
+    if (amount === 0) continue;
+    announceBoost(row.match_id, player, amount, row.goal_count, "goal");
+  }
+
+  for (const row of assistRows) {
+    const player = players.get(row.player_id);
+    if (!player) continue;
+    const amount = (ASSIST_BOOST_BY_RARITY[player.rarity] ?? 0) * row.assist_count;
+    if (amount === 0) continue;
+    announceBoost(row.match_id, player, amount, row.assist_count, "assist");
+  }
 }
 
 // Announced once game-wide per (match, player, event) — the boost amount is
@@ -394,13 +434,23 @@ function reconcileMissingGoalBoosts() {
 // / "🤡CLOWN" markers are detected by the chat to give these their own styling.
 function announceBoost(matchId: string, player: Player, boost: number, count: number, type: "goal" | "assist") {
   if (!claimBoostAnnouncement(matchId, player.id, type)) return;
+
+  const recipientMatchId = type === "assist" ? `${matchId}:assist` : matchId;
+  const recipients = (getDb()
+    .prepare("SELECT users.username FROM goal_boosts gb JOIN users ON users.id = gb.user_id WHERE gb.player_id = ? AND gb.match_id = ? ORDER BY users.username")
+    .all(player.id, recipientMatchId) as Array<{ username: string }>).map((row) => row.username);
+  // Locked-squad gating means this can never be empty in practice, but stay
+  // silent rather than announce a boost that applied to no one.
+  if (recipients.length === 0) return;
+
+  const who = ` Boosted: ${recipients.join(", ")}.`;
   const feat = featPhrase(count, type);
   const base = player.rating;
   const after = base + boost;
   if (boost > 0) {
-    createAdminChatMessage(`⚡ UPGRADE · ${player.name} ${feat}! +${boost} on his card: ${base} → ${after} 📈`);
+    createAdminChatMessage(`⚡ UPGRADE · ${player.name} ${feat}! +${boost} on his card: ${base} → ${after} 📈${who}`);
   } else {
-    createAdminChatMessage(`🤡 CLOWN TAX · ${player.name} ${feat} — ${boost} on his card: ${base} → ${after} 📉`);
+    createAdminChatMessage(`🤡 CLOWN TAX · ${player.name} ${feat} — ${boost} on his card: ${base} → ${after} 📉${who}`);
   }
 }
 
