@@ -1,7 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
 import { getAdminUsernames } from "@/lib/server/admin";
 import { getDb } from "@/lib/server/db";
-import { compareDailyScores, getDailyScore, isMatchdaySettled } from "@/lib/server/dailyScoring";
+import { compareDailyScores, getDailyScore, isMatchdayOpen, isMatchdaySettled } from "@/lib/server/dailyScoring";
 import { cupThemes } from "@/lib/cupLegends";
 
 const cupSchedules = [
@@ -208,26 +208,29 @@ function resolveBracket(db: DatabaseSync, matches: BuildMatch[]): CupMatch[] {
     } else if (away.isBye && !home.isBye && home.userId !== null) {
       winner = { username: home.display, userId: home.userId };
       status = "bye";
-    } else if (home.userId !== null && away.userId !== null) {
-      // Both sides known: show the running score whether or not the day has
-      // closed, so players can watch a head-to-head update live. Only
-      // actually decide a winner once the matchday window has settled.
+    } else if (home.userId !== null && away.userId !== null && isMatchdaySettled(match.date)) {
       const homeDaily = getDailyScore(db, home.userId, match.date);
       const awayDaily = getDailyScore(db, away.userId, match.date);
       homeScore = homeDaily.total;
       awayScore = awayDaily.total;
-      if (isMatchdaySettled(match.date)) {
-        const cmp = compareDailyScores(homeDaily, awayDaily);
-        // Last-resort deterministic tie-break (identical total AND activity)
-        // so a match never gets stuck unresolved: lower username wins.
-        winner = cmp < 0 || (cmp === 0 && home.display.localeCompare(away.display) <= 0)
-          ? { username: home.display, userId: home.userId }
-          : { username: away.display, userId: away.userId };
-        status = "decided";
-      } else {
-        status = "live";
-      }
+      const cmp = compareDailyScores(homeDaily, awayDaily);
+      // Last-resort deterministic tie-break (identical total AND activity)
+      // so a match never gets stuck unresolved: lower username wins.
+      winner = cmp < 0 || (cmp === 0 && home.display.localeCompare(away.display) <= 0)
+        ? { username: home.display, userId: home.userId }
+        : { username: away.display, userId: away.userId };
+      status = "decided";
+    } else if (home.userId !== null && away.userId !== null && isMatchdayOpen(match.date)) {
+      // Both sides known AND this date's window is the one currently open —
+      // not a future round whose participants just happen to be known
+      // already. Show the running score, but don't decide a winner yet.
+      homeScore = getDailyScore(db, home.userId, match.date).total;
+      awayScore = getDailyScore(db, away.userId, match.date).total;
+      status = "live";
     }
+    // Otherwise (both known but the window hasn't opened yet, e.g. a future
+    // round) stays "scheduled" with no score — it isn't live just because
+    // the draw already assigned real names to both slots.
 
     if (winner) decided.set(match.id, winner);
 

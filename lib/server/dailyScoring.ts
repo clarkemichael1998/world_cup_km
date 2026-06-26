@@ -34,6 +34,15 @@ export function isMatchdaySettled(date: string, now: Date = new Date()): boolean
   return now.getTime() >= unlockAt.getTime();
 }
 
+// True only while the 3pm-to-3pm window for this date is the one currently
+// open — not before it starts, not after it closes. A future round's day
+// (e.g. tomorrow's R16) is NOT "live" just because both sides happen to
+// already be known; it has to have actually started.
+export function isMatchdayOpen(date: string, now: Date = new Date()): boolean {
+  const { lockAt, unlockAt } = londonLockWindowForDate(date);
+  return now.getTime() >= lockAt.getTime() && now.getTime() < unlockAt.getTime();
+}
+
 export function getDailyScore(db: DatabaseSync, userId: number, date: string): DailyScore {
   const { lockAt, unlockAt } = londonLockWindowForDate(date);
   const lockAtIso = lockAt.toISOString();
