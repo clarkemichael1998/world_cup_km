@@ -19,7 +19,7 @@ type CupMatch = {
   homeScore: number | null;
   awayScore: number | null;
   winner: string | null;
-  status: "scheduled" | "decided" | "bye";
+  status: "scheduled" | "live" | "decided" | "bye";
 };
 type CupDefinition = {
   id: number;
@@ -274,13 +274,17 @@ function BracketPanel({ cup, theme }: { cup: CupDefinition; theme: CupTheme }) {
               <p className="mb-3 text-xs font-bold text-green-900/55">{formatDate(round.date)}</p>
               <div className="space-y-2">
                 {matches.map((match) => (
-                  <div key={match.id} className={`rounded-md bg-white p-3 shadow-sm ring-1 ${match.status === "decided" ? "ring-green-900/15" : "ring-green-900/5"}`}>
+                  <div key={match.id} className={`rounded-md bg-white p-3 shadow-sm ring-1 ${match.status === "decided" ? "ring-green-900/15" : match.status === "live" ? "ring-red-400/40" : "ring-green-900/5"}`}>
                     <div className="mb-2 flex items-center justify-between gap-2">
                       <p className="text-[10px] font-black uppercase tracking-wide text-green-900/45">{match.label}</p>
                       {match.status === "decided" ? (
                         <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-black uppercase ${theme.accent}`}>Final</span>
                       ) : match.status === "bye" ? (
                         <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[9px] font-black uppercase text-slate-500">Bye</span>
+                      ) : match.status === "live" ? (
+                        <span className="flex items-center gap-1 rounded-full bg-red-50 px-1.5 py-0.5 text-[9px] font-black uppercase text-red-600">
+                          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500" /> Live
+                        </span>
                       ) : (
                         <span className="rounded-full bg-sky-50 px-1.5 py-0.5 text-[9px] font-black uppercase text-sky-600">Upcoming</span>
                       )}

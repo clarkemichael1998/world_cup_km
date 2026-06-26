@@ -8,6 +8,23 @@ import { ChatFeed } from "@/components/ChatFeed";
 
 const WC_FINAL = new Date("2026-07-19T18:00:00Z");
 
+type MatchdayScore = {
+  date: string;
+  lockAt: string;
+  unlockAt: string;
+  settled: boolean;
+  score: {
+    activityRaw: number;
+    activityPoints: number;
+    winCount: number;
+    winPoints: number;
+    boostRaw: number;
+    footballRaw: number;
+    footballPoints: number;
+    total: number;
+  };
+};
+
 function useCountdown() {
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
@@ -32,6 +49,7 @@ export default function Home() {
   const [newsBusy, setNewsBusy] = useState(false);
   const [redeemAmount, setRedeemAmount] = useState(1);
   const [redeeming, setRedeeming] = useState(false);
+  const [matchdayScore, setMatchdayScore] = useState<MatchdayScore | null>(null);
   const router = useRouter();
   const countdown = useCountdown();
 
@@ -47,6 +65,10 @@ export default function Home() {
         setWonMatchday(p.wonMatchday ?? null);
         setNewsMessage(p.news?.message ?? "");
       })
+      .catch(() => {});
+    fetch("/api/matchday/score", { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((p) => setMatchdayScore(p))
       .catch(() => {});
   }, []);
 
@@ -103,6 +125,8 @@ export default function Home() {
         )}
       </div>
 
+      {matchdayScore ? <MatchdayScoreCard data={matchdayScore} /> : null}
+
       {canSetNews ? (
         <section className="rounded-lg border border-amber-400 bg-gradient-to-r from-amber-50 to-yellow-50 p-4 shadow-sm">
           <p className="text-sm font-bold uppercase tracking-wide text-amber-800">👑 Matchday Champion{wonMatchday ? ` — ${wonMatchday}` : ""}</p>
@@ -155,5 +179,47 @@ function CountUnit({ value, label }: { value: number; label: string }) {
       <p className="text-2xl font-black leading-none tabular-nums">{String(value).padStart(2, "0")}</p>
       <p className="text-[9px] font-black uppercase tracking-wide text-green-200/70">{label}</p>
     </div>
+  );
+}
+
+// Same activity/football/total formula the leaderboard and cup matches use,
+// updating live as the player logs activity — visible before the matchday
+// window even closes, not just after.
+function MatchdayScoreCard({ data }: { data: MatchdayScore }) {
+  const { score } = data;
+  const activityCapped = score.activityRaw > score.activityPoints;
+  const footballCapped = score.footballRaw > score.footballPoints;
+
+  return (
+    <section className="rounded-lg border border-green-900/10 bg-white p-4 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wide text-green-900/50">
+            {data.settled ? "Last Matchday" : "Today's Matchday"} · {data.date}
+          </p>
+          <p className="mt-0.5 text-xs font-semibold text-green-900/55">
+            {data.settled ? "Closed — final score for that day." : "Still open — updates live as you log activity and matches play out."}
+          </p>
+        </div>
+        <span className={`text-2xl font-black ${data.settled ? "text-green-950" : "text-pitch"}`}>{score.total.toFixed(1)}</span>
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <div className="rounded-md bg-green-950/5 px-3 py-2">
+          <p className="text-[10px] font-black uppercase tracking-wide text-green-900/40">Activity</p>
+          <p className="mt-0.5 text-lg font-black text-green-950">
+            {score.activityPoints.toFixed(1)}
+            {activityCapped ? <span className="ml-1 text-xs font-bold text-green-900/40">(capped, {score.activityRaw.toFixed(1)} logged)</span> : null}
+          </p>
+        </div>
+        <div className="rounded-md bg-green-950/5 px-3 py-2">
+          <p className="text-[10px] font-black uppercase tracking-wide text-green-900/40">Football</p>
+          <p className="mt-0.5 text-lg font-black text-green-950">
+            {score.footballPoints.toFixed(0)}
+            {footballCapped ? <span className="ml-1 text-xs font-bold text-green-900/40">(capped)</span> : null}
+          </p>
+          <p className="text-[10px] font-semibold text-green-900/45">{score.winCount} win{score.winCount === 1 ? "" : "s"} · {score.boostRaw >= 0 ? "+" : ""}{score.boostRaw} boosts</p>
+        </div>
+      </div>
+    </section>
   );
 }

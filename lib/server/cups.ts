@@ -29,7 +29,7 @@ export type CupMatch = {
   awayScore: number | null;
   /** Username of the decided winner, else null while still scheduled/TBD. */
   winner: string | null;
-  status: "scheduled" | "decided" | "bye";
+  status: "scheduled" | "live" | "decided" | "bye";
 };
 
 export type CupDefinition = {
@@ -208,18 +208,25 @@ function resolveBracket(db: DatabaseSync, matches: BuildMatch[]): CupMatch[] {
     } else if (away.isBye && !home.isBye && home.userId !== null) {
       winner = { username: home.display, userId: home.userId };
       status = "bye";
-    } else if (home.userId !== null && away.userId !== null && isMatchdaySettled(match.date)) {
+    } else if (home.userId !== null && away.userId !== null) {
+      // Both sides known: show the running score whether or not the day has
+      // closed, so players can watch a head-to-head update live. Only
+      // actually decide a winner once the matchday window has settled.
       const homeDaily = getDailyScore(db, home.userId, match.date);
       const awayDaily = getDailyScore(db, away.userId, match.date);
       homeScore = homeDaily.total;
       awayScore = awayDaily.total;
-      const cmp = compareDailyScores(homeDaily, awayDaily);
-      // Last-resort deterministic tie-break (identical total AND activity)
-      // so a match never gets stuck unresolved: lower username wins.
-      winner = cmp < 0 || (cmp === 0 && home.display.localeCompare(away.display) <= 0)
-        ? { username: home.display, userId: home.userId }
-        : { username: away.display, userId: away.userId };
-      status = "decided";
+      if (isMatchdaySettled(match.date)) {
+        const cmp = compareDailyScores(homeDaily, awayDaily);
+        // Last-resort deterministic tie-break (identical total AND activity)
+        // so a match never gets stuck unresolved: lower username wins.
+        winner = cmp < 0 || (cmp === 0 && home.display.localeCompare(away.display) <= 0)
+          ? { username: home.display, userId: home.userId }
+          : { username: away.display, userId: away.userId };
+        status = "decided";
+      } else {
+        status = "live";
+      }
     }
 
     if (winner) decided.set(match.id, winner);
