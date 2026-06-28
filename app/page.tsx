@@ -1,12 +1,25 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { BrandLogo } from "@/components/BrandLogo";
 import { Button } from "@/components/Button";
 import { ChatFeed } from "@/components/ChatFeed";
+import { getCupThemeById } from "@/lib/cupLegends";
 
 const WC_FINAL = new Date("2026-07-19T18:00:00Z");
+
+type CupStatus = {
+  cupId: number;
+  cupName: string;
+  state: "champion" | "through" | "live" | "upcoming" | "eliminated";
+  round: string;
+  roundDate: string;
+  opponent: string | null;
+  myScore: number | null;
+  opponentScore: number | null;
+};
 
 type MatchdayScore = {
   date: string;
@@ -50,10 +63,15 @@ export default function Home() {
   const [redeemAmount, setRedeemAmount] = useState(1);
   const [redeeming, setRedeeming] = useState(false);
   const [matchdayScore, setMatchdayScore] = useState<MatchdayScore | null>(null);
+  const [cupStatuses, setCupStatuses] = useState<CupStatus[] | null>(null);
   const router = useRouter();
   const countdown = useCountdown();
 
   useEffect(() => {
+    fetch("/api/cups/my-status", { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((p) => setCupStatuses(p?.statuses ?? []))
+      .catch(() => {});
     fetch("/api/credits", { credentials: "include" })
       .then((r) => r.json())
       .then((p) => setRewardCredits(p.credits ?? 0))
@@ -124,6 +142,8 @@ export default function Home() {
           <p className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-black text-amber-900">Final kicked off — logging locked.</p>
         )}
       </div>
+
+      {cupStatuses && cupStatuses.length > 0 ? <CupStatusCard statuses={cupStatuses} /> : null}
 
       {matchdayScore ? <MatchdayScoreCard data={matchdayScore} /> : null}
 
@@ -219,6 +239,62 @@ function MatchdayScoreCard({ data }: { data: MatchdayScore }) {
           </p>
           <p className="text-[10px] font-semibold text-green-900/45">{score.winCount} win{score.winCount === 1 ? "" : "s"} · {score.boostRaw >= 0 ? "+" : ""}{score.boostRaw} boosts</p>
         </div>
+      </div>
+    </section>
+  );
+}
+
+const CUP_STATE_LABEL: Record<CupStatus["state"], string> = {
+  champion: "Champion!",
+  through: "Through to next round",
+  live: "Live now",
+  upcoming: "Upcoming",
+  eliminated: "Eliminated"
+};
+
+const CUP_STATE_STYLE: Record<CupStatus["state"], string> = {
+  champion: "bg-amber-100 text-amber-900",
+  through: "bg-green-100 text-green-900",
+  live: "bg-pitch/15 text-pitch",
+  upcoming: "bg-green-950/5 text-green-900/60",
+  eliminated: "bg-red-100 text-red-900"
+};
+
+function CupStatusCard({ statuses }: { statuses: CupStatus[] }) {
+  return (
+    <section className="rounded-lg border border-green-900/10 bg-white p-4 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs font-bold uppercase tracking-wide text-green-900/50">Your Cup Status</p>
+        <Link href="/cups" className="text-xs font-bold text-pitch hover:underline">View brackets &rarr;</Link>
+      </div>
+      <p className="mt-0.5 text-xs font-semibold text-green-900/55">
+        Squads lock and cup points are earned 3pm UK &rarr; 3pm UK the next day, the same window each round.
+      </p>
+      <div className="mt-3 space-y-2">
+        {statuses.map((status) => {
+          const theme = getCupThemeById(status.cupId);
+          return (
+            <div key={status.cupId} className="rounded-md bg-green-950/5 px-3 py-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs font-black text-green-950">{theme?.cupName ?? status.cupName}</p>
+                <span className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wide ${CUP_STATE_STYLE[status.state]}`}>
+                  {CUP_STATE_LABEL[status.state]}
+                </span>
+              </div>
+              <p className="mt-1 text-[11px] font-semibold text-green-900/60">
+                {status.round} &middot; locks/scores by 3pm UK on {status.roundDate}
+              </p>
+              {status.opponent ? (
+                <p className="mt-0.5 text-xs font-bold text-green-900/80">
+                  vs {status.opponent}
+                  {status.myScore !== null && status.opponentScore !== null ? (
+                    <span className="ml-1 font-black text-pitch">{status.myScore.toFixed(1)} - {status.opponentScore.toFixed(1)}</span>
+                  ) : null}
+                </p>
+              ) : null}
+            </div>
+          );
+        })}
       </div>
     </section>
   );

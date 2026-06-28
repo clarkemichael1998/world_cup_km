@@ -84,6 +84,66 @@ export function getCupHubData() {
   };
 }
 
+export type MyCupStatus = {
+  cupId: number;
+  cupName: string;
+  state: "champion" | "through" | "live" | "upcoming" | "eliminated";
+  round: string;
+  roundDate: string;
+  opponent: string | null;
+  myScore: number | null;
+  opponentScore: number | null;
+};
+
+// A player's current position across every unlocked cup — used by the home
+// page so it's obvious who you're facing, your live score, and when your
+// next deadline is, without digging into the bracket.
+export function getMyCupStatuses(username: string): MyCupStatus[] {
+  const data = getCupHubData();
+  const results: MyCupStatus[] = [];
+
+  for (const cup of data.cups) {
+    if (cup.locked) continue;
+    const myMatches = cup.matches.filter((match) => match.home === username || match.away === username).sort((a, b) => a.day - b.day);
+    if (myMatches.length === 0) continue;
+
+    const last = myMatches[myMatches.length - 1];
+    const isHome = last.home === username;
+    const opponentName = isHome ? last.away : last.home;
+    const opponent = opponentName === "TBD" || opponentName === "Bye" ? null : opponentName;
+    const myScore = isHome ? last.homeScore : last.awayScore;
+    const opponentScore = isHome ? last.awayScore : last.homeScore;
+    const isFinalRound = last.round === "final";
+
+    let state: MyCupStatus["state"];
+    let round = last.label;
+    let roundDate = last.date;
+
+    if (last.status === "decided" || last.status === "bye") {
+      if (last.winner !== username) {
+        state = "eliminated";
+      } else if (isFinalRound) {
+        state = "champion";
+      } else {
+        state = "through";
+        const next = cup.rounds.find((r) => r.day === last.day + 1);
+        if (next) {
+          round = next.label;
+          roundDate = next.date;
+        }
+      }
+    } else if (last.status === "live") {
+      state = "live";
+    } else {
+      state = "upcoming";
+    }
+
+    results.push({ cupId: cup.id, cupName: cup.name, state, round, roundDate, opponent, myScore, opponentScore });
+  }
+
+  return results;
+}
+
 type Participant = { id: number; username: string };
 
 function getCupParticipants(db: DatabaseSync): Participant[] {

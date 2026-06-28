@@ -96,7 +96,11 @@ async function syncFootballData() {
         status: string;
         homeTeam?: { name?: string };
         awayTeam?: { name?: string };
-        score?: { winner?: "HOME_TEAM" | "AWAY_TEAM" | "DRAW" | null };
+        score?: {
+          winner?: "HOME_TEAM" | "AWAY_TEAM" | "DRAW" | null;
+          extraTime?: { home?: number | null; away?: number | null } | null;
+          penalties?: { home?: number | null; away?: number | null } | null;
+        };
         goals?: Array<{ scorer?: { name?: string }; assist?: { name?: string }; minute?: number }>;
       }>;
     };
@@ -104,7 +108,22 @@ async function syncFootballData() {
     const fixtures = (payload.matches ?? []).map((match): FixtureResult => {
       const homeTeam = normalizeTeam(match.homeTeam?.name ?? "Unknown");
       const awayTeam = normalizeTeam(match.awayTeam?.name ?? "Unknown");
-      const winner = match.score?.winner === "HOME_TEAM" ? homeTeam : match.score?.winner === "AWAY_TEAM" ? awayTeam : null;
+
+      // In knockout rounds, football-data.org's top-level score.winner should
+      // already reflect the actual result after extra time/penalties — but if
+      // it ever comes back null/DRAW for a finished knockout tie, fall back to
+      // comparing the penalties score, then the extra-time score, so a shootout
+      // or AET winner is still correctly recorded rather than treated as a draw.
+      let winner = match.score?.winner === "HOME_TEAM" ? homeTeam : match.score?.winner === "AWAY_TEAM" ? awayTeam : null;
+      if (!winner && match.status === "FINISHED") {
+        const pens = match.score?.penalties;
+        const et = match.score?.extraTime;
+        if (pens && pens.home != null && pens.away != null && pens.home !== pens.away) {
+          winner = pens.home > pens.away ? homeTeam : awayTeam;
+        } else if (et && et.home != null && et.away != null && et.home !== et.away) {
+          winner = et.home > et.away ? homeTeam : awayTeam;
+        }
+      }
       return {
         matchId: `football-data-${match.id}`,
         matchDate: match.utcDate.slice(0, 10),
