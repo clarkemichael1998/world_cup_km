@@ -492,6 +492,54 @@ button {
   z-index: 0;
 }
 
+.profile-cup-legend-xi {
+  border-color: rgba(255, 255, 255, 0.92) !important;
+  isolation: isolate;
+  background:
+    radial-gradient(circle at 18% 16%, rgba(255, 255, 255, 0.95), transparent 18%),
+    radial-gradient(circle at 78% 24%, rgba(125, 211, 252, 0.7), transparent 22%),
+    linear-gradient(135deg, #172554 0%, #2563eb 30%, #fef08a 58%, #67e8f9 78%, #f8fafc 100%);
+  box-shadow:
+    0 10px 26px rgba(250, 204, 21, 0.35),
+    0 0 24px rgba(96, 165, 250, 0.5),
+    0 0 0 1px rgba(255, 255, 255, 0.62),
+    inset 0 0 24px rgba(255, 255, 255, 0.2);
+}
+
+.profile-cup-legend-xi > * {
+  position: relative;
+  z-index: 1;
+}
+
+.profile-cup-legend-xi::before,
+.profile-cup-legend-xi::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+}
+
+.profile-cup-legend-xi::before {
+  inset: -65%;
+  background:
+    conic-gradient(from 130deg, rgba(255,255,255,0), rgba(192,132,252,0.5), rgba(34,211,238,0.5), rgba(250,204,21,0.5), rgba(255,255,255,0)),
+    repeating-linear-gradient(35deg, rgba(255,255,255,0.18) 0 1px, transparent 1px 7px);
+  mix-blend-mode: screen;
+  opacity: 0.72;
+  animation: cup-legend-foil 5s ease infinite;
+  z-index: 0;
+}
+
+.profile-cup-legend-xi::after {
+  inset: 0;
+  background:
+    radial-gradient(circle at 14% 18%, rgba(255,255,255,0.95) 0 1px, transparent 2px),
+    radial-gradient(circle at 82% 34%, rgba(255,255,255,0.85) 0 1px, transparent 2px),
+    radial-gradient(circle at 62% 78%, rgba(250,204,21,0.8) 0 1px, transparent 2px),
+    linear-gradient(115deg, transparent 0 30%, rgba(255,255,255,0.5) 42%, rgba(125,211,252,0.38) 49%, transparent 62%);
+  opacity: 0.9;
+  z-index: 0;
+}
+
 /* Hide scrollbar but keep scrollable (for mobile nav) */
 .scrollbar-none {
   -ms-overflow-style: none;
