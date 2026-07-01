@@ -334,6 +334,7 @@ function MatchMonitorTab({ onForbidden }: { onForbidden: () => void }) {
 function LiveSettleTab({ onForbidden }: { onForbidden: () => void }) {
   const [busy, setBusy] = useState(false);
   const [resyncBusy, setResyncBusy] = useState(false);
+  const [cupBusy, setCupBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [diagUser, setDiagUser] = useState("");
@@ -454,6 +455,32 @@ function LiveSettleTab({ onForbidden }: { onForbidden: () => void }) {
     }
   }
 
+  async function settleCups() {
+    if (cupBusy) return;
+    setCupBusy(true);
+    setNotice("");
+    setError("");
+    try {
+      const res = await fetch("/api/admin/settle-cups", { method: "POST", credentials: "include" });
+      if (res.status === 403) { onForbidden(); return; }
+      const data = (await res.json().catch(() => ({}))) as {
+        awardedCount?: number;
+        alreadyAwardedCount?: number;
+        awarded?: Array<{ cupName: string; username: string; rewardLabel: string; packCredits: number; legendAwarded: boolean; iconAwarded: boolean }>;
+        error?: string;
+      };
+      if (!res.ok) {
+        setError(data.error ?? "Could not settle cup rewards.");
+        return;
+      }
+      const larssonWinner = data.awarded?.find((row) => row.cupName === "Larsson Cup" && row.legendAwarded);
+      const larssonText = larssonWinner ? ` Larsson card awarded to ${larssonWinner.username}.` : "";
+      setNotice(`Cup rewards settled: ${data.awardedCount ?? 0} newly awarded, ${data.alreadyAwardedCount ?? 0} already present.${larssonText}`);
+    } finally {
+      setCupBusy(false);
+    }
+  }
+
   return (
     <section className="max-w-2xl rounded-lg border border-green-900/10 bg-white p-6 shadow-sm">
       <p className="text-sm font-bold uppercase tracking-wide text-green-900/60">Live Match Settlement</p>
@@ -493,6 +520,20 @@ function LiveSettleTab({ onForbidden }: { onForbidden: () => void }) {
         <p className="mt-2 text-xs font-semibold text-green-900/55">
           &quot;Force re-check all&quot; re-fetches finished matches even if they previously returned no goals — use it to diagnose whether the API is supplying scorer data at all.
         </p>
+      </div>
+
+      <div className="mt-6 border-t border-green-900/10 pt-5">
+        <p className="text-sm font-bold uppercase tracking-wide text-green-900/60">Cup Rewards</p>
+        <p className="mt-2 text-sm font-semibold text-green-900/65">
+          Awards completed cup prizes once: pack credits for the sticker rewards, a guaranteed Icon for the runner-up, and the Cup Legend card for the winner. Safe to run more than once.
+        </p>
+        <button
+          onClick={settleCups}
+          disabled={cupBusy}
+          className="mt-4 rounded-md bg-blue-700 px-5 py-3 font-black text-white hover:bg-blue-800 disabled:opacity-40"
+        >
+          {cupBusy ? "Settling cups..." : "Settle Cup Rewards"}
+        </button>
       </div>
 
       {notice ? <p className="mt-4 rounded-md bg-green-50 p-3 text-sm font-bold text-green-800">{notice}</p> : null}

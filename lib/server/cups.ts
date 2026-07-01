@@ -1,8 +1,8 @@
 import type { DatabaseSync } from "node:sqlite";
 import { getAdminUsernames } from "@/lib/server/admin";
-import { getDb } from "@/lib/server/db";
+import { awardPlayersInTransaction, createAdminChatMessage, getAllPlayers, getDb } from "@/lib/server/db";
 import { compareDailyScores, getDailyScore, isMatchdayOpen, isMatchdaySettled } from "@/lib/server/dailyScoring";
-import { cupThemes } from "@/lib/cupLegends";
+import { cupThemes, getCupLegendPlayer } from "@/lib/cupLegends";
 
 const cupSchedules = [
   ["2026-06-26", "2026-06-27", "2026-06-28", "2026-06-29", "2026-06-30"],
@@ -95,6 +95,18 @@ export type MyCupStatus = {
   opponentScore: number | null;
 };
 
+export type CupRewardSettlement = {
+  cupId: number;
+  cupName: string;
+  rewardKey: string;
+  rewardLabel: string;
+  username: string;
+  packCredits: number;
+  iconAwarded: boolean;
+  legendAwarded: boolean;
+  applied: boolean;
+};
+
 // A player's current position across every unlocked cup — used by the home
 // page so it's obvious who you're facing, your live score, and when your
 // next deadline is, without digging into the bracket.
@@ -142,6 +154,143 @@ export function getMyCupStatuses(username: string): MyCupStatus[] {
   }
 
   return results;
+}
+
+export function settleCupRewards(): { awarded: CupRewardSettlement[]; alreadyAwarded: CupRewardSettlement[] } {
+  const db = getDb();
+  const participants = getCupParticipants(db);
+  const userByUsername = new Map(participants.map((participant) => [participant.username, participant]));
+  const awarded: CupRewardSettlement[] = [];
+  const alreadyAwarded: CupRewardSettlement[] = [];
+
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    for (const [index, dates] of cupSchedules.entries()) {
+      const cup = buildCup(db, index + 1, dates, participants);
+      const final = cup.matches.find((match) => match.round === "final");
+
+      for (const match of cup.matches) {
+        if (!isSettledMatch(match)) continue;
+
+        if (match.id === "playoff" && match.winner) {
+          pushSettlement(db, cup, match.winner, "playoff-winner", "Play-off winner", 10, null, awarded, alreadyAwarded, userByUsername);
+        }
+
+        if (match.round === "quarter-finals") {
+          const loser = getMatchLoser(match);
+          if (loser) pushSettlement(db, cup, loser, `qf-elim-${match.id}`, "Quarter-final elimination", 15, null, awarded, alreadyAwarded, userByUsername);
+        }
+
+        if (match.round === "semi-finals") {
+          const loser = getMatchLoser(match);
+          if (loser) pushSettlement(db, cup, loser, `sf-elim-${match.id}`, "Semi-final elimination", 25, null, awarded, alreadyAwarded, userByUsername);
+        }
+      }
+
+      if (final && isSettledMatch(final) && final.winner) {
+        const runnerUp = getMatchLoser(final);
+        if (runnerUp) pushSettlement(db, cup, runnerUp, "runner-up", "Runner-up", 30, "icon", awarded, alreadyAwarded, userByUsername);
+        pushSettlement(db, cup, final.winner, "winner", "Cup winner", 35, "legend", awarded, alreadyAwarded, userByUsername);
+      }
+    }
+
+    db.exec("COMMIT");
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
+
+  for (const row of awarded) {
+    const extras = row.legendAwarded ? ` and the ${row.cupName} Legend card` : row.iconAwarded ? " and a guaranteed Icon card" : "";
+    createAdminChatMessage(`🏆 ${row.cupName}: ${row.username} awarded ${row.packCredits} pack credits${extras} for ${row.rewardLabel}.`);
+  }
+
+  return { awarded, alreadyAwarded };
+}
+
+function isSettledMatch(match: CupMatch) {
+  return (match.status === "decided" || match.status === "bye") && Boolean(match.winner);
+}
+
+function getMatchLoser(match: CupMatch) {
+  if (!match.winner) return null;
+  if (match.home === match.winner) return isRealPlayerName(match.away) ? match.away : null;
+  if (match.away === match.winner) return isRealPlayerName(match.home) ? match.home : null;
+  return null;
+}
+
+function isRealPlayerName(value: string) {
+  return value !== "TBD" && value !== "Bye";
+}
+
+function pushSettlement(
+  db: DatabaseSync,
+  cup: Omit<CupDefinition, "locked" | "unlocksOn">,
+  username: string,
+  rewardKey: string,
+  rewardLabel: string,
+  packCredits: number,
+  cardPrize: "icon" | "legend" | null,
+  awarded: CupRewardSettlement[],
+  alreadyAwarded: CupRewardSettlement[],
+  userByUsername: Map<string, Participant>
+) {
+  const user = userByUsername.get(username);
+  if (!user) return;
+
+  const cardIds = getCupPrizeCardIds(cup.id, cardPrize);
+  const result = db
+    .prepare(
+      `INSERT OR IGNORE INTO cup_reward_events (
+        cup_id, cup_name, user_id, reward_key, reward_label,
+        pack_credit_count, icon_count, legend_player_id, card_award_count
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    )
+    .run(
+      cup.id,
+      cup.name,
+      user.id,
+      rewardKey,
+      rewardLabel,
+      packCredits,
+      cardPrize === "icon" ? cardIds.length : 0,
+      cardPrize === "legend" ? cardIds[0] ?? null : null,
+      cardIds.length
+    );
+
+  const row: CupRewardSettlement = {
+    cupId: cup.id,
+    cupName: cup.name,
+    rewardKey,
+    rewardLabel,
+    username,
+    packCredits,
+    iconAwarded: cardPrize === "icon" && cardIds.length > 0,
+    legendAwarded: cardPrize === "legend" && cardIds.length > 0,
+    applied: result.changes > 0
+  };
+
+  if (result.changes === 0) {
+    alreadyAwarded.push(row);
+    return;
+  }
+
+  const sourceId = Number(result.lastInsertRowid);
+  if (packCredits > 0) db.prepare("UPDATE users SET reward_credits = reward_credits + ? WHERE id = ?").run(packCredits, user.id);
+  if (cardIds.length > 0) awardPlayersInTransaction(db, user.id, cardIds, "cup_reward", sourceId);
+  awarded.push(row);
+}
+
+function getCupPrizeCardIds(cupId: number, cardPrize: "icon" | "legend" | null) {
+  if (!cardPrize) return [];
+  if (cardPrize === "legend") {
+    const legend = getCupLegendPlayer(cupId);
+    return legend ? [legend.id] : [];
+  }
+  const icons = getAllPlayers().filter((player) => player.rarity === "icon" && !player.cupId);
+  if (icons.length === 0) return [];
+  const index = Math.floor(Math.random() * icons.length);
+  return [icons[index].id];
 }
 
 type Participant = { id: number; username: string };

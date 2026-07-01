@@ -232,6 +232,21 @@ export function getDb() {
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id)
     );
+    CREATE TABLE IF NOT EXISTS cup_reward_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      cup_id INTEGER NOT NULL,
+      cup_name TEXT NOT NULL,
+      user_id INTEGER NOT NULL,
+      reward_key TEXT NOT NULL,
+      reward_label TEXT NOT NULL,
+      pack_credit_count INTEGER NOT NULL DEFAULT 0,
+      icon_count INTEGER NOT NULL DEFAULT 0,
+      legend_player_id INTEGER,
+      card_award_count INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(cup_id, user_id, reward_key),
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
     CREATE TABLE IF NOT EXISTS goal_scorers (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       match_id TEXT NOT NULL,
@@ -922,7 +937,7 @@ export function spendCreditsForPlayers(userId: number, amount: number, playerIds
   }
 }
 
-function awardPlayersInTransaction(database: DatabaseSync, userId: number, playerIds: number[], source: string, sourceId: number | null) {
+export function awardPlayersInTransaction(database: DatabaseSync, userId: number, playerIds: number[], source: string, sourceId: number | null) {
   const existingPlayer = database.prepare("SELECT duplicate_count FROM user_players WHERE user_id = ? AND player_id = ?");
   const insertPlayer = database.prepare("INSERT INTO user_players (user_id, player_id, duplicate_count) VALUES (?, ?, 0)");
   const updateDuplicate = database.prepare("UPDATE user_players SET duplicate_count = duplicate_count + 1 WHERE user_id = ? AND player_id = ?");
