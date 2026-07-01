@@ -94,7 +94,7 @@ export function PlayerCard({
         {album ? (
           <div className="mb-3 flex items-center justify-between gap-2 border-b border-black/10 pb-2">
             <span className="text-[9px] font-black uppercase tracking-[0.22em] opacity-60">
-              {cupTheme ? `${cupTheme.cupName} Champion Card` : "Official Tournament Sticker"}
+              {cupTheme ? `${cupTheme.cupName} Iridescent Champion Card` : "Official Tournament Sticker"}
             </span>
             <span className={`rounded-sm px-1.5 py-0.5 text-[9px] font-black uppercase tabular-nums opacity-90 ${cupTheme ? cupTheme.accent : "bg-black/10 opacity-70"}`}>
               {cupTheme ? "Cup Legend" : `${rarityLabels[player.rarity]} #${player.id}`}
@@ -104,7 +104,7 @@ export function PlayerCard({
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wide ${cupTheme ? `${cupTheme.accent}` : "bg-black/10 opacity-80"}`}>
-              {cupTheme ? "Cup Legend" : player.rarity}
+              {cupTheme ? "Iridescent Cup Legend" : player.rarity}
             </p>
             <h3 className={`${large ? "text-3xl" : "text-lg"} break-words font-black leading-tight`}>{player.name}</h3>
             {cupTheme ? <p className="text-xs font-bold opacity-80">{cupTheme.cupName} · {cupTheme.country}</p> : null}

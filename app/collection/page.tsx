@@ -195,13 +195,13 @@ function CompactSticker({ player, ratingBoost, duplicateCount }: { player: Playe
 
   if (cupTheme) {
     return (
-      <div className={`compact-sticker flex aspect-[3/4] min-h-32 flex-col rounded-md border-2 ${cupTheme.border} bg-gradient-to-br ${cupTheme.colours} p-2 text-white shadow-sm ring-1 ring-green-950/10`}>
+      <div className={`compact-sticker sticker-cup-legend flex aspect-[3/4] min-h-32 flex-col rounded-md border-2 ${cupTheme.border} bg-gradient-to-br ${cupTheme.colours} p-2 text-white shadow-sm ring-1 ring-green-950/10`}>
         <div className="mb-1 flex items-center justify-between gap-1">
           <span className="rounded bg-black/20 px-1 text-[9px] font-black uppercase">{player.pos}</span>
           <span className="rounded bg-white/85 px-1.5 py-0.5 text-[10px] font-black text-green-950">{effectiveRating}</span>
         </div>
         <div className="mb-1 flex items-center justify-between gap-1 text-[7px] font-black uppercase tracking-wide opacity-85">
-          <span>Cup Legend</span>
+          <span>Iridescent</span>
           <span className={`inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[8px] ${cupTheme.accent}`}>{cupTheme.shirtNumber}</span>
         </div>
         <div className="flex flex-1 flex-col items-center justify-center text-center">
@@ -210,7 +210,7 @@ function CompactSticker({ player, ratingBoost, duplicateCount }: { player: Playe
           <p className="mt-1 line-clamp-1 text-[9px] font-bold opacity-85">{cupTheme.cupName}</p>
         </div>
         <div className="mt-1 flex items-center justify-between border-t border-white/25 pt-1 text-[8px] font-black uppercase tracking-wide opacity-80">
-          <span>Legend</span>
+          <span>Cup Legend</span>
           <span>{duplicateCount > 0 ? `x${duplicateCount + 1}` : `#${player.id}`}</span>
         </div>
       </div>
