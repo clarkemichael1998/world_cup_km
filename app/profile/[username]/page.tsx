@@ -192,12 +192,11 @@ function XiCard({ slot, item, compact }: { slot: string; item?: XiPlayer; compac
   if (!item) return <div className={`${compact ? "h-14 w-16" : "h-24 w-20 sm:w-32"} rounded-lg border border-dashed border-white/25 bg-white/5`} />;
   const cupTheme = getCupThemeById(item.player.cupId);
   return (
-    <div className={`${cupTheme ? "profile-cup-legend-xi text-white" : rarityClasses[item.player.rarity]} ${compact ? "w-16 p-1.5" : "w-20 p-2 sm:w-32 sm:p-2.5"} relative overflow-hidden rounded-lg border-2 shadow-md`}>
+    <div className={`${cupTheme ? "profile-cup-legend-xi text-slate-950" : rarityClasses[item.player.rarity]} ${compact ? "w-16 p-1.5" : "w-20 p-2 sm:w-32 sm:p-2.5"} relative overflow-hidden rounded-lg border-2 shadow-md`}>
       <div className="flex items-start justify-between gap-1">
         <span className="text-[8px] font-black uppercase opacity-70">{slot}</span>
-        <span className={`rounded px-1.5 py-0.5 text-[10px] font-black ${cupTheme ? "bg-white/90 text-blue-950 shadow-sm" : "bg-green-950 text-white"}`}>{item.effectiveRating}</span>
+        <span className={`rounded px-1.5 py-0.5 text-[10px] font-black ${cupTheme ? "bg-white/90 text-slate-950 shadow-sm" : "bg-green-950 text-white"}`}>{item.effectiveRating}</span>
       </div>
-      {cupTheme ? <p className={`${compact ? "text-[6px]" : "text-[7px] sm:text-[8px]"} mt-1 rounded-full bg-white/20 px-1 py-0.5 text-center font-black uppercase tracking-wide text-white shadow-sm`}>Iridescent</p> : null}
       <p className={`${compact ? "text-[9px]" : "text-[10px] sm:text-xs"} mt-1 line-clamp-2 font-black leading-tight`}>{item.player.name}</p>
       {!compact ? <p className="mt-0.5 hidden truncate text-[9px] font-bold opacity-75 sm:block">{cupTheme ? `${cupTheme.cupName} Legend` : item.player.nation}</p> : null}
       {item.boost.total !== 0 ? <div className="mt-1 flex flex-wrap gap-1">{item.boost.goal !== 0 ? <AwardBadge type="goal" amount={item.boost.goal} compact /> : null}{item.boost.assist !== 0 ? <AwardBadge type="assist" amount={item.boost.assist} compact /> : null}</div> : null}

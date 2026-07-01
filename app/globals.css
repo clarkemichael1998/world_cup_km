@@ -251,7 +251,7 @@ button {
     radial-gradient(circle at 72% 18%, rgba(125, 211, 252, 0.55), transparent 20%),
     linear-gradient(135deg, rgba(15, 23, 42, 0.22), transparent 34%),
     linear-gradient(135deg, #172554 0%, #2563eb 28%, #fef08a 55%, #67e8f9 75%, #f8fafc 100%) !important;
-  color: #ffffff;
+  color: #020617;
   box-shadow:
     0 12px 30px rgba(37, 99, 235, 0.35),
     0 0 0 1px rgba(255, 255, 255, 0.55),
@@ -459,6 +459,7 @@ button {
 .card-cup-legend {
   border-color: transparent !important;
   isolation: isolate;
+  color: #020617 !important;
   box-shadow:
     0 18px 42px rgba(37, 99, 235, 0.35),
     0 0 0 1px rgba(255, 255, 255, 0.55),
@@ -495,6 +496,7 @@ button {
 .profile-cup-legend-xi {
   border-color: rgba(255, 255, 255, 0.92) !important;
   isolation: isolate;
+  color: #020617;
   background:
     radial-gradient(circle at 18% 16%, rgba(255, 255, 255, 0.95), transparent 18%),
     radial-gradient(circle at 78% 24%, rgba(125, 211, 252, 0.7), transparent 22%),

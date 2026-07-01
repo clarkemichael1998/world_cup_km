@@ -71,7 +71,7 @@ export function PlayerCard({
     <article
       className={`card-sheen relative overflow-hidden rounded-lg border-2 p-4 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-md ${
         cupTheme
-          ? `bg-gradient-to-br ${cupTheme.colours} text-white ${cupTheme.border} card-cup-legend`
+          ? `bg-gradient-to-br ${cupTheme.colours} text-slate-950 ${cupTheme.border} card-cup-legend`
           : `${album ? rarityCardClasses[player.rarity] : ""} ${rarityStyles[player.rarity]} ${
               player.rarity === "icon" ? "card-icon" : player.rarity === "legend" ? "card-legend" : ""
             }`
@@ -94,25 +94,25 @@ export function PlayerCard({
         {album ? (
           <div className="mb-3 flex items-center justify-between gap-2 border-b border-black/10 pb-2">
             <span className="text-[9px] font-black uppercase tracking-[0.22em] opacity-60">
-              {cupTheme ? `${cupTheme.cupName} Iridescent Champion Card` : "Official Tournament Sticker"}
+              {cupTheme ? `${cupTheme.cupName} Champion Card` : "Official Tournament Sticker"}
             </span>
-            <span className={`rounded-sm px-1.5 py-0.5 text-[9px] font-black uppercase tabular-nums opacity-90 ${cupTheme ? cupTheme.accent : "bg-black/10 opacity-70"}`}>
+            <span className={`rounded-sm px-1.5 py-0.5 text-[9px] font-black uppercase tabular-nums opacity-90 ${cupTheme ? "bg-white/80 text-slate-950" : "bg-black/10 opacity-70"}`}>
               {cupTheme ? "Cup Legend" : `${rarityLabels[player.rarity]} #${player.id}`}
             </span>
           </div>
         ) : null}
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wide ${cupTheme ? `${cupTheme.accent}` : "bg-black/10 opacity-80"}`}>
-              {cupTheme ? "Iridescent Cup Legend" : player.rarity}
+            <p className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wide ${cupTheme ? "bg-white/80 text-slate-950 shadow-sm" : "bg-black/10 opacity-80"}`}>
+              {cupTheme ? "Cup Legend" : player.rarity}
             </p>
             <h3 className={`${large ? "text-3xl" : "text-lg"} break-words font-black leading-tight`}>{player.name}</h3>
             {cupTheme ? <p className="text-xs font-bold opacity-80">{cupTheme.cupName} · {cupTheme.country}</p> : null}
           </div>
-          <div className={`shrink-0 rounded-lg border px-3 py-2 text-center shadow-sm ${cupTheme ? "border-white/30 bg-white/15 text-white" : "border-black/5 bg-white/80 text-green-950"}`}>
+          <div className={`shrink-0 rounded-lg border px-3 py-2 text-center shadow-sm ${cupTheme ? "border-white/60 bg-white/80 text-slate-950" : "border-black/5 bg-white/80 text-green-950"}`}>
             <div className={`${large ? "text-3xl" : "text-xl"} font-black`}>{hideRating ? "??" : effectiveRating}</div>
             <div className="text-xs font-bold">{player.pos}</div>
-            {!hideRating && ratingBoost > 0 && <div className={`text-[10px] font-black ${cupTheme ? "text-amber-200" : "text-green-600"}`}>+{ratingBoost} ⚽</div>}
+            {!hideRating && ratingBoost > 0 && <div className={`text-[10px] font-black ${cupTheme ? "text-slate-950" : "text-green-600"}`}>+{ratingBoost} ⚽</div>}
           </div>
         </div>
 
