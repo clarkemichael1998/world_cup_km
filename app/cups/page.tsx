@@ -90,49 +90,112 @@ export default function CupsPage() {
 }
 
 function CupMenu({ cups, onSelect }: { cups: CupDefinition[]; onSelect: (id: number) => void }) {
+  const liveCup = cups.find((cup) => !cup.locked && cup.matches.some((match) => match.status === "live"));
+  const openCups = cups.filter((cup) => !cup.locked).length;
+
   return (
-    <section className="mt-2 grid gap-4 sm:grid-cols-2">
-      {cups.map((cup) => {
-        const theme = getCupThemeById(cup.id);
-        if (!theme) return null;
-        return (
-          <button
-            key={cup.id}
-            type="button"
-            disabled={cup.locked}
-            onClick={() => onSelect(cup.id)}
-            title={cup.locked ? `Unlocks ${formatDate(cup.unlocksOn)}` : `Open ${cup.name}`}
-            className={`group relative overflow-hidden rounded-2xl border text-left shadow-sm transition ${
-              cup.locked ? "cursor-not-allowed border-white/10" : "border-white/40 hover:-translate-y-1 hover:shadow-xl"
-            }`}
-          >
-            <div className={`relative min-h-56 overflow-hidden bg-gradient-to-br ${theme.colours} p-4 text-white`}>
-              <CupMotif cupId={cup.id} className="pointer-events-none absolute inset-0 h-full w-full" />
-              <div className="pointer-events-none absolute -bottom-2 -right-4 h-32 w-24 opacity-85">
-                <LegendPortrait imagePath={theme.imagePath} shirtNumber={theme.shirtNumber} alt={theme.legend} className="h-full w-full" rounded="rounded-xl" silhouetteOpacity="opacity-100" />
-              </div>
-              <div className="relative">
-                <p className="text-xs font-bold uppercase tracking-[0.25em] text-white/70">Cup {cup.id}</p>
-                <p className="mt-2 text-2xl font-black leading-none drop-shadow">{cup.name}</p>
-                <p className="mt-1 text-sm font-bold text-white/80">{cup.country}</p>
-              </div>
-              {cup.locked ? (
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-green-950/60 backdrop-blur-[1px]">
-                  <LockIcon />
-                  <p className="text-xs font-bold uppercase tracking-wide text-white/90">Unlocks {formatDate(cup.unlocksOn)}</p>
+    <div className="mt-2 space-y-5">
+      <section className="relative overflow-hidden rounded-3xl bg-green-950 p-5 text-white shadow-xl sm:p-7">
+        <div className="absolute -right-20 -top-20 h-56 w-56 rounded-full bg-amber-300/20 blur-2xl" />
+        <div className="absolute bottom-0 left-0 h-36 w-36 rounded-full bg-sky-300/10 blur-2xl" />
+        <div className="relative grid gap-5 lg:grid-cols-[1fr_0.9fr] lg:items-end">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.35em] text-amber-200/80">Cup Season</p>
+            <h2 className="mt-2 max-w-3xl text-3xl font-black tracking-tight sm:text-5xl">Four knockout runs. Four legend cards. One group chat meltdown waiting to happen.</h2>
+            <p className="mt-3 max-w-2xl text-sm font-bold leading-6 text-white/70">
+              Pick a cup to see the draw, live scores, prizes, and the route to the final. Completed rounds settle from the same daily activity and match-event score used on the leaderboard.
+            </p>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            <HeroStat label="Unlocked" value={`${openCups}/4`} />
+            <HeroStat label="Live Now" value={liveCup ? liveCup.name.replace(" Cup", "") : "--"} />
+            <HeroStat label="Final Cup Ends" value="19 Jul" />
+          </div>
+        </div>
+      </section>
+
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {cups.map((cup) => {
+          const theme = getCupThemeById(cup.id);
+          if (!theme) return null;
+          const progress = getCupProgress(cup);
+          const status = getCupStatus(cup);
+          return (
+            <button
+              key={cup.id}
+              type="button"
+              disabled={cup.locked}
+              onClick={() => onSelect(cup.id)}
+              title={cup.locked ? `Unlocks ${formatDate(cup.unlocksOn)}` : `Open ${cup.name}`}
+              className={`group relative overflow-hidden rounded-3xl border text-left shadow-sm transition ${
+                cup.locked ? "cursor-not-allowed border-white/10 opacity-75" : "border-white/50 hover:-translate-y-1 hover:shadow-2xl"
+              }`}
+            >
+              <div className={`relative min-h-64 overflow-hidden bg-gradient-to-br ${theme.colours} p-4 text-white`}>
+                <CupMotif cupId={cup.id} className="pointer-events-none absolute inset-0 h-full w-full opacity-90" />
+                <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/35 to-transparent" />
+                <div className="pointer-events-none absolute -bottom-4 -right-5 h-40 w-28 opacity-90 transition duration-300 group-hover:scale-105">
+                  <LegendPortrait imagePath={theme.imagePath} shirtNumber={theme.shirtNumber} alt={theme.legend} className="h-full w-full" rounded="rounded-2xl" silhouetteOpacity="opacity-100" />
                 </div>
-              ) : null}
-            </div>
-            <div className="bg-white p-4">
-              <p className="text-xs font-bold text-green-900/60">{formatDate(cup.startDate)} - {formatDate(cup.endDate)}</p>
-              <p className="mt-2 text-lg font-black text-green-950">{cup.locked ? "???" : cup.prize}</p>
-              <p className="mt-1 text-xs font-bold text-green-900/60">Winner takes the Cup Legend card</p>
-            </div>
-          </button>
-        );
-      })}
-    </section>
+                <div className="relative flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-[0.25em] text-white/70">Cup {cup.id}</p>
+                    <p className="mt-2 text-2xl font-black leading-none drop-shadow">{cup.name}</p>
+                    <p className="mt-1 text-sm font-bold text-white/80">{cup.country}</p>
+                  </div>
+                  <span className={`rounded-full px-2 py-1 text-[10px] font-black uppercase shadow-sm ${cup.locked ? "bg-white/15 text-white" : status.className}`}>
+                    {cup.locked ? "Locked" : status.label}
+                  </span>
+                </div>
+                <div className="absolute bottom-4 left-4 right-4">
+                  <div className="mb-2 flex items-center justify-between text-[10px] font-black uppercase tracking-wide text-white/80">
+                    <span>{formatDate(cup.startDate)}</span>
+                    <span>{formatDate(cup.endDate)}</span>
+                  </div>
+                  <div className="h-2 overflow-hidden rounded-full bg-white/20">
+                    <div className="h-full rounded-full bg-white shadow-sm transition-all" style={{ width: `${progress}%` }} />
+                  </div>
+                </div>
+                {cup.locked ? (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-green-950/65 backdrop-blur-[2px]">
+                    <LockIcon />
+                    <p className="text-xs font-black uppercase tracking-wide text-white/90">Unlocks {formatDate(cup.unlocksOn)}</p>
+                  </div>
+                ) : null}
+              </div>
+              <div className="bg-white p-4">
+                <p className="text-xs font-bold text-green-900/55">Prize card</p>
+                <p className="mt-1 text-lg font-black text-green-950">{cup.locked ? "Mystery Legend" : cup.prize}</p>
+                <p className="mt-2 text-xs font-bold text-green-900/60">{cup.locked ? "Draw hidden until unlock." : "Tap for bracket, scores, and awards."}</p>
+              </div>
+            </button>
+          );
+        })}
+      </section>
+    </div>
   );
+}
+
+function HeroStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/10 p-3 backdrop-blur">
+      <p className="text-[10px] font-black uppercase tracking-wide text-white/50">{label}</p>
+      <p className="mt-1 truncate text-lg font-black text-white">{value}</p>
+    </div>
+  );
+}
+
+function getCupProgress(cup: CupDefinition) {
+  if (cup.locked) return 0;
+  const finishedRounds = cup.rounds.filter((round) => cup.matches.some((match) => match.day === round.day && (match.status === "decided" || match.status === "bye"))).length;
+  return Math.round((finishedRounds / cup.rounds.length) * 100);
+}
+
+function getCupStatus(cup: CupDefinition) {
+  if (cup.matches.some((match) => match.status === "live")) return { label: "Live", className: "bg-red-50 text-red-600" };
+  if (cup.matches.some((match) => match.round === "final" && match.status === "decided")) return { label: "Complete", className: "bg-white text-green-950" };
+  if (cup.matches.some((match) => match.status === "decided" || match.status === "bye")) return { label: "In Play", className: "bg-amber-100 text-amber-900" };
+  return { label: "Open", className: "bg-white text-green-950" };
 }
 
 const PANEL_LABELS = ["Bracket", "Rules", "Awards"] as const;
@@ -231,21 +294,31 @@ function PanelSlide({ width, children }: { width: number; children: React.ReactN
 }
 
 function HeroCup({ cup, theme }: { cup: CupDefinition; theme: CupTheme }) {
+  const status = getCupStatus(cup);
+  const progress = getCupProgress(cup);
+  const final = cup.matches.find((match) => match.round === "final");
+
   return (
-    <section className={`relative overflow-hidden rounded-3xl bg-gradient-to-br ${theme.colours} p-6 text-white shadow-xl`}>
-      <CupMotif cupId={cup.id} className="pointer-events-none absolute -right-10 -top-16 h-72 w-72 opacity-90" />
-      <div className="relative flex flex-wrap items-center gap-5">
-        <LegendPortrait
-          imagePath={theme.imagePath}
-          shirtNumber={theme.shirtNumber}
-          alt={theme.legend}
-          className="h-28 w-28 shrink-0 sm:h-36 sm:w-36"
-          rounded="rounded-full"
-          silhouetteOpacity="opacity-80"
-        />
-        <div className="min-w-0">
-          <p className="text-xs font-bold uppercase tracking-[0.35em] text-white/70">{cup.country} Legend Theme</p>
-          <h2 className="mt-1 text-3xl font-black tracking-tight sm:text-5xl">{cup.legend}</h2>
+    <section className={`relative overflow-hidden rounded-3xl bg-gradient-to-br ${theme.colours} p-5 text-white shadow-xl sm:p-7`}>
+      <CupMotif cupId={cup.id} className="pointer-events-none absolute -right-10 -top-16 h-80 w-80 opacity-90" />
+      <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-black/30 to-transparent" />
+      <div className="relative grid gap-5 lg:grid-cols-[auto_1fr_auto] lg:items-end">
+        <LegendPortrait imagePath={theme.imagePath} shirtNumber={theme.shirtNumber} alt={theme.legend} className="h-28 w-28 shrink-0 sm:h-40 sm:w-40" rounded="rounded-3xl" silhouetteOpacity="opacity-85" />
+        <div className="min-w-0 max-w-2xl">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="rounded-full bg-white/15 px-3 py-1 text-[10px] font-black uppercase tracking-[0.25em] text-white/75 backdrop-blur">{cup.country} Legend Theme</p>
+            <p className={`rounded-full px-3 py-1 text-[10px] font-black uppercase shadow-sm ${status.className}`}>{status.label}</p>
+          </div>
+          <h2 className="mt-3 text-4xl font-black tracking-tight sm:text-6xl">{cup.legend}</h2>
+          <p className="mt-2 text-sm font-bold text-white/80">{cup.name} · {formatDate(cup.startDate)} to {formatDate(cup.endDate)}</p>
+        </div>
+        <div className="min-w-48 rounded-2xl border border-white/15 bg-white/12 p-4 backdrop-blur">
+          <p className="text-[10px] font-black uppercase tracking-wide text-white/55">Route progress</p>
+          <p className="mt-1 text-3xl font-black">{progress}%</p>
+          <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/20">
+            <div className="h-full rounded-full bg-white" style={{ width: `${progress}%` }} />
+          </div>
+          <p className="mt-3 text-xs font-bold text-white/75">Final: {final ? formatDate(final.date) : formatDate(cup.endDate)}</p>
         </div>
       </div>
     </section>
