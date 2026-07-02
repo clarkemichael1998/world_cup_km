@@ -101,7 +101,7 @@ function CupMenu({ cups, onSelect }: { cups: CupDefinition[]; onSelect: (id: num
         <div className="relative grid gap-5 lg:grid-cols-[1fr_0.9fr] lg:items-end">
           <div>
             <p className="text-xs font-black uppercase tracking-[0.35em] text-amber-200/80">Cup Season</p>
-            <h2 className="mt-2 max-w-3xl text-3xl font-black tracking-tight sm:text-5xl">Four knockout runs. Four legend cards. One group chat meltdown waiting to happen.</h2>
+            <h2 className="mt-2 max-w-3xl text-3xl font-black tracking-tight sm:text-5xl">Four knockout runs. Four legend cards. Every round has a story.</h2>
             <p className="mt-3 max-w-2xl text-sm font-bold leading-6 text-white/70">
               Pick a cup to see the draw, live scores, prizes, and the route to the final. Completed rounds settle from the same daily activity and match-event score used on the leaderboard.
             </p>
@@ -326,66 +326,128 @@ function HeroCup({ cup, theme }: { cup: CupDefinition; theme: CupTheme }) {
 }
 
 function BracketPanel({ cup, theme }: { cup: CupDefinition; theme: CupTheme }) {
+  const featured = getFeaturedMatch(cup);
+
   return (
-    <div className={`rounded-2xl border-2 ${theme.border} ${theme.soft} p-5 shadow-sm`}>
+    <div className={`rounded-3xl border-2 ${theme.border} ${theme.soft} p-4 shadow-sm sm:p-5`}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className={`text-xs font-bold uppercase tracking-wide ${theme.text}`}>Current Draw</p>
-          <h2 className="text-2xl font-black text-green-950">{cup.name}</h2>
+          <p className={`text-xs font-black uppercase tracking-wide ${theme.text}`}>Cup Route</p>
+          <h2 className="text-3xl font-black tracking-tight text-green-950">{cup.name}</h2>
+          <p className="mt-1 text-sm font-bold text-green-900/55">Featured tie stays up top. Scroll the route below for the full bracket.</p>
         </div>
         <p className={`rounded-full bg-gradient-to-r ${theme.colours} px-3 py-1 text-xs font-black text-white shadow-sm`}>
           {formatDate(cup.startDate)} - {formatDate(cup.endDate)}
         </p>
       </div>
-      <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+
+      {featured ? <FeaturedMatch match={featured} theme={theme} /> : null}
+
+      <div className="mt-5 flex items-center justify-between gap-3 rounded-2xl border border-white/50 bg-white/55 px-3 py-2">
+        <p className="text-xs font-black uppercase tracking-wide text-green-900/45">Full bracket route</p>
+        <p className="text-xs font-bold text-green-900/55">Scroll up / down</p>
+      </div>
+
+      <div className="mt-3 max-h-[72vh] overflow-y-auto pr-1">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         {cup.rounds.map((round) => {
           const matches = cup.matches.filter((match) => match.day === round.day);
           return (
-            <div key={round.day} className="rounded-xl border border-white/40 bg-white/60 p-3">
-              <p className={`text-xs font-bold uppercase tracking-wide ${theme.text}`}>Day {round.day}</p>
-              <p className="font-black text-green-950">{round.label}</p>
-              <p className="mb-3 text-xs font-bold text-green-900/55">{formatDate(round.date)}</p>
+            <div key={round.day} className="rounded-2xl border border-white/50 bg-white/65 p-3 shadow-sm">
+              <div className="mb-3 flex items-start justify-between gap-2">
+                <div>
+                  <p className={`text-xs font-black uppercase tracking-wide ${theme.text}`}>Day {round.day}</p>
+                  <p className="font-black text-green-950">{round.label}</p>
+                  <p className="text-xs font-bold text-green-900/55">{formatDate(round.date)}</p>
+                </div>
+                <span className="rounded-full bg-green-950/5 px-2 py-1 text-[9px] font-black uppercase text-green-900/50">{matches.length} tie{matches.length === 1 ? "" : "s"}</span>
+              </div>
               <div className="space-y-2">
-                {matches.map((match) => (
-                  <div key={match.id} className={`rounded-md bg-white p-3 shadow-sm ring-1 ${match.status === "decided" ? "ring-green-900/15" : match.status === "live" ? "ring-red-400/40" : "ring-green-900/5"}`}>
-                    <div className="mb-2 flex items-center justify-between gap-2">
-                      <p className="text-[10px] font-black uppercase tracking-wide text-green-900/45">{match.label}</p>
-                      {match.status === "decided" ? (
-                        <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-black uppercase ${theme.accent}`}>Final</span>
-                      ) : match.status === "bye" ? (
-                        <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[9px] font-black uppercase text-slate-500">Bye</span>
-                      ) : match.status === "live" ? (
-                        <span className="flex items-center gap-1 rounded-full bg-red-50 px-1.5 py-0.5 text-[9px] font-black uppercase text-red-600">
-                          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500" /> Live
-                        </span>
-                      ) : (
-                        <span className="rounded-full bg-sky-50 px-1.5 py-0.5 text-[9px] font-black uppercase text-sky-600">Upcoming</span>
-                      )}
-                    </div>
-                    <Team name={match.home} score={match.homeScore} isWinner={match.winner === match.home} theme={theme} />
-                    <p className="my-1 text-center text-[10px] font-black text-green-900/35">vs</p>
-                    <Team name={match.away} score={match.awayScore} isWinner={match.winner === match.away} theme={theme} />
-                  </div>
-                ))}
+                {matches.map((match) => <MatchCard key={match.id} match={match} theme={theme} />)}
               </div>
             </div>
           );
         })}
+        </div>
       </div>
     </div>
   );
 }
 
-function Team({ name, score, isWinner, theme }: { name: string; score: number | null; isWinner: boolean; theme: CupTheme }) {
+function getFeaturedMatch(cup: CupDefinition) {
+  return (
+    cup.matches.find((match) => match.status === "live") ??
+    cup.matches.find((match) => match.status === "scheduled" && match.home !== "TBD" && match.away !== "TBD") ??
+    [...cup.matches].reverse().find((match) => match.status === "decided" || match.status === "bye") ??
+    cup.matches[0] ??
+    null
+  );
+}
+
+function FeaturedMatch({ match, theme }: { match: CupMatch; theme: CupTheme }) {
+  const status = match.status === "live" ? "Live fixture" : match.status === "scheduled" ? "Next fixture" : "Latest result";
+  return (
+    <section className={`relative mt-5 overflow-hidden rounded-3xl bg-gradient-to-br ${theme.colours} p-4 text-white shadow-lg sm:p-5`}>
+      <CupMotif cupId={theme.cupId} className="pointer-events-none absolute -right-10 -top-10 h-52 w-52 opacity-80" />
+      <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/30 to-transparent" />
+      <div className="relative grid gap-4 lg:grid-cols-[0.65fr_1fr] lg:items-center">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-full bg-white/15 px-3 py-1 text-[10px] font-black uppercase tracking-wide text-white/80 backdrop-blur">{status}</span>
+            <MatchStatusBadge status={match.status} theme={theme} />
+          </div>
+          <h3 className="mt-3 text-2xl font-black tracking-tight sm:text-4xl">{match.label}</h3>
+          <p className="mt-1 text-sm font-bold text-white/75">{formatDate(match.date)}</p>
+        </div>
+        <div className="rounded-2xl border border-white/20 bg-white/15 p-3 backdrop-blur">
+          <Team name={match.home} score={match.homeScore} isWinner={match.winner === match.home} theme={theme} featured />
+          <p className="my-2 text-center text-[10px] font-black uppercase tracking-[0.3em] text-white/60">versus</p>
+          <Team name={match.away} score={match.awayScore} isWinner={match.winner === match.away} theme={theme} featured />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function MatchCard({ match, theme }: { match: CupMatch; theme: CupTheme }) {
+  return (
+    <div className={`rounded-xl bg-white p-3 shadow-sm ring-1 transition ${match.status === "decided" ? "ring-green-900/15" : match.status === "live" ? "ring-2 ring-red-400/50" : "ring-green-900/5"}`}>
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <p className="text-[10px] font-black uppercase tracking-wide text-green-900/45">{match.label}</p>
+        <MatchStatusBadge status={match.status} theme={theme} />
+      </div>
+      <Team name={match.home} score={match.homeScore} isWinner={match.winner === match.home} theme={theme} />
+      <p className="my-1 text-center text-[10px] font-black text-green-900/35">vs</p>
+      <Team name={match.away} score={match.awayScore} isWinner={match.winner === match.away} theme={theme} />
+    </div>
+  );
+}
+
+function MatchStatusBadge({ status, theme }: { status: CupMatch["status"]; theme: CupTheme }) {
+  if (status === "decided") return <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-black uppercase ${theme.accent}`}>Final</span>;
+  if (status === "bye") return <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[9px] font-black uppercase text-slate-500">Bye</span>;
+  if (status === "live") {
+    return (
+      <span className="flex items-center gap-1 rounded-full bg-red-50 px-1.5 py-0.5 text-[9px] font-black uppercase text-red-600">
+        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500" /> Live
+      </span>
+    );
+  }
+  return <span className="rounded-full bg-sky-50 px-1.5 py-0.5 text-[9px] font-black uppercase text-sky-600">Upcoming</span>;
+}
+
+function Team({ name, score, isWinner, theme, featured = false }: { name: string; score: number | null; isWinner: boolean; theme: CupTheme; featured?: boolean }) {
   const placeholder = name === "TBD" || name === "Bye";
   return (
     <p
-      className={`flex items-center justify-between gap-2 rounded px-2 py-1 text-sm font-black ${
-        placeholder ? "bg-slate-100 text-slate-400" : isWinner ? `${theme.soft} ${theme.text}` : "bg-slate-50 text-green-900/55"
+      className={`flex items-center justify-between gap-2 rounded px-2 py-1 font-black ${
+        featured ? "text-base sm:text-lg" : "text-sm"
+      } ${
+        placeholder ? "bg-slate-100 text-slate-400" : isWinner ? `${theme.soft} ${theme.text}` : featured ? "bg-white/85 text-green-950" : "bg-slate-50 text-green-900/55"
       }`}
     >
       <span className="truncate">{name}</span>
-      {score !== null ? <span className="shrink-0 tabular-nums">{score.toFixed(1)}</span> : null}
+      {score !== null ? <span className={`shrink-0 tabular-nums ${featured ? "text-xl sm:text-2xl" : ""}`}>{score.toFixed(1)}</span> : null}
     </p>
   );
 }
