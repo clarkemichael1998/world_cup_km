@@ -25,6 +25,7 @@ type DirectProposal = {
 };
 type RecentTrade = { offererUsername: string; acceptorUsername: string; playerId: number; acceptedPlayerId: number; completedAt: string };
 type TradeView = "home" | "recommended" | "proposals" | "teams" | "market";
+type BestSwapMode = "collections" | "ranking";
 type NationProgress = { nation: string; total: number; owned: number; missing: Player[]; percent: number };
 
 const COLLECTION_BOOST = 3;
@@ -57,6 +58,7 @@ export default function TradePage() {
   const [tradeBusy, setTradeBusy] = useState(false);
   const [tradeNotice, setTradeNotice] = useState("");
   const [activeView, setActiveView] = useState<TradeView>("home");
+  const [bestSwapMode, setBestSwapMode] = useState<BestSwapMode>("collections");
   const [search, setSearch] = useState("");
 
   useEffect(() => {
@@ -147,6 +149,17 @@ export default function TradePage() {
       });
   }, [market, ownedIds, playerById, progressByNation]);
 
+  const rankedMarket = useMemo(() => {
+    return market
+      .filter((entry) => !ownedIds.has(entry.playerId))
+      .sort((a, b) => {
+        const aPlayer = playerById.get(a.playerId);
+        const bPlayer = playerById.get(b.playerId);
+        return (bPlayer?.rating ?? 0) - (aPlayer?.rating ?? 0) || (b.duplicateCount ?? 0) - (a.duplicateCount ?? 0);
+      });
+  }, [market, ownedIds, playerById]);
+
+  const activeBestSwaps = bestSwapMode === "collections" ? recommendedMarket : rankedMarket;
   const visibleMarket = useMemo(() => {
     const query = search.trim().toLowerCase();
     if (!query) return market;
@@ -214,9 +227,23 @@ export default function TradePage() {
 
       {activeView === "recommended" ? (
         <section className="rounded-2xl border border-green-900/10 bg-white p-4 shadow-sm">
-          <SectionHeader title="Best Swaps For Me" text="Choose one of your duplicates to offer for the card you want." />
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <SectionHeader
+              title="Best Swaps For Me"
+              text={bestSwapMode === "collections" ? "Cards that get you closest to completing teams and unlocking boosts." : "Highest-rated available cards you do not own yet."}
+            />
+            <div className="inline-flex rounded-full bg-green-950/10 p-1">
+              <ModeButton active={bestSwapMode === "collections"} onClick={() => setBestSwapMode("collections")}>
+                Complete teams
+              </ModeButton>
+              <ModeButton active={bestSwapMode === "ranking"} onClick={() => setBestSwapMode("ranking")}>
+                Top ranked
+              </ModeButton>
+            </div>
+          </div>
+          <BestSwapShowcase entries={activeBestSwaps.slice(0, 3)} playerById={playerById} progressByNation={progressByNation} mode={bestSwapMode} />
           <MarketList
-            entries={recommendedMarket}
+            entries={activeBestSwaps}
             playerById={playerById}
             ownedIds={ownedIds}
             duplicateCounts={state?.duplicateCounts ?? {}}
@@ -347,6 +374,52 @@ function MarketList({
           tradeAction={tradeAction}
         />
       ))}
+    </div>
+  );
+}
+
+function BestSwapShowcase({
+  entries,
+  playerById,
+  progressByNation,
+  mode
+}: {
+  entries: MarketEntry[];
+  playerById: Map<number, Player>;
+  progressByNation: Map<string, NationProgress>;
+  mode: BestSwapMode;
+}) {
+  if (entries.length === 0) return null;
+
+  return (
+    <div className="mt-4 grid gap-3 md:grid-cols-3">
+      {entries.map((entry, index) => {
+        const player = playerById.get(entry.playerId);
+        const progress = player ? progressByNation.get(player.nation) : undefined;
+        const helper =
+          mode === "collections"
+            ? progress?.missing.length === 1
+              ? `Completes ${player?.nation}`
+              : `${player?.nation ?? "Team"}: ${progress?.owned ?? 0}/${progress?.total ?? 0}`
+            : `${player?.rating ?? "-"} rated ${player?.rarity ?? "card"}`;
+
+        return (
+          <div key={`${entry.userId}:${entry.playerId}:showcase`} className="overflow-hidden rounded-2xl border border-green-900/10 bg-gradient-to-br from-green-950 to-green-800 p-4 text-white shadow-sm">
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/50">#{index + 1} target</p>
+            <div className="mt-3 flex items-center justify-between gap-3">
+              <div className={`flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-xl ring-2 ${rarityRing[player?.rarity ?? "common"] ?? rarityRing.common}`}>
+                <span className="text-lg font-black leading-none text-green-950">{player?.rating ?? "-"}</span>
+                <span className="text-[8px] font-black uppercase leading-none text-green-950/70">{player?.pos ?? ""}</span>
+              </div>
+              <div className="min-w-0 flex-1 text-right">
+                <p className="truncate text-sm font-black">{player?.name ?? `Player ${entry.playerId}`}</p>
+                <p className="mt-1 text-xs font-bold text-white/65">{helper}</p>
+                <p className="mt-1 text-[10px] font-black uppercase tracking-wide text-amber-200">{entry.username} has spare x{entry.duplicateCount}</p>
+              </div>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -596,6 +669,18 @@ function SectionHeader({ title, text }: { title: string; text: string }) {
       <p className="text-sm font-black uppercase tracking-wide text-green-900/60">{title}</p>
       <p className="mt-1 text-xs font-semibold text-green-900/55">{text}</p>
     </div>
+  );
+}
+
+function ModeButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-full px-3 py-1.5 text-xs font-black transition ${active ? "bg-white text-green-950 shadow-sm" : "text-green-950/60 hover:text-green-950"}`}
+    >
+      {children}
+    </button>
   );
 }
 
