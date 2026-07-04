@@ -5,6 +5,7 @@ import {
   createTradeOffer,
   declineTradeProposal,
   getCurrentUser,
+  getDb,
   getOpenTradeOffers,
   getPendingProposalsForOpenOffers,
   getRecentCompletedTrades,
@@ -24,15 +25,38 @@ export async function GET() {
     proposalsByOffer.set(proposal.offer_id, list);
   }
 
+  const openOffers = getOpenTradeOffers();
+  const tradeUsers = [...new Set(openOffers.map((offer) => offer.user_id))];
+  const ownershipByUser = new Map<number, Array<{ playerId: number; duplicateCount: number }>>();
+
+  if (tradeUsers.length > 0) {
+    const placeholders = tradeUsers.map(() => "?").join(",");
+    const rows = getDb()
+      .prepare(`SELECT user_id, player_id, duplicate_count FROM user_players WHERE user_id IN (${placeholders})`)
+      .all(...tradeUsers) as Array<{ user_id: number; player_id: number; duplicate_count: number }>;
+
+    for (const row of rows) {
+      const list = ownershipByUser.get(row.user_id) ?? [];
+      list.push({ playerId: row.player_id, duplicateCount: row.duplicate_count });
+      ownershipByUser.set(row.user_id, list);
+    }
+  }
+
   return NextResponse.json({
-    offers: getOpenTradeOffers().map((offer) => ({
-      id: offer.id,
-      username: offer.username,
-      playerId: offer.player_id,
-      createdAt: offer.created_at,
-      isMine: offer.user_id === user.id,
-      proposals: proposalsByOffer.get(offer.id) ?? []
-    })),
+    offers: openOffers.map((offer) => {
+      const ownership = ownershipByUser.get(offer.user_id) ?? [];
+      return {
+        id: offer.id,
+        username: offer.username,
+        playerId: offer.player_id,
+        createdAt: offer.created_at,
+        isMine: offer.user_id === user.id,
+        spareCount: ownership.find((owned) => owned.playerId === offer.player_id)?.duplicateCount ?? 0,
+        offererOwnedPlayerIds: ownership.map((owned) => owned.playerId),
+        offererDuplicateCounts: Object.fromEntries(ownership.map((owned) => [owned.playerId, owned.duplicateCount])),
+        proposals: proposalsByOffer.get(offer.id) ?? []
+      };
+    }),
     recent: getRecentCompletedTrades().map((trade) => ({
       offererUsername: trade.offerer_username,
       acceptorUsername: trade.acceptor_username,

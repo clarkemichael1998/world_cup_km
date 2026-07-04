@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/Button";
 import { PageTitle } from "@/components/PageTitle";
@@ -10,8 +11,22 @@ import { loadUserStateAsync } from "@/lib/storage";
 import type { Player, UserState } from "@/lib/types";
 
 type TradeProposal = { id: number; username: string; playerId: number; isMine: boolean };
-type TradeOffer = { id: number; username: string; playerId: number; createdAt: string; isMine: boolean; proposals: TradeProposal[] };
+type TradeOffer = {
+  id: number;
+  username: string;
+  playerId: number;
+  createdAt: string;
+  isMine: boolean;
+  spareCount: number;
+  offererOwnedPlayerIds: number[];
+  offererDuplicateCounts: Record<number, number>;
+  proposals: TradeProposal[];
+};
 type RecentTrade = { offererUsername: string; acceptorUsername: string; playerId: number; acceptedPlayerId: number; completedAt: string };
+type TradeTab = "recommended" | "missing" | "desk" | "all";
+type NationProgress = { nation: string; total: number; owned: number; missing: Player[]; percent: number };
+
+const COLLECTION_BOOST = 3;
 
 const rarityRing: Record<string, string> = {
   icon: "ring-zinc-400 bg-gradient-to-br from-zinc-50 to-zinc-200",
@@ -40,6 +55,8 @@ export default function TradePage() {
   const [acceptSelections, setAcceptSelections] = useState<Record<number, number>>({});
   const [tradeBusy, setTradeBusy] = useState(false);
   const [tradeNotice, setTradeNotice] = useState("");
+  const [activeTab, setActiveTab] = useState<TradeTab>("recommended");
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
     loadUserStateAsync().then(setState);
@@ -79,6 +96,29 @@ export default function TradePage() {
   }
 
   const playerById = useMemo(() => new Map(playerPool.map((player) => [player.id, player])), [playerPool]);
+  const ownedIds = useMemo(() => new Set(state?.ownedPlayerIds ?? []), [state]);
+
+  const collectionPlayers = useMemo(() => playerPool.filter((player) => !player.cupId), [playerPool]);
+
+  const nationProgress = useMemo<NationProgress[]>(() => {
+    const byNation = new Map<string, Player[]>();
+    for (const player of collectionPlayers) {
+      const list = byNation.get(player.nation) ?? [];
+      list.push(player);
+      byNation.set(player.nation, list);
+    }
+
+    return [...byNation.entries()]
+      .map(([nation, players]) => {
+        const missing = players.filter((player) => !ownedIds.has(player.id)).sort((a, b) => b.rating - a.rating || a.name.localeCompare(b.name));
+        const owned = players.length - missing.length;
+        return { nation, total: players.length, owned, missing, percent: Math.round((owned / players.length) * 100) };
+      })
+      .sort((a, b) => a.missing.length - b.missing.length || b.percent - a.percent || a.nation.localeCompare(b.nation));
+  }, [collectionPlayers, ownedIds]);
+
+  const progressByNation = useMemo(() => new Map(nationProgress.map((progress) => [progress.nation, progress])), [nationProgress]);
+
   const myDuplicates = useMemo(
     () =>
       Object.entries(state?.duplicateCounts ?? {})
@@ -93,176 +133,219 @@ export default function TradePage() {
   const otherOffers = offers.filter((offer) => !offer.isMine);
   const offerPreview = offerPlayerId !== "" ? playerById.get(offerPlayerId) : undefined;
 
+  const recommendedOffers = useMemo(() => {
+    return otherOffers
+      .filter((offer) => !ownedIds.has(offer.playerId))
+      .sort((a, b) => {
+        const aPlayer = playerById.get(a.playerId);
+        const bPlayer = playerById.get(b.playerId);
+        const aProgress = aPlayer ? progressByNation.get(aPlayer.nation) : undefined;
+        const bProgress = bPlayer ? progressByNation.get(bPlayer.nation) : undefined;
+        return (
+          Number(bProgress?.missing.length === 1) - Number(aProgress?.missing.length === 1) ||
+          (aProgress?.missing.length ?? 999) - (bProgress?.missing.length ?? 999) ||
+          (bPlayer?.rating ?? 0) - (aPlayer?.rating ?? 0)
+        );
+      });
+  }, [otherOffers, ownedIds, playerById, progressByNation]);
+
+  const visibleAllOffers = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return otherOffers;
+    return otherOffers.filter((offer) => {
+      const player = playerById.get(offer.playerId);
+      return [offer.username, player?.name, player?.nation, player?.rarity].some((value) => value?.toLowerCase().includes(query));
+    });
+  }, [otherOffers, playerById, search]);
+
+  const missingTargets = nationProgress.filter((progress) => progress.missing.length > 0).slice(0, 6);
+  const completedNations = nationProgress.filter((progress) => progress.missing.length === 0).length;
+  const needsCount = collectionPlayers.filter((player) => !ownedIds.has(player.id)).length;
+
   return (
     <div>
-      <PageTitle title="Sticker Trading" subtitle="Swap duplicate stickers one-for-one with the rest of the group." />
+      <PageTitle title="Trading Hub" subtitle="Find the swaps that finish teams, unlock collection boosts, and clear duplicate clutter." />
+
+      <div className="mb-5 grid gap-3 md:grid-cols-4">
+        <StatCard label="Teams complete" value={completedNations} detail={`+${COLLECTION_BOOST} to every player in each completed team`} />
+        <StatCard label="Still needed" value={needsCount} detail="Missing stickers across regular collections" />
+        <StatCard label="Your spares" value={myDuplicates.length} detail="Different duplicate players you can offer" />
+        <StatCard label="Useful offers" value={recommendedOffers.length} detail="Open trades containing stickers you do not own" />
+      </div>
 
       <ol className="mb-5 grid gap-2 sm:grid-cols-3">
-        <HowToStep n={1} title="Offer a spare" text="Put one of your duplicates up for trade." />
-        <HowToStep n={2} title="Collect proposals" text="Others propose one of their duplicates in return." />
-        <HowToStep n={3} title="Confirm a swap" text="Pick the proposal you like. Done — one for one." />
+        <HowToStep n={1} title="Chase teams" text={`Complete a nation to give every player in that team +${COLLECTION_BOOST}.`} />
+        <HowToStep n={2} title="Offer real spares" text="The page now labels duplicate counts and whether either side needs the sticker." />
+        <HowToStep n={3} title="Accept quickly" text="Recommended trades surface the offers most likely to move your Best XI." />
       </ol>
 
       {tradeNotice ? <p className="mb-4 rounded-md bg-amber-100 px-3 py-2 text-sm font-black text-amber-900">{tradeNotice}</p> : null}
 
-      <section className="mb-5 rounded-lg border border-amber-300 bg-amber-50 p-4 shadow-sm">
-        <p className="text-sm font-bold uppercase tracking-wide text-amber-800">Offer a Duplicate</p>
-        <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
-          <select
-            className="min-w-0 flex-1 rounded-md border border-amber-300 bg-white px-3 py-2 text-sm font-bold text-amber-950"
-            value={offerPlayerId}
-            onChange={(event) => setOfferPlayerId(event.target.value ? Number(event.target.value) : "")}
-          >
-            <option value="">{myDuplicates.length > 0 ? "Choose a duplicate to offer..." : "No duplicates to offer"}</option>
-            {myDuplicates.map((player) => (
-              <option key={player.id} value={player.id}>
-                {player.name} · {player.rating} {player.rarity} · {player.nation} (x{(state?.duplicateCounts[player.id] ?? 0) + 1})
-              </option>
-            ))}
-          </select>
-          {offerPreview ? <StickerChip player={offerPreview} /> : null}
-          <Button
-            variant="accent"
-            className="shrink-0"
-            onClick={() => offerPlayerId !== "" && tradeAction({ action: "create", playerId: offerPlayerId }, "Offer posted — waiting for proposals.")}
-            disabled={tradeBusy || offerPlayerId === ""}
-          >
-            Post Offer
-          </Button>
+      <section className="mb-5 overflow-hidden rounded-2xl border border-amber-300 bg-gradient-to-br from-amber-50 via-white to-green-50 shadow-sm">
+        <div className="grid gap-4 p-4 lg:grid-cols-[1.2fr_0.8fr]">
+          <div>
+            <p className="text-sm font-black uppercase tracking-wide text-amber-800">Offer A Duplicate</p>
+            <p className="mt-1 text-xs font-semibold text-green-900/65">Post one spare copy. Your original card stays in your club until a confirmed trade uses the duplicate.</p>
+            <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
+              <select
+                className="min-w-0 flex-1 rounded-md border border-amber-300 bg-white px-3 py-2 text-sm font-bold text-amber-950"
+                value={offerPlayerId}
+                onChange={(event) => setOfferPlayerId(event.target.value ? Number(event.target.value) : "")}
+              >
+                <option value="">{myDuplicates.length > 0 ? "Choose a duplicate to offer..." : "No duplicates to offer"}</option>
+                {myDuplicates.map((player) => (
+                  <option key={player.id} value={player.id}>
+                    {player.name} - {player.rating} {player.rarity} - {player.nation} - spare x{state?.duplicateCounts[player.id] ?? 0}
+                  </option>
+                ))}
+              </select>
+              {offerPreview ? <StickerChip player={offerPreview} suffix={`spare x${state?.duplicateCounts[offerPreview.id] ?? 0}`} /> : null}
+              <Button
+                variant="accent"
+                className="shrink-0"
+                onClick={() => offerPlayerId !== "" && tradeAction({ action: "create", playerId: offerPlayerId }, "Offer posted. Waiting for proposals.")}
+                disabled={tradeBusy || offerPlayerId === ""}
+              >
+                Post Offer
+              </Button>
+            </div>
+            {myDuplicates.length === 0 ? (
+              <p className="mt-2 text-xs font-semibold text-amber-700/80">
+                No duplicates yet. Pull more stickers from{" "}
+                <Link href="/add-km" className="underline">
+                  logging activity
+                </Link>{" "}
+                or opening packs.
+              </p>
+            ) : null}
+          </div>
+          <div className="rounded-xl border border-green-900/10 bg-white/80 p-3">
+            <p className="text-xs font-black uppercase tracking-wide text-green-900/55">Closest collection prizes</p>
+            <div className="mt-2 space-y-2">
+              {missingTargets.slice(0, 3).map((progress) => (
+                <MiniProgress key={progress.nation} progress={progress} />
+              ))}
+            </div>
+          </div>
         </div>
-        {myDuplicates.length === 0 ? (
-          <p className="mt-2 text-xs font-semibold text-amber-700/80">
-            You have no duplicates yet. Pull more stickers from{" "}
-            <Link href="/add-km" className="underline">logging activity</Link> or opening packs.
-          </p>
-        ) : null}
       </section>
 
-      <div className="grid gap-5 lg:grid-cols-2">
-        <section className="rounded-lg border border-green-900/10 bg-white p-4 shadow-sm">
-          <p className="text-sm font-bold uppercase tracking-wide text-green-900/60">Your Offers</p>
+      <div className="mb-4 flex flex-wrap gap-2">
+        <TabButton active={activeTab === "recommended"} onClick={() => setActiveTab("recommended")}>
+          Recommended ({recommendedOffers.length})
+        </TabButton>
+        <TabButton active={activeTab === "missing"} onClick={() => setActiveTab("missing")}>
+          Missing Teams
+        </TabButton>
+        <TabButton active={activeTab === "desk"} onClick={() => setActiveTab("desk")}>
+          Your Desk ({myOffers.length})
+        </TabButton>
+        <TabButton active={activeTab === "all"} onClick={() => setActiveTab("all")}>
+          All Offers ({otherOffers.length})
+        </TabButton>
+      </div>
+
+      {activeTab === "recommended" ? (
+        <section className="rounded-2xl border border-green-900/10 bg-white p-4 shadow-sm">
+          <SectionHeader title="Recommended Trades" text="These offers contain stickers you do not own, with team-completion swaps pushed to the top." />
+          <OfferList
+            offers={recommendedOffers}
+            playerById={playerById}
+            ownedIds={ownedIds}
+            duplicateCounts={state?.duplicateCounts ?? {}}
+            myDuplicates={myDuplicates}
+            acceptSelections={acceptSelections}
+            setAcceptSelections={setAcceptSelections}
+            progressByNation={progressByNation}
+            tradeBusy={tradeBusy}
+            tradeAction={tradeAction}
+            emptyText="No open offers currently help your collection. Post a strong duplicate and make the market come to you."
+          />
+        </section>
+      ) : null}
+
+      {activeTab === "missing" ? (
+        <section className="rounded-2xl border border-green-900/10 bg-white p-4 shadow-sm">
+          <SectionHeader title="Missing Team Targets" text={`Complete any team to add +${COLLECTION_BOOST} to all of its players. Available trades are shown beside the missing stickers.`} />
+          <div className="mt-4 grid gap-3 lg:grid-cols-2">
+            {missingTargets.map((progress) => (
+              <NationTargetCard
+                key={progress.nation}
+                progress={progress}
+                offers={otherOffers}
+                playerById={playerById}
+                ownedIds={ownedIds}
+                duplicateCounts={state?.duplicateCounts ?? {}}
+                myDuplicates={myDuplicates}
+                acceptSelections={acceptSelections}
+                setAcceptSelections={setAcceptSelections}
+                progressByNation={progressByNation}
+                tradeBusy={tradeBusy}
+                tradeAction={tradeAction}
+              />
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {activeTab === "desk" ? (
+        <section className="rounded-2xl border border-green-900/10 bg-white p-4 shadow-sm">
+          <SectionHeader title="Your Trade Desk" text="Manage your posted duplicates and decide which incoming proposal is worth taking." />
           <div className="mt-3 space-y-3">
             {myOffers.length > 0 ? (
               myOffers.map((offer) => (
-                <div key={offer.id} className="rounded-lg border border-amber-200 bg-amber-50/50 p-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <StickerCard player={playerById.get(offer.playerId)} fallbackId={offer.playerId} label="You're offering" />
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => tradeAction({ action: "cancel", offerId: offer.id }, "Offer withdrawn.")}
-                      disabled={tradeBusy}
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                  {offer.proposals.length > 0 ? (
-                    <div className="mt-3 space-y-2 border-t border-amber-200 pt-3">
-                      <p className="text-[11px] font-black uppercase tracking-wide text-amber-800/80">{offer.proposals.length} proposal{offer.proposals.length === 1 ? "" : "s"} — pick one</p>
-                      {offer.proposals.map((proposal) => (
-                        <div key={proposal.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-white/70 px-2 py-2">
-                          <StickerCard player={playerById.get(proposal.playerId)} fallbackId={proposal.playerId} label={`${proposal.username} gives`} />
-                          <div className="flex items-center gap-2">
-                            <Button
-                              variant="primary"
-                              size="sm"
-                              onClick={() => tradeAction({ action: "confirm", proposalId: proposal.id }, "Trade complete! 🔁")}
-                              disabled={tradeBusy}
-                            >
-                              Confirm
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => tradeAction({ action: "decline", proposalId: proposal.id }, "Proposal declined.")}
-                              disabled={tradeBusy}
-                            >
-                              Decline
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="mt-2 text-xs font-semibold text-amber-700/75">No proposals yet — hold tight.</p>
-                  )}
-                </div>
+                <YourOfferCard
+                  key={offer.id}
+                  offer={offer}
+                  playerById={playerById}
+                  duplicateCounts={state?.duplicateCounts ?? {}}
+                  tradeBusy={tradeBusy}
+                  tradeAction={tradeAction}
+                />
               ))
             ) : (
-              <p className="text-sm font-semibold text-green-900/55">You have no open offers. Post one above.</p>
+              <p className="text-sm font-semibold text-green-900/55">You have no open offers. Post one above and make the market move.</p>
             )}
           </div>
         </section>
+      ) : null}
 
-        <section className="rounded-lg border border-green-900/10 bg-white p-4 shadow-sm">
-          <p className="text-sm font-bold uppercase tracking-wide text-green-900/60">Open Offers</p>
-          <div className="mt-3 space-y-3">
-            {otherOffers.length > 0 ? (
-              otherOffers.map((offer) => {
-                const myProposal = offer.proposals.find((proposal) => proposal.isMine);
-                return (
-                  <div key={offer.id} className="rounded-lg border border-green-900/10 bg-green-950/5 p-3">
-                    <StickerCard player={playerById.get(offer.playerId)} fallbackId={offer.playerId} label={`${offer.username} offers`} />
-                    {myProposal ? (
-                      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-green-900/10 pt-3">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-bold text-green-900/60">You proposed</span>
-                          <StickerChip player={playerById.get(myProposal.playerId)} />
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => tradeAction({ action: "withdraw", proposalId: myProposal.id }, "Proposal withdrawn.")}
-                          disabled={tradeBusy}
-                        >
-                          Withdraw
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-green-900/10 pt-3">
-                        <span className="text-xs font-bold uppercase tracking-wide text-green-900/50">Give in return</span>
-                        <select
-                          className="min-w-0 flex-1 rounded-md border border-green-900/20 bg-white px-2 py-1.5 text-xs font-bold text-green-950"
-                          value={acceptSelections[offer.id] ?? ""}
-                          onChange={(event) => setAcceptSelections((prev) => ({ ...prev, [offer.id]: Number(event.target.value) }))}
-                        >
-                          <option value="">Choose a duplicate...</option>
-                          {myDuplicates.map((player) => (
-                            <option key={player.id} value={player.id}>
-                              {player.name} · {player.rating} {player.rarity} · {player.nation}
-                            </option>
-                          ))}
-                        </select>
-                        <Button
-                          variant="primary"
-                          size="sm"
-                          className="shrink-0"
-                          onClick={() => acceptSelections[offer.id] && tradeAction({ action: "propose", offerId: offer.id, playerId: acceptSelections[offer.id] }, "Proposal sent — the offerer decides.")}
-                          disabled={tradeBusy || !acceptSelections[offer.id]}
-                        >
-                          Propose
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                );
-              })
-            ) : (
-              <p className="text-sm font-semibold text-green-900/55">No one else has an open offer right now.</p>
-            )}
+      {activeTab === "all" ? (
+        <section className="rounded-2xl border border-green-900/10 bg-white p-4 shadow-sm">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <SectionHeader title="All Open Offers" text="Search the whole trade market when you know exactly who you want." />
+            <input
+              className="rounded-md border border-green-900/15 bg-white px-3 py-2 text-sm font-bold text-green-950 placeholder:text-green-900/35"
+              placeholder="Search player, nation, rarity, user..."
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
           </div>
+          <OfferList
+            offers={visibleAllOffers}
+            playerById={playerById}
+            ownedIds={ownedIds}
+            duplicateCounts={state?.duplicateCounts ?? {}}
+            myDuplicates={myDuplicates}
+            acceptSelections={acceptSelections}
+            setAcceptSelections={setAcceptSelections}
+            progressByNation={progressByNation}
+            tradeBusy={tradeBusy}
+            tradeAction={tradeAction}
+            emptyText="No matching open offers right now."
+          />
         </section>
-      </div>
+      ) : null}
 
       {recentTrades.length > 0 ? (
-        <section className="mt-5 rounded-lg border border-green-900/10 bg-white p-4 shadow-sm">
-          <p className="text-sm font-bold uppercase tracking-wide text-green-900/60">Recent Trades</p>
+        <section className="mt-5 rounded-2xl border border-green-900/10 bg-white p-4 shadow-sm">
+          <SectionHeader title="Recent Trades" text="Completed swaps from the market." />
           <div className="mt-3 space-y-2">
             {recentTrades.slice(0, 10).map((trade, index) => (
               <div key={index} className="flex flex-wrap items-center gap-2 rounded-md bg-green-950/5 px-3 py-2 text-xs font-bold text-green-950">
                 <span className="font-black">{trade.offererUsername}</span>
                 <StickerChip player={playerById.get(trade.playerId)} />
-                <span className="text-green-900/50">🔁</span>
+                <span className="text-green-900/45">swapped for</span>
                 <StickerChip player={playerById.get(trade.acceptedPlayerId)} />
                 <span className="font-black">{trade.acceptorUsername}</span>
               </div>
@@ -272,6 +355,326 @@ export default function TradePage() {
       ) : null}
     </div>
   );
+}
+
+function OfferList({
+  offers,
+  playerById,
+  ownedIds,
+  duplicateCounts,
+  myDuplicates,
+  acceptSelections,
+  setAcceptSelections,
+  progressByNation,
+  tradeBusy,
+  tradeAction,
+  emptyText
+}: {
+  offers: TradeOffer[];
+  playerById: Map<number, Player>;
+  ownedIds: Set<number>;
+  duplicateCounts: Record<number, number>;
+  myDuplicates: Player[];
+  acceptSelections: Record<number, number>;
+  setAcceptSelections: (updater: (prev: Record<number, number>) => Record<number, number>) => void;
+  progressByNation: Map<string, NationProgress>;
+  tradeBusy: boolean;
+  tradeAction: (body: Record<string, unknown>, successNotice: string) => Promise<void>;
+  emptyText: string;
+}) {
+  if (offers.length === 0) return <p className="mt-3 text-sm font-semibold text-green-900/55">{emptyText}</p>;
+
+  return (
+    <div className="mt-3 grid gap-3 xl:grid-cols-2">
+      {offers.map((offer) => (
+        <OpenOfferCard
+          key={offer.id}
+          offer={offer}
+          playerById={playerById}
+          ownedIds={ownedIds}
+          duplicateCounts={duplicateCounts}
+          myDuplicates={myDuplicates}
+          acceptSelections={acceptSelections}
+          setAcceptSelections={setAcceptSelections}
+          progressByNation={progressByNation}
+          tradeBusy={tradeBusy}
+          tradeAction={tradeAction}
+        />
+      ))}
+    </div>
+  );
+}
+
+function OpenOfferCard({
+  offer,
+  playerById,
+  ownedIds,
+  duplicateCounts,
+  myDuplicates,
+  acceptSelections,
+  setAcceptSelections,
+  progressByNation,
+  tradeBusy,
+  tradeAction
+}: {
+  offer: TradeOffer;
+  playerById: Map<number, Player>;
+  ownedIds: Set<number>;
+  duplicateCounts: Record<number, number>;
+  myDuplicates: Player[];
+  acceptSelections: Record<number, number>;
+  setAcceptSelections: (updater: (prev: Record<number, number>) => Record<number, number>) => void;
+  progressByNation: Map<string, NationProgress>;
+  tradeBusy: boolean;
+  tradeAction: (body: Record<string, unknown>, successNotice: string) => Promise<void>;
+}) {
+  const player = playerById.get(offer.playerId);
+  const progress = player ? progressByNation.get(player.nation) : undefined;
+  const myProposal = offer.proposals.find((proposal) => proposal.isMine);
+  const selectedPlayerId = acceptSelections[offer.id];
+  const sortedDuplicates = [...myDuplicates].sort((a, b) => {
+    const aNeeded = !offer.offererOwnedPlayerIds.includes(a.id);
+    const bNeeded = !offer.offererOwnedPlayerIds.includes(b.id);
+    return Number(bNeeded) - Number(aNeeded) || b.rating - a.rating || a.name.localeCompare(b.name);
+  });
+
+  return (
+    <div className="rounded-xl border border-green-900/10 bg-green-950/[0.03] p-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <StickerCard player={player} fallbackId={offer.playerId} label={`${offer.username} offers`} />
+        <div className="flex flex-wrap justify-end gap-1.5">
+          <Badge tone={ownedIds.has(offer.playerId) ? "muted" : "good"}>{ownedIds.has(offer.playerId) ? "Already owned" : "You need this"}</Badge>
+          {progress?.missing.length === 1 ? <Badge tone="gold">Completes {player?.nation}</Badge> : null}
+          <Badge tone={offer.spareCount > 0 ? "muted" : "danger"}>{offer.spareCount > 0 ? `Spare x${offer.spareCount}` : "No spare now"}</Badge>
+        </div>
+      </div>
+      {progress && progress.missing.length > 1 ? (
+        <p className="mt-2 text-xs font-bold text-green-900/60">
+          {player?.nation}: {progress.owned}/{progress.total} collected. This leaves {Math.max(progress.missing.length - 1, 0)} missing.
+        </p>
+      ) : null}
+      {myProposal ? (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-green-900/10 pt-3">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-green-900/60">You proposed</span>
+            <StickerChip player={playerById.get(myProposal.playerId)} suffix={`spare x${duplicateCounts[myProposal.playerId] ?? 0}`} />
+          </div>
+          <Button variant="ghost" size="sm" onClick={() => tradeAction({ action: "withdraw", proposalId: myProposal.id }, "Proposal withdrawn.")} disabled={tradeBusy}>
+            Withdraw
+          </Button>
+        </div>
+      ) : (
+        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-green-900/10 pt-3">
+          <span className="text-xs font-black uppercase tracking-wide text-green-900/50">Give</span>
+          <select
+            className="min-w-0 flex-1 rounded-md border border-green-900/20 bg-white px-2 py-1.5 text-xs font-bold text-green-950"
+            value={selectedPlayerId ?? ""}
+            onChange={(event) => setAcceptSelections((prev) => ({ ...prev, [offer.id]: Number(event.target.value) }))}
+          >
+            <option value="">Choose one of your duplicates...</option>
+            {sortedDuplicates.map((duplicate) => (
+              <option key={duplicate.id} value={duplicate.id}>
+                {duplicate.name} - spare x{duplicateCounts[duplicate.id] ?? 0} - {offer.offererOwnedPlayerIds.includes(duplicate.id) ? "they own it" : "they need it"}
+              </option>
+            ))}
+          </select>
+          <Button
+            variant="primary"
+            size="sm"
+            className="shrink-0"
+            onClick={() => selectedPlayerId && tradeAction({ action: "propose", offerId: offer.id, playerId: selectedPlayerId }, "Proposal sent. The offerer decides.")}
+            disabled={tradeBusy || !selectedPlayerId || offer.spareCount < 1}
+          >
+            Propose
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function YourOfferCard({
+  offer,
+  playerById,
+  duplicateCounts,
+  tradeBusy,
+  tradeAction
+}: {
+  offer: TradeOffer;
+  playerById: Map<number, Player>;
+  duplicateCounts: Record<number, number>;
+  tradeBusy: boolean;
+  tradeAction: (body: Record<string, unknown>, successNotice: string) => Promise<void>;
+}) {
+  return (
+    <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <StickerCard player={playerById.get(offer.playerId)} fallbackId={offer.playerId} label="You're offering" />
+        <div className="flex items-center gap-2">
+          <Badge tone={(duplicateCounts[offer.playerId] ?? 0) > 0 ? "muted" : "danger"}>Your spare x{duplicateCounts[offer.playerId] ?? 0}</Badge>
+          <Button variant="ghost" size="sm" onClick={() => tradeAction({ action: "cancel", offerId: offer.id }, "Offer withdrawn.")} disabled={tradeBusy}>
+            Cancel
+          </Button>
+        </div>
+      </div>
+      {offer.proposals.length > 0 ? (
+        <div className="mt-3 space-y-2 border-t border-amber-200 pt-3">
+          <p className="text-[11px] font-black uppercase tracking-wide text-amber-800/80">{offer.proposals.length} proposal{offer.proposals.length === 1 ? "" : "s"} - pick one</p>
+          {offer.proposals.map((proposal) => (
+            <div key={proposal.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-white/75 px-2 py-2">
+              <StickerCard player={playerById.get(proposal.playerId)} fallbackId={proposal.playerId} label={`${proposal.username} gives`} />
+              <div className="flex items-center gap-2">
+                <Button variant="primary" size="sm" onClick={() => tradeAction({ action: "confirm", proposalId: proposal.id }, "Trade complete.")} disabled={tradeBusy}>
+                  Confirm
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => tradeAction({ action: "decline", proposalId: proposal.id }, "Proposal declined.")} disabled={tradeBusy}>
+                  Decline
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="mt-2 text-xs font-semibold text-amber-700/75">No proposals yet. Stronger duplicates usually get first bites.</p>
+      )}
+    </div>
+  );
+}
+
+function NationTargetCard({
+  progress,
+  offers,
+  playerById,
+  ownedIds,
+  duplicateCounts,
+  myDuplicates,
+  acceptSelections,
+  setAcceptSelections,
+  progressByNation,
+  tradeBusy,
+  tradeAction
+}: {
+  progress: NationProgress;
+  offers: TradeOffer[];
+  playerById: Map<number, Player>;
+  ownedIds: Set<number>;
+  duplicateCounts: Record<number, number>;
+  myDuplicates: Player[];
+  acceptSelections: Record<number, number>;
+  setAcceptSelections: (updater: (prev: Record<number, number>) => Record<number, number>) => void;
+  progressByNation: Map<string, NationProgress>;
+  tradeBusy: boolean;
+  tradeAction: (body: Record<string, unknown>, successNotice: string) => Promise<void>;
+}) {
+  const flag = flagUrl(progress.nation);
+
+  return (
+    <div className="rounded-xl border border-green-900/10 bg-green-950/[0.03] p-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          {flag ? <img src={flag} alt="" className="h-5 rounded-sm object-cover" style={{ width: "1.8rem" }} /> : null}
+          <div>
+            <p className="text-sm font-black text-green-950">{progress.nation}</p>
+            <p className="text-xs font-bold text-green-900/55">{progress.owned}/{progress.total} collected</p>
+          </div>
+        </div>
+        <Badge tone={progress.missing.length === 1 ? "gold" : "muted"}>{progress.missing.length} missing</Badge>
+      </div>
+      <div className="mt-3 h-2 overflow-hidden rounded-full bg-green-950/10">
+        <div className="h-full rounded-full bg-pitch" style={{ width: `${progress.percent}%` }} />
+      </div>
+      <div className="mt-3 space-y-2">
+        {progress.missing.slice(0, 5).map((missingPlayer) => {
+          const matchingOffers = offers.filter((offer) => offer.playerId === missingPlayer.id);
+          return (
+            <div key={missingPlayer.id} className="rounded-lg bg-white/75 p-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <StickerChip player={missingPlayer} />
+                {matchingOffers.length > 0 ? <Badge tone="good">{matchingOffers.length} open</Badge> : <Badge tone="muted">No open spare</Badge>}
+              </div>
+              {matchingOffers.slice(0, 2).map((offer) => (
+                <div key={offer.id} className="mt-2">
+                  <OpenOfferCard
+                    offer={offer}
+                    playerById={playerById}
+                    ownedIds={ownedIds}
+                    duplicateCounts={duplicateCounts}
+                    myDuplicates={myDuplicates}
+                    acceptSelections={acceptSelections}
+                    setAcceptSelections={setAcceptSelections}
+                    progressByNation={progressByNation}
+                    tradeBusy={tradeBusy}
+                    tradeAction={tradeAction}
+                  />
+                </div>
+              ))}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function StatCard({ label, value, detail }: { label: string; value: number; detail: string }) {
+  return (
+    <div className="rounded-2xl border border-green-900/10 bg-white p-4 shadow-sm">
+      <p className="text-xs font-black uppercase tracking-wide text-green-900/45">{label}</p>
+      <p className="mt-1 text-3xl font-black text-green-950">{value}</p>
+      <p className="mt-1 text-xs font-semibold text-green-900/60">{detail}</p>
+    </div>
+  );
+}
+
+function MiniProgress({ progress }: { progress: NationProgress }) {
+  const flag = flagUrl(progress.nation);
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-2 text-xs font-black text-green-950">
+        <span className="inline-flex items-center gap-1.5">
+          {flag ? <img src={flag} alt="" className="h-3 rounded-sm object-cover" style={{ width: "1rem" }} /> : null}
+          {progress.nation}
+        </span>
+        <span>{progress.owned}/{progress.total}</span>
+      </div>
+      <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-green-950/10">
+        <div className="h-full rounded-full bg-amber-500" style={{ width: `${progress.percent}%` }} />
+      </div>
+    </div>
+  );
+}
+
+function SectionHeader({ title, text }: { title: string; text: string }) {
+  return (
+    <div>
+      <p className="text-sm font-black uppercase tracking-wide text-green-900/60">{title}</p>
+      <p className="mt-1 text-xs font-semibold text-green-900/55">{text}</p>
+    </div>
+  );
+}
+
+function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-full px-4 py-2 text-xs font-black transition ${
+        active ? "bg-pitch text-white shadow-sm" : "bg-white text-green-950 ring-1 ring-green-900/10 hover:bg-green-50"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function Badge({ tone, children }: { tone: "good" | "gold" | "muted" | "danger"; children: ReactNode }) {
+  const classes = {
+    good: "bg-emerald-100 text-emerald-900 ring-emerald-200",
+    gold: "bg-amber-100 text-amber-900 ring-amber-200",
+    muted: "bg-green-950/10 text-green-950 ring-green-900/10",
+    danger: "bg-red-100 text-red-900 ring-red-200"
+  };
+  return <span className={`inline-flex rounded-full px-2 py-1 text-[10px] font-black uppercase tracking-wide ring-1 ${classes[tone]}`}>{children}</span>;
 }
 
 function HowToStep({ n, title, text }: { n: number; title: string; text: string }) {
@@ -286,7 +689,6 @@ function HowToStep({ n, title, text }: { n: number; title: string; text: string 
   );
 }
 
-// Full card: flag, name, club, rarity-tinted rating badge.
 function StickerCard({ player, fallbackId, label }: { player: Player | undefined; fallbackId: number; label: string }) {
   if (!player) {
     return <div className="text-sm font-bold text-green-900/60">{label}: Player {fallbackId}</div>;
@@ -310,14 +712,14 @@ function StickerCard({ player, fallbackId, label }: { player: Player | undefined
   );
 }
 
-// Inline compact chip: flag + name + rating, for dense lists.
-function StickerChip({ player }: { player: Player | undefined }) {
+function StickerChip({ player, suffix }: { player: Player | undefined; suffix?: string }) {
   if (!player) return <span className="rounded bg-green-950/10 px-1.5 py-0.5 text-xs font-bold">Unknown</span>;
   const flag = flagUrl(player.nation);
   return (
     <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-black ring-1 ${rarityBadge[player.rarity] ?? rarityBadge.common}`}>
       {flag ? <img src={flag} alt="" className="h-3 rounded-sm object-cover" style={{ width: "1rem" }} /> : null}
       {player.name} {player.rating}
+      {suffix ? <span className="opacity-75">({suffix})</span> : null}
     </span>
   );
 }
