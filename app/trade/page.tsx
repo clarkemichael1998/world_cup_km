@@ -23,7 +23,7 @@ type TradeOffer = {
   proposals: TradeProposal[];
 };
 type RecentTrade = { offererUsername: string; acceptorUsername: string; playerId: number; acceptedPlayerId: number; completedAt: string };
-type TradeTab = "recommended" | "missing" | "desk" | "all";
+type TradeView = "home" | "offer" | "recommended" | "teams" | "desk" | "market";
 type NationProgress = { nation: string; total: number; owned: number; missing: Player[]; percent: number };
 
 const COLLECTION_BOOST = 3;
@@ -55,7 +55,7 @@ export default function TradePage() {
   const [acceptSelections, setAcceptSelections] = useState<Record<number, number>>({});
   const [tradeBusy, setTradeBusy] = useState(false);
   const [tradeNotice, setTradeNotice] = useState("");
-  const [activeTab, setActiveTab] = useState<TradeTab>("recommended");
+  const [activeView, setActiveView] = useState<TradeView>("home");
   const [search, setSearch] = useState("");
 
   useEffect(() => {
@@ -164,88 +164,128 @@ export default function TradePage() {
 
   return (
     <div>
-      <PageTitle title="Trading Hub" subtitle="Find the swaps that finish teams, unlock collection boosts, and clear duplicate clutter." />
-
-      <div className="mb-5 grid gap-3 md:grid-cols-4">
-        <StatCard label="Teams complete" value={completedNations} detail={`+${COLLECTION_BOOST} to every player in each completed team`} />
-        <StatCard label="Still needed" value={needsCount} detail="Missing stickers across regular collections" />
-        <StatCard label="Your spares" value={myDuplicates.length} detail="Different duplicate players you can offer" />
-        <StatCard label="Useful offers" value={recommendedOffers.length} detail="Open trades containing stickers you do not own" />
-      </div>
-
-      <ol className="mb-5 grid gap-2 sm:grid-cols-3">
-        <HowToStep n={1} title="Chase teams" text={`Complete a nation to give every player in that team +${COLLECTION_BOOST}.`} />
-        <HowToStep n={2} title="Offer real spares" text="The page now labels duplicate counts and whether either side needs the sticker." />
-        <HowToStep n={3} title="Accept quickly" text="Recommended trades surface the offers most likely to move your Best XI." />
-      </ol>
+      <PageTitle title="Trading Hub" subtitle="Swap duplicates and finish teams for collection boosts." />
 
       {tradeNotice ? <p className="mb-4 rounded-md bg-amber-100 px-3 py-2 text-sm font-black text-amber-900">{tradeNotice}</p> : null}
 
-      <section className="mb-5 overflow-hidden rounded-2xl border border-amber-300 bg-gradient-to-br from-amber-50 via-white to-green-50 shadow-sm">
-        <div className="grid gap-4 p-4 lg:grid-cols-[1.2fr_0.8fr]">
-          <div>
-            <p className="text-sm font-black uppercase tracking-wide text-amber-800">Offer A Duplicate</p>
-            <p className="mt-1 text-xs font-semibold text-green-900/65">Post one spare copy. Your original card stays in your club until a confirmed trade uses the duplicate.</p>
-            <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
-              <select
-                className="min-w-0 flex-1 rounded-md border border-amber-300 bg-white px-3 py-2 text-sm font-bold text-amber-950"
-                value={offerPlayerId}
-                onChange={(event) => setOfferPlayerId(event.target.value ? Number(event.target.value) : "")}
-              >
-                <option value="">{myDuplicates.length > 0 ? "Choose a duplicate to offer..." : "No duplicates to offer"}</option>
-                {myDuplicates.map((player) => (
-                  <option key={player.id} value={player.id}>
-                    {player.name} - {player.rating} {player.rarity} - {player.nation} - spare x{state?.duplicateCounts[player.id] ?? 0}
-                  </option>
+      {activeView === "home" ? (
+        <>
+          <section className="mb-5 overflow-hidden rounded-2xl border border-green-900/10 bg-gradient-to-br from-green-950 via-green-900 to-amber-700 p-5 text-white shadow-sm">
+            <p className="text-xs font-black uppercase tracking-[0.2em] text-white/65">What do you want to do?</p>
+            <h2 className="mt-2 max-w-2xl text-2xl font-black sm:text-3xl">Make one smart swap, finish a team, or manage your offers.</h2>
+            <p className="mt-2 max-w-2xl text-sm font-semibold text-white/75">
+              Team collections give every player from that nation +{COLLECTION_BOOST}. Start with recommended swaps if you want the shortest route.
+            </p>
+            <div className="mt-4 grid gap-2 sm:grid-cols-4">
+              <MiniStat label="Useful offers" value={recommendedOffers.length} />
+              <MiniStat label="Your spares" value={myDuplicates.length} />
+              <MiniStat label="Open offers" value={otherOffers.length} />
+              <MiniStat label="Teams done" value={completedNations} />
+            </div>
+          </section>
+
+          <div className="grid gap-3 md:grid-cols-2">
+            <ActionCard
+              title="Best trades for me"
+              text="See only offers for stickers you still need."
+              meta={`${recommendedOffers.length} useful offers`}
+              tone="green"
+              onClick={() => setActiveView("recommended")}
+            />
+            <ActionCard
+              title="Post a duplicate"
+              text="Put one spare sticker up for a one-for-one swap."
+              meta={`${myDuplicates.length} spare players`}
+              tone="amber"
+              onClick={() => setActiveView("offer")}
+            />
+            <ActionCard
+              title="Finish a team"
+              text={`Find the closest nations to unlock the +${COLLECTION_BOOST} boost.`}
+              meta={`${needsCount} stickers still needed`}
+              tone="white"
+              onClick={() => setActiveView("teams")}
+            />
+            <ActionCard
+              title="My offers"
+              text="Accept, decline, or cancel your active trade offers."
+              meta={`${myOffers.length} active offers`}
+              tone="white"
+              onClick={() => setActiveView("desk")}
+            />
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setActiveView("market")}
+            className="mt-4 w-full rounded-xl border border-green-900/10 bg-white px-4 py-3 text-left text-sm font-black text-green-950 shadow-sm transition hover:bg-green-50"
+          >
+            Browse the full market <span className="font-semibold text-green-900/50">({otherOffers.length} open offers)</span>
+          </button>
+
+          {recentTrades.length > 0 ? (
+            <section className="mt-5 rounded-2xl border border-green-900/10 bg-white p-4 shadow-sm">
+              <SectionHeader title="Latest Swaps" text="A quick look at recent completed trades." />
+              <div className="mt-3 space-y-2">
+                {recentTrades.slice(0, 3).map((trade, index) => (
+                  <RecentTradeRow key={index} trade={trade} playerById={playerById} />
                 ))}
-              </select>
-              {offerPreview ? <StickerChip player={offerPreview} suffix={`spare x${state?.duplicateCounts[offerPreview.id] ?? 0}`} /> : null}
-              <Button
-                variant="accent"
-                className="shrink-0"
-                onClick={() => offerPlayerId !== "" && tradeAction({ action: "create", playerId: offerPlayerId }, "Offer posted. Waiting for proposals.")}
-                disabled={tradeBusy || offerPlayerId === ""}
-              >
-                Post Offer
-              </Button>
-            </div>
-            {myDuplicates.length === 0 ? (
-              <p className="mt-2 text-xs font-semibold text-amber-700/80">
-                No duplicates yet. Pull more stickers from{" "}
-                <Link href="/add-km" className="underline">
-                  logging activity
-                </Link>{" "}
-                or opening packs.
-              </p>
-            ) : null}
-          </div>
-          <div className="rounded-xl border border-green-900/10 bg-white/80 p-3">
-            <p className="text-xs font-black uppercase tracking-wide text-green-900/55">Closest collection prizes</p>
-            <div className="mt-2 space-y-2">
-              {missingTargets.slice(0, 3).map((progress) => (
-                <MiniProgress key={progress.nation} progress={progress} />
-              ))}
-            </div>
-          </div>
+              </div>
+            </section>
+          ) : null}
+        </>
+      ) : null}
+
+      {activeView !== "home" ? (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+          <Button variant="ghost" size="sm" onClick={() => setActiveView("home")}>
+            Back to trading home
+          </Button>
+          <button type="button" onClick={() => setActiveView("market")} className="text-xs font-black uppercase tracking-wide text-green-900/55 underline">
+            Full market
+          </button>
         </div>
-      </section>
+      ) : null}
 
-      <div className="mb-4 flex flex-wrap gap-2">
-        <TabButton active={activeTab === "recommended"} onClick={() => setActiveTab("recommended")}>
-          Recommended ({recommendedOffers.length})
-        </TabButton>
-        <TabButton active={activeTab === "missing"} onClick={() => setActiveTab("missing")}>
-          Missing Teams
-        </TabButton>
-        <TabButton active={activeTab === "desk"} onClick={() => setActiveTab("desk")}>
-          Your Desk ({myOffers.length})
-        </TabButton>
-        <TabButton active={activeTab === "all"} onClick={() => setActiveTab("all")}>
-          All Offers ({otherOffers.length})
-        </TabButton>
-      </div>
+      {activeView === "offer" ? (
+        <section className="rounded-2xl border border-amber-300 bg-gradient-to-br from-amber-50 via-white to-green-50 p-4 shadow-sm">
+          <SectionHeader title="Post A Duplicate" text="Choose one spare copy. Your original card stays in your club unless a confirmed trade uses the duplicate." />
+          <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+            <select
+              className="min-w-0 flex-1 rounded-md border border-amber-300 bg-white px-3 py-2 text-sm font-bold text-amber-950"
+              value={offerPlayerId}
+              onChange={(event) => setOfferPlayerId(event.target.value ? Number(event.target.value) : "")}
+            >
+              <option value="">{myDuplicates.length > 0 ? "Choose a duplicate to offer..." : "No duplicates to offer"}</option>
+              {myDuplicates.map((player) => (
+                <option key={player.id} value={player.id}>
+                  {player.name} - {player.rating} {player.rarity} - {player.nation} - spare x{state?.duplicateCounts[player.id] ?? 0}
+                </option>
+              ))}
+            </select>
+            {offerPreview ? <StickerChip player={offerPreview} suffix={`spare x${state?.duplicateCounts[offerPreview.id] ?? 0}`} /> : null}
+            <Button
+              variant="accent"
+              className="shrink-0"
+              onClick={() => offerPlayerId !== "" && tradeAction({ action: "create", playerId: offerPlayerId }, "Offer posted. Waiting for proposals.")}
+              disabled={tradeBusy || offerPlayerId === ""}
+            >
+              Post Offer
+            </Button>
+          </div>
+          {myDuplicates.length === 0 ? (
+            <p className="mt-3 text-xs font-semibold text-amber-700/80">
+              No duplicates yet. Pull more stickers from{" "}
+              <Link href="/add-km" className="underline">
+                logging activity
+              </Link>{" "}
+              or opening packs.
+            </p>
+          ) : null}
+        </section>
+      ) : null}
 
-      {activeTab === "recommended" ? (
+      {activeView === "recommended" ? (
         <section className="rounded-2xl border border-green-900/10 bg-white p-4 shadow-sm">
           <SectionHeader title="Recommended Trades" text="These offers contain stickers you do not own, with team-completion swaps pushed to the top." />
           <OfferList
@@ -264,7 +304,7 @@ export default function TradePage() {
         </section>
       ) : null}
 
-      {activeTab === "missing" ? (
+      {activeView === "teams" ? (
         <section className="rounded-2xl border border-green-900/10 bg-white p-4 shadow-sm">
           <SectionHeader title="Missing Team Targets" text={`Complete any team to add +${COLLECTION_BOOST} to all of its players. Available trades are shown beside the missing stickers.`} />
           <div className="mt-4 grid gap-3 lg:grid-cols-2">
@@ -288,7 +328,7 @@ export default function TradePage() {
         </section>
       ) : null}
 
-      {activeTab === "desk" ? (
+      {activeView === "desk" ? (
         <section className="rounded-2xl border border-green-900/10 bg-white p-4 shadow-sm">
           <SectionHeader title="Your Trade Desk" text="Manage your posted duplicates and decide which incoming proposal is worth taking." />
           <div className="mt-3 space-y-3">
@@ -310,7 +350,7 @@ export default function TradePage() {
         </section>
       ) : null}
 
-      {activeTab === "all" ? (
+      {activeView === "market" ? (
         <section className="rounded-2xl border border-green-900/10 bg-white p-4 shadow-sm">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <SectionHeader title="All Open Offers" text="Search the whole trade market when you know exactly who you want." />
@@ -334,23 +374,6 @@ export default function TradePage() {
             tradeAction={tradeAction}
             emptyText="No matching open offers right now."
           />
-        </section>
-      ) : null}
-
-      {recentTrades.length > 0 ? (
-        <section className="mt-5 rounded-2xl border border-green-900/10 bg-white p-4 shadow-sm">
-          <SectionHeader title="Recent Trades" text="Completed swaps from the market." />
-          <div className="mt-3 space-y-2">
-            {recentTrades.slice(0, 10).map((trade, index) => (
-              <div key={index} className="flex flex-wrap items-center gap-2 rounded-md bg-green-950/5 px-3 py-2 text-xs font-bold text-green-950">
-                <span className="font-black">{trade.offererUsername}</span>
-                <StickerChip player={playerById.get(trade.playerId)} />
-                <span className="text-green-900/45">swapped for</span>
-                <StickerChip player={playerById.get(trade.acceptedPlayerId)} />
-                <span className="font-black">{trade.acceptorUsername}</span>
-              </div>
-            ))}
-          </div>
         </section>
       ) : null}
     </div>
@@ -616,30 +639,39 @@ function NationTargetCard({
   );
 }
 
-function StatCard({ label, value, detail }: { label: string; value: number; detail: string }) {
+function ActionCard({
+  title,
+  text,
+  meta,
+  tone,
+  onClick
+}: {
+  title: string;
+  text: string;
+  meta: string;
+  tone: "green" | "amber" | "white";
+  onClick: () => void;
+}) {
+  const classes = {
+    green: "border-green-800 bg-green-950 text-white hover:bg-green-900",
+    amber: "border-amber-300 bg-amber-50 text-amber-950 hover:bg-amber-100",
+    white: "border-green-900/10 bg-white text-green-950 hover:bg-green-50"
+  };
+
   return (
-    <div className="rounded-2xl border border-green-900/10 bg-white p-4 shadow-sm">
-      <p className="text-xs font-black uppercase tracking-wide text-green-900/45">{label}</p>
-      <p className="mt-1 text-3xl font-black text-green-950">{value}</p>
-      <p className="mt-1 text-xs font-semibold text-green-900/60">{detail}</p>
-    </div>
+    <button type="button" onClick={onClick} className={`rounded-2xl border p-5 text-left shadow-sm transition ${classes[tone]}`}>
+      <p className="text-lg font-black">{title}</p>
+      <p className={`mt-1 text-sm font-semibold ${tone === "green" ? "text-white/75" : "text-green-900/60"}`}>{text}</p>
+      <p className={`mt-4 text-xs font-black uppercase tracking-wide ${tone === "green" ? "text-white/55" : "text-green-900/45"}`}>{meta}</p>
+    </button>
   );
 }
 
-function MiniProgress({ progress }: { progress: NationProgress }) {
-  const flag = flagUrl(progress.nation);
+function MiniStat({ label, value }: { label: string; value: number }) {
   return (
-    <div>
-      <div className="flex items-center justify-between gap-2 text-xs font-black text-green-950">
-        <span className="inline-flex items-center gap-1.5">
-          {flag ? <img src={flag} alt="" className="h-3 rounded-sm object-cover" style={{ width: "1rem" }} /> : null}
-          {progress.nation}
-        </span>
-        <span>{progress.owned}/{progress.total}</span>
-      </div>
-      <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-green-950/10">
-        <div className="h-full rounded-full bg-amber-500" style={{ width: `${progress.percent}%` }} />
-      </div>
+    <div className="rounded-xl bg-white/10 px-3 py-2 ring-1 ring-white/15">
+      <p className="text-xl font-black">{value}</p>
+      <p className="text-[10px] font-black uppercase tracking-wide text-white/60">{label}</p>
     </div>
   );
 }
@@ -653,17 +685,15 @@ function SectionHeader({ title, text }: { title: string; text: string }) {
   );
 }
 
-function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
+function RecentTradeRow({ trade, playerById }: { trade: RecentTrade; playerById: Map<number, Player> }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`rounded-full px-4 py-2 text-xs font-black transition ${
-        active ? "bg-pitch text-white shadow-sm" : "bg-white text-green-950 ring-1 ring-green-900/10 hover:bg-green-50"
-      }`}
-    >
-      {children}
-    </button>
+    <div className="flex flex-wrap items-center gap-2 rounded-md bg-green-950/5 px-3 py-2 text-xs font-bold text-green-950">
+      <span className="font-black">{trade.offererUsername}</span>
+      <StickerChip player={playerById.get(trade.playerId)} />
+      <span className="text-green-900/45">swapped for</span>
+      <StickerChip player={playerById.get(trade.acceptedPlayerId)} />
+      <span className="font-black">{trade.acceptorUsername}</span>
+    </div>
   );
 }
 
