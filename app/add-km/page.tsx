@@ -82,7 +82,7 @@ export default function AddKmPage() {
     <div>
       <PageTitle title="Add Activity" subtitle="Walks, runs, strength workouts, and other sessions all convert into reward credits." />
 
-      <form onSubmit={submitActivity} className="max-w-xl rounded-lg border border-green-900/10 bg-white p-6 shadow-sm">
+      <form onSubmit={submitActivity} className="premium-card max-w-xl rounded-2xl p-6">
         <div className="mb-4 flex items-center justify-between">
           <label className="block text-sm font-bold uppercase tracking-wide text-green-900/70" htmlFor="activity-amount">
             Activity

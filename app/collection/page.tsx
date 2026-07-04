@@ -60,7 +60,7 @@ export default function CollectionPage() {
     <div>
       <PageTitle title="Sticker Album" subtitle={`${owned.length} official KMXI sticker${owned.length === 1 ? "" : "s"} placed in your World Cup 2026 album.`} />
 
-      <section className="mb-5 rounded-lg border border-green-900/10 bg-white p-4 shadow-sm">
+      <section className="premium-card mb-5 rounded-2xl p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-xs font-bold uppercase tracking-wide text-green-900/45">Album Completion</p>
@@ -89,7 +89,7 @@ export default function CollectionPage() {
         </Link>
       ) : null}
 
-      <section className="mb-5 rounded-lg border border-green-900/10 bg-white p-3 shadow-sm">
+      <section className="premium-card mb-5 rounded-2xl p-3">
         <div className="mb-3 flex items-center justify-between gap-3">
           <div>
             <p className="text-xs font-bold uppercase tracking-wide text-green-900/45">Country Pages</p>

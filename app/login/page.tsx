@@ -36,7 +36,7 @@ export default function LoginPage() {
   return (
     <div>
       <PageTitle title="Login" subtitle="Create or reopen your KMXI account. Password must be at least 8 characters." />
-      <form onSubmit={submit} className="max-w-md rounded-lg border border-green-900/10 bg-white p-6 shadow-sm">
+      <form onSubmit={submit} className="premium-card max-w-md rounded-2xl p-6">
         <label className="block text-sm font-bold uppercase tracking-wide text-green-900/70" htmlFor="username">
           Username
           <input id="username" className="mt-2 w-full rounded-md border border-green-900/20 px-4 py-3 text-base font-bold" value={username} onChange={(event) => setUsername(event.target.value)} />

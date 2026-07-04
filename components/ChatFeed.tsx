@@ -89,7 +89,7 @@ export function ChatFeed() {
 
   return (
     <section className="space-y-4">
-      <div className="rounded-lg border border-green-900/10 bg-white p-4 shadow-sm">
+      <div className="premium-card rounded-2xl p-4">
         <div className="flex items-center justify-between gap-3">
           <p className="text-sm font-bold uppercase tracking-wide text-green-900/60">Group Chat</p>
           <p className="text-xs font-bold text-green-900/45">Newest first</p>
@@ -130,7 +130,7 @@ export function ChatFeed() {
         ) : null}
       </div>
 
-      <div className="rounded-lg border border-green-900/10 bg-white p-3 shadow-sm">
+      <div className="premium-card rounded-2xl p-3">
         <div className="space-y-2">
           {messages.length > 0 ? (
             messages.map((item) => {

@@ -202,7 +202,7 @@ export default function TradePage() {
           </div>
 
           {recentTrades.length > 0 ? (
-            <section className="mt-5 rounded-2xl border border-green-900/10 bg-white p-4 shadow-sm">
+            <section className="premium-card mt-5 rounded-2xl p-4">
               <SectionHeader title="Latest Swaps" text="Recently completed one-for-one trades." />
               <div className="mt-3 space-y-2">
                 {recentTrades.slice(0, 3).map((trade, index) => (
@@ -226,7 +226,7 @@ export default function TradePage() {
       ) : null}
 
       {activeView === "recommended" ? (
-        <section className="rounded-2xl border border-green-900/10 bg-white p-4 shadow-sm">
+        <section className="premium-card rounded-2xl p-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <SectionHeader
               title="Best Swaps For Me"
@@ -259,7 +259,7 @@ export default function TradePage() {
       ) : null}
 
       {activeView === "proposals" ? (
-        <section className="rounded-2xl border border-green-900/10 bg-white p-4 shadow-sm">
+        <section className="premium-card rounded-2xl p-4">
           <SectionHeader title="Proposed Trades" text="Incoming proposals can be accepted or rejected. Your sent proposals can be withdrawn." />
           <div className="mt-4 grid gap-4 lg:grid-cols-2">
             <ProposalColumn title={`Incoming (${incoming.length})`} emptyText="No one has proposed a swap to you yet.">
@@ -277,7 +277,7 @@ export default function TradePage() {
       ) : null}
 
       {activeView === "teams" ? (
-        <section className="rounded-2xl border border-green-900/10 bg-white p-4 shadow-sm">
+        <section className="premium-card rounded-2xl p-4">
           <SectionHeader title="Finish A Team" text={`Complete any nation to add +${COLLECTION_BOOST} to all of its players.`} />
           <div className="mt-4 grid gap-3 lg:grid-cols-2">
             {missingTargets.map((progress) => (
@@ -301,7 +301,7 @@ export default function TradePage() {
       ) : null}
 
       {activeView === "market" ? (
-        <section className="rounded-2xl border border-green-900/10 bg-white p-4 shadow-sm">
+        <section className="premium-card rounded-2xl p-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <SectionHeader title="Full Duplicate Market" text="Every spare card is automatically available here." />
             <input
