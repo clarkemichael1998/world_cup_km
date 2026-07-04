@@ -9,6 +9,25 @@ import { loadUserStateAsync } from "@/lib/storage";
 import type { Player, UserState } from "@/lib/types";
 
 type MarketEntry = { userId: number; username: string; playerId: number; duplicateCount: number };
+type RandomChallenge = {
+  id: number;
+  challengerId: number;
+  challengerUsername: string;
+  targetId: number;
+  targetUsername: string;
+  status: string;
+  createdAt: string;
+  isMine: boolean;
+  isIncoming: boolean;
+};
+type RandomLogEntry = {
+  id: number;
+  challengerUsername: string;
+  targetUsername: string;
+  challengerPlayerId: number;
+  targetPlayerId: number;
+  completedAt: string;
+};
 type DirectProposal = {
   id: number;
   proposerId: number;
@@ -23,7 +42,7 @@ type DirectProposal = {
   isIncoming: boolean;
 };
 type RecentTrade = { offererUsername: string; acceptorUsername: string; playerId: number; acceptedPlayerId: number; completedAt: string };
-type TradeView = "home" | "recommended" | "proposals" | "teams" | "market";
+type TradeView = "home" | "recommended" | "proposals" | "teams" | "market" | "danger";
 type BestSwapMode = "collections" | "ranking";
 type NationProgress = { nation: string; total: number; owned: number; missing: Player[]; percent: number };
 
@@ -69,11 +88,16 @@ export default function TradePage() {
   const [bestSwapMode, setBestSwapMode] = useState<BestSwapMode>("collections");
   const [search, setSearch] = useState("");
   const [proposalTab, setProposalTab] = useState<"incoming" | "sent">("incoming");
+  const [randomChallenges, setRandomChallenges] = useState<RandomChallenge[]>([]);
+  const [randomLog, setRandomLog] = useState<RandomLogEntry[]>([]);
+  const [otherUsers, setOtherUsers] = useState<{ id: number; username: string }[]>([]);
+  const [dangerTargetId, setDangerTargetId] = useState(0);
 
   useEffect(() => {
     loadUserStateAsync().then(setState);
     loadPlayerPool().then(setPlayerPool);
     loadTrades();
+    loadRandomSwaps();
   }, []);
 
   async function loadTrades() {
@@ -85,6 +109,36 @@ export default function TradePage() {
       setProposals(payload.proposals ?? []);
       setRecentTrades(payload.recent ?? []);
     } catch {}
+  }
+
+  async function loadRandomSwaps() {
+    try {
+      const res = await fetch("/api/random-swap", { credentials: "include" });
+      if (!res.ok) return;
+      const payload = await res.json();
+      setRandomChallenges(payload.challenges ?? []);
+      setRandomLog(payload.log ?? []);
+      setOtherUsers(payload.users ?? []);
+    } catch {}
+  }
+
+  async function dangerAction(body: Record<string, unknown>, successNotice: string) {
+    if (tradeBusy) return;
+    setTradeBusy(true);
+    setTradeNotice("");
+    try {
+      const res = await fetch("/api/random-swap", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(body)
+      });
+      const payload = await res.json();
+      setTradeNotice(res.ok ? successNotice : payload.error ?? "Action failed.");
+      await loadRandomSwaps();
+    } finally {
+      setTradeBusy(false);
+    }
   }
 
   async function tradeAction(body: Record<string, unknown>, successNotice: string) {
@@ -180,6 +234,7 @@ export default function TradePage() {
 
   const incoming = proposals.filter((p) => p.isIncoming);
   const outgoing = proposals.filter((p) => p.isMine);
+  const incomingChallenges = randomChallenges.filter((c) => c.isIncoming);
 
   const sharedProps = {
     playerById,
@@ -223,6 +278,12 @@ export default function TradePage() {
         </TabButton>
         <TabButton active={activeView === "market"} onClick={() => setActiveView("market")}>
           All Cards
+        </TabButton>
+        <TabButton active={activeView === "danger"} onClick={() => setActiveView("danger")} danger>
+          🎲 Danger
+          {incomingChallenges.length > 0 ? (
+            <span className="ml-1.5 rounded-full bg-red-500/40 px-1.5 py-0.5 text-[9px] font-black text-red-200 tabular-nums">{incomingChallenges.length}</span>
+          ) : null}
         </TabButton>
       </nav>
 
@@ -275,6 +336,14 @@ export default function TradePage() {
               badge={`${market.length} cards`}
               accent="neutral"
               onClick={() => setActiveView("market")}
+            />
+            <QuickCard
+              icon="🎲"
+              title="Danger Swap"
+              desc="Challenge someone to swap a fully random card from each collection. No picks. Pure chaos."
+              badge={incomingChallenges.length > 0 ? `${incomingChallenges.length} incoming` : "High risk"}
+              accent="danger"
+              onClick={() => setActiveView("danger")}
             />
           </div>
 
@@ -395,20 +464,39 @@ export default function TradePage() {
           <MarketList entries={visibleMarket} emptyText="No matching duplicates are available right now." {...sharedProps} />
         </section>
       ) : null}
+
+      {/* ── DANGER SWAP ─────────────────────────────────────── */}
+      {activeView === "danger" ? (
+        <DangerSwapView
+          challenges={randomChallenges}
+          log={randomLog}
+          otherUsers={otherUsers}
+          playerById={playerById}
+          dangerTargetId={dangerTargetId}
+          setDangerTargetId={setDangerTargetId}
+          tradeBusy={tradeBusy}
+          dangerAction={dangerAction}
+        />
+      ) : null}
     </div>
   );
 }
 
 // ── Tab navigation ────────────────────────────────────────────
 
-function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
+function TabButton({ active, onClick, children, danger }: { active: boolean; onClick: () => void; children: ReactNode; danger?: boolean }) {
+  const cls = danger
+    ? active
+      ? "bg-red-500 text-white shadow-sm shadow-red-900/40"
+      : "text-red-400/80 hover:bg-red-500/15 hover:text-red-300"
+    : active
+    ? "bg-white text-green-950 shadow-sm"
+    : "text-white/55 hover:bg-white/8 hover:text-white/80";
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`flex shrink-0 items-center whitespace-nowrap rounded-lg px-3 py-2 text-xs font-black transition ${
-        active ? "bg-white text-green-950 shadow-sm" : "text-white/55 hover:bg-white/8 hover:text-white/80"
-      }`}
+      className={`flex shrink-0 items-center whitespace-nowrap rounded-lg px-3 py-2 text-xs font-black transition ${cls}`}
     >
       {children}
     </button>
@@ -430,17 +518,19 @@ function QuickCard({
   icon, title, desc, badge, accent, onClick
 }: {
   icon: string; title: string; desc: string; badge: string;
-  accent: "green" | "amber" | "neutral"; onClick: () => void;
+  accent: "green" | "amber" | "neutral" | "danger"; onClick: () => void;
 }) {
   const card = {
     green: "border-green-500/25 bg-green-500/8 hover:bg-green-500/12",
     amber: "border-amber-400/30 bg-amber-400/10 hover:bg-amber-400/15",
-    neutral: "border-white/10 bg-white/5 hover:bg-white/8"
+    neutral: "border-white/10 bg-white/5 hover:bg-white/8",
+    danger: "border-red-500/30 bg-red-500/8 hover:bg-red-500/12"
   }[accent];
   const badgeCls = {
     green: "bg-green-500/20 text-green-300",
     amber: "bg-amber-400/20 text-amber-300",
-    neutral: "bg-white/10 text-white/40"
+    neutral: "bg-white/10 text-white/40",
+    danger: "bg-red-500/20 text-red-300"
   }[accent];
   return (
     <button type="button" onClick={onClick} className={`rounded-2xl border p-5 text-left transition ${card}`}>
@@ -938,6 +1028,177 @@ function ModeButton({ active, onClick, children }: { active: boolean; onClick: (
     >
       {children}
     </button>
+  );
+}
+
+// ── Danger Swap ───────────────────────────────────────────────
+
+function DangerSwapView({
+  challenges, log, otherUsers, playerById, dangerTargetId, setDangerTargetId, tradeBusy, dangerAction
+}: {
+  challenges: RandomChallenge[];
+  log: RandomLogEntry[];
+  otherUsers: { id: number; username: string }[];
+  playerById: Map<number, Player>;
+  dangerTargetId: number;
+  setDangerTargetId: (id: number) => void;
+  tradeBusy: boolean;
+  dangerAction: (body: Record<string, unknown>, successNotice: string) => Promise<void>;
+}) {
+  const incoming = challenges.filter((c) => c.isIncoming);
+  const outgoing = challenges.filter((c) => c.isMine);
+
+  return (
+    <section>
+      {/* Header */}
+      <div className="mb-5 overflow-hidden rounded-2xl border border-red-500/30 bg-gradient-to-br from-red-950/60 via-red-900/30 to-red-950/50 p-5">
+        <div className="flex items-center gap-2">
+          <span className="text-2xl">🎲</span>
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-red-400/70">Danger Zone</p>
+        </div>
+        <h2 className="mt-2 text-xl font-black text-white">Random Swap</h2>
+        <p className="mt-1 text-sm font-semibold text-red-200/60">
+          Challenge someone to swap a completely random card from each collection. No picks, no previews — you won't know what you lose or gain until it's done.
+        </p>
+        <ul className="mt-3 space-y-1">
+          {[
+            "Players in your locked XI are protected",
+            "Players from completed nations are protected",
+            "Everything else is fair game"
+          ].map((rule) => (
+            <li key={rule} className="flex items-center gap-2 text-xs font-semibold text-red-200/50">
+              <span className="h-1 w-1 shrink-0 rounded-full bg-red-500/60" />
+              {rule}
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      {/* Issue challenge */}
+      <div className="mb-5 rounded-2xl border border-red-500/25 bg-red-950/20 p-4">
+        <p className="mb-3 text-xs font-black uppercase tracking-widest text-red-400/70">Issue a Challenge</p>
+        <div className="flex gap-2">
+          <select
+            className="min-w-0 flex-1 rounded-xl border border-red-500/25 bg-red-950/40 px-3 py-2.5 text-sm font-bold text-white focus:border-red-400/50 focus:outline-none"
+            value={dangerTargetId || ""}
+            onChange={(e) => setDangerTargetId(Number(e.target.value))}
+          >
+            <option value="" className="bg-green-950">Select opponent…</option>
+            {otherUsers.map((u) => (
+              <option key={u.id} value={u.id} className="bg-green-950">{u.username}</option>
+            ))}
+          </select>
+          <button
+            className="shrink-0 rounded-xl bg-red-500 px-5 py-2.5 text-sm font-black text-white transition hover:bg-red-400 disabled:opacity-40"
+            disabled={tradeBusy || !dangerTargetId}
+            onClick={() => dangerTargetId && dangerAction({ action: "challenge", targetId: dangerTargetId }, "Challenge sent — now they decide.")}
+          >
+            Challenge
+          </button>
+        </div>
+      </div>
+
+      {/* Incoming challenges */}
+      {incoming.length > 0 ? (
+        <div className="mb-5">
+          <p className="mb-3 text-xs font-black uppercase tracking-widest text-red-400/70">Incoming Challenges</p>
+          <div className="space-y-3">
+            {incoming.map((c) => (
+              <div key={c.id} className="overflow-hidden rounded-2xl border border-red-500/30 bg-red-950/25">
+                <div className="flex items-center justify-between gap-3 p-4">
+                  <div>
+                    <p className="text-sm font-black text-white">
+                      <span className="text-red-300">{c.challengerUsername}</span> is challenging you to a Danger Swap
+                    </p>
+                    <p className="mt-0.5 text-xs font-semibold text-red-200/40">
+                      Issued {new Date(c.createdAt).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                    </p>
+                  </div>
+                  <span className="rounded-full bg-red-500/20 px-2.5 py-1 text-[10px] font-black text-red-300">🎲 DANGER</span>
+                </div>
+                <div className="flex gap-2 border-t border-red-500/15 px-4 py-3">
+                  <button
+                    className="flex-1 rounded-xl bg-red-500 py-2.5 text-sm font-black text-white transition hover:bg-red-400 disabled:opacity-40"
+                    disabled={tradeBusy}
+                    onClick={() => dangerAction({ action: "accept", swapId: c.id }, "Swap executed — check the chat for the result!")}
+                  >
+                    Accept (no going back)
+                  </button>
+                  <button
+                    className="rounded-xl bg-white/8 px-5 py-2.5 text-sm font-black text-white/40 transition hover:bg-white/12 disabled:opacity-40"
+                    disabled={tradeBusy}
+                    onClick={() => dangerAction({ action: "decline", swapId: c.id }, "Challenge declined.")}
+                  >
+                    Decline
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {/* Sent challenges */}
+      {outgoing.length > 0 ? (
+        <div className="mb-5">
+          <p className="mb-3 text-xs font-black uppercase tracking-widest text-white/35">Sent Challenges</p>
+          <div className="space-y-2">
+            {outgoing.map((c) => (
+              <div key={c.id} className="flex items-center justify-between gap-3 rounded-xl border border-white/8 bg-white/4 px-4 py-3">
+                <div>
+                  <p className="text-sm font-semibold text-white/70">
+                    Waiting on <span className="font-black text-white">{c.targetUsername}</span>
+                  </p>
+                  <p className="text-xs font-semibold text-white/30">
+                    Sent {new Date(c.createdAt).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                  </p>
+                </div>
+                <button
+                  className="rounded-lg bg-white/8 px-4 py-2 text-xs font-black text-white/40 hover:bg-white/12 disabled:opacity-40"
+                  disabled={tradeBusy}
+                  onClick={() => dangerAction({ action: "withdraw", swapId: c.id }, "Challenge withdrawn.")}
+                >
+                  Withdraw
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {/* Public log */}
+      <div>
+        <p className="mb-3 text-xs font-black uppercase tracking-widest text-white/35">Danger Swap Log</p>
+        {log.length === 0 ? (
+          <div className="rounded-xl border border-white/8 bg-white/4 p-6 text-center text-sm font-semibold text-white/25">
+            No danger swaps have happened yet. Be the first to take the plunge.
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {log.map((entry) => {
+              const cPlayer = playerById.get(entry.challengerPlayerId);
+              const tPlayer = playerById.get(entry.targetPlayerId);
+              return (
+                <div key={entry.id} className="overflow-hidden rounded-xl border border-white/8 bg-white/4 px-4 py-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs font-black text-white/70">{entry.challengerUsername}</span>
+                    <span className="text-[10px] text-white/20">lost</span>
+                    <MiniChip player={cPlayer} />
+                    <span className="text-[10px] font-black text-red-400/60">⇄</span>
+                    <span className="text-xs font-black text-white/70">{entry.targetUsername}</span>
+                    <span className="text-[10px] text-white/20">lost</span>
+                    <MiniChip player={tPlayer} />
+                  </div>
+                  <p className="mt-1.5 text-[10px] font-semibold text-white/25">
+                    {new Date(entry.completedAt).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </section>
   );
 }
 

@@ -354,6 +354,18 @@ export function getDb() {
       rank INTEGER NOT NULL,
       PRIMARY KEY (snapshot_date, user_id)
     );
+    CREATE TABLE IF NOT EXISTS random_swaps (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      challenger_id INTEGER NOT NULL,
+      target_id INTEGER NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      challenger_player_id INTEGER,
+      target_player_id INTEGER,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      completed_at TEXT,
+      FOREIGN KEY (challenger_id) REFERENCES users(id),
+      FOREIGN KEY (target_id) REFERENCES users(id)
+    );
   `);
   migrateKmLogActivity(db);
   migrateChatMessages(db);
@@ -944,7 +956,7 @@ export function awardNationCompletionRewards(userId: number): string[] {
     db.prepare("UPDATE users SET reward_credits = reward_credits + ? WHERE id = ?").run(creditsToAward, userId);
     awarded.push(nation);
     const username = (db.prepare("SELECT username FROM users WHERE id = ?").get(userId) as { username: string } | undefined)?.username ?? "Someone";
-    createAdminChatMessage(`📖 Album milestone: ${username} completed the ${nation} page and earned ${creditsToAward} pack credits!`);
+    createAdminChatMessage(`📖 ${username} just completed the ${nation} page — full house! They've earned ${creditsToAward} pack credits.`);
   }
   return awarded;
 }
@@ -3052,6 +3064,167 @@ function migrateFixtureResults(database: DatabaseSync) {
       database.prepare("UPDATE fixture_results SET winner = ?, updated_at = CURRENT_TIMESTAMP WHERE winner = ?").run(canonical, variant);
     }
   }
+}
+
+// ── Random Swap ───────────────────────────────────────────────
+
+function getEligibleRandomSwapPlayerIds(db: DatabaseSync, userId: number): number[] {
+  const owned = db.prepare("SELECT player_id FROM user_players WHERE user_id = ?").all(userId) as { player_id: number }[];
+
+  const lockedIds = new Set<number>(
+    (
+      db
+        .prepare(
+          `SELECT lsp.player_id FROM locked_squad_players lsp
+           JOIN locked_squads ls ON ls.id = lsp.locked_squad_id
+           WHERE ls.user_id = ?`
+        )
+        .all(userId) as { player_id: number }[]
+    ).map((r) => r.player_id)
+  );
+
+  const completedNations = new Set<string>(
+    (db.prepare("SELECT nation FROM nation_completion_rewards WHERE user_id = ?").all(userId) as { nation: string }[]).map((r) => r.nation)
+  );
+
+  const playerNationMap = new Map(basePlayers.map((p) => [p.id, p.nation]));
+
+  return owned
+    .filter((r) => !lockedIds.has(r.player_id))
+    .filter((r) => {
+      const nation = playerNationMap.get(r.player_id);
+      return nation !== undefined && !completedNations.has(nation);
+    })
+    .map((r) => r.player_id);
+}
+
+function transferRandomSwapPlayer(db: DatabaseSync, fromUserId: number, toUserId: number, playerId: number) {
+  const giver = db.prepare("SELECT duplicate_count FROM user_players WHERE user_id = ? AND player_id = ?").get(fromUserId, playerId) as { duplicate_count: number } | undefined;
+  if (!giver) return;
+  if (giver.duplicate_count > 0) {
+    db.prepare("UPDATE user_players SET duplicate_count = duplicate_count - 1 WHERE user_id = ? AND player_id = ?").run(fromUserId, playerId);
+  } else {
+    db.prepare("DELETE FROM user_players WHERE user_id = ? AND player_id = ?").run(fromUserId, playerId);
+  }
+  const receiver = db.prepare("SELECT duplicate_count FROM user_players WHERE user_id = ? AND player_id = ?").get(toUserId, playerId) as { duplicate_count: number } | undefined;
+  if (receiver) {
+    db.prepare("UPDATE user_players SET duplicate_count = duplicate_count + 1 WHERE user_id = ? AND player_id = ?").run(toUserId, playerId);
+  } else {
+    db.prepare("INSERT INTO user_players (user_id, player_id, duplicate_count) VALUES (?, ?, 0)").run(toUserId, playerId);
+  }
+}
+
+export function initiateRandomSwap(challengerId: number, targetId: number): { ok: boolean; error?: string } {
+  if (challengerId === targetId) return { ok: false, error: "Cannot challenge yourself." };
+  const db = getDb();
+
+  const existing = db
+    .prepare(
+      `SELECT id FROM random_swaps WHERE status = 'pending'
+       AND ((challenger_id = ? AND target_id = ?) OR (challenger_id = ? AND target_id = ?))`
+    )
+    .get(challengerId, targetId, targetId, challengerId) as { id: number } | undefined;
+  if (existing) return { ok: false, error: "A random swap challenge is already pending between you two." };
+
+  const eligible = getEligibleRandomSwapPlayerIds(db, challengerId);
+  if (eligible.length === 0) return { ok: false, error: "You have no eligible players to put in the pot." };
+
+  db.prepare("INSERT INTO random_swaps (challenger_id, target_id) VALUES (?, ?)").run(challengerId, targetId);
+  return { ok: true };
+}
+
+export function respondToRandomSwap(swapId: number, userId: number, action: "accept" | "decline" | "withdraw"): { ok: boolean; error?: string } {
+  const db = getDb();
+  const swap = db.prepare("SELECT id, challenger_id, target_id FROM random_swaps WHERE id = ? AND status = 'pending'").get(swapId) as {
+    id: number; challenger_id: number; target_id: number;
+  } | undefined;
+  if (!swap) return { ok: false, error: "Challenge not found or already resolved." };
+
+  if (action === "withdraw") {
+    if (swap.challenger_id !== userId) return { ok: false, error: "Only the challenger can withdraw." };
+    db.prepare("UPDATE random_swaps SET status = 'withdrawn' WHERE id = ?").run(swapId);
+    return { ok: true };
+  }
+  if (action === "decline") {
+    if (swap.target_id !== userId) return { ok: false, error: "Only the target can decline." };
+    db.prepare("UPDATE random_swaps SET status = 'declined' WHERE id = ?").run(swapId);
+    return { ok: true };
+  }
+
+  // accept
+  if (swap.target_id !== userId) return { ok: false, error: "Only the target can accept." };
+
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    const challengerEligible = getEligibleRandomSwapPlayerIds(db, swap.challenger_id);
+    const targetEligible = getEligibleRandomSwapPlayerIds(db, userId);
+    if (challengerEligible.length === 0) { db.exec("ROLLBACK"); return { ok: false, error: "The challenger has no eligible players to swap." }; }
+    if (targetEligible.length === 0) { db.exec("ROLLBACK"); return { ok: false, error: "You have no eligible players to swap." }; }
+
+    const challengerPlayerId = challengerEligible[Math.floor(Math.random() * challengerEligible.length)];
+    const targetPlayerId = targetEligible[Math.floor(Math.random() * targetEligible.length)];
+
+    transferRandomSwapPlayer(db, swap.challenger_id, userId, challengerPlayerId);
+    transferRandomSwapPlayer(db, userId, swap.challenger_id, targetPlayerId);
+
+    db.prepare(
+      "UPDATE random_swaps SET status = 'completed', challenger_player_id = ?, target_player_id = ?, completed_at = CURRENT_TIMESTAMP WHERE id = ?"
+    ).run(challengerPlayerId, targetPlayerId, swapId);
+    db.exec("COMMIT");
+
+    const playerMap = new Map(getAllPlayers().map((p) => [p.id, p]));
+    const cPlayer = playerMap.get(challengerPlayerId);
+    const tPlayer = playerMap.get(targetPlayerId);
+    const challengerName = (db.prepare("SELECT username FROM users WHERE id = ?").get(swap.challenger_id) as { username: string } | undefined)?.username ?? "Someone";
+    const targetName = (db.prepare("SELECT username FROM users WHERE id = ?").get(userId) as { username: string } | undefined)?.username ?? "Someone";
+    createAdminChatMessage(
+      `🎲 DANGER SWAP — ${challengerName} lost ${cPlayer?.name ?? "Unknown"} (${cPlayer?.rarity ?? "?"}) · ${targetName} lost ${tPlayer?.name ?? "Unknown"} (${tPlayer?.rarity ?? "?"}). Pure chaos.`
+    );
+    return { ok: true };
+  } catch (err) {
+    db.exec("ROLLBACK");
+    throw err;
+  }
+}
+
+export function getRandomSwapChallenges(userId: number) {
+  return getDb()
+    .prepare(
+      `SELECT rs.id, rs.challenger_id, rs.target_id, rs.status, rs.created_at,
+              u1.username AS challenger_username, u2.username AS target_username
+       FROM random_swaps rs
+       JOIN users u1 ON u1.id = rs.challenger_id
+       JOIN users u2 ON u2.id = rs.target_id
+       WHERE (rs.challenger_id = ? OR rs.target_id = ?) AND rs.status = 'pending'
+       ORDER BY rs.created_at DESC`
+    )
+    .all(userId, userId) as Array<{
+      id: number; challenger_id: number; target_id: number; status: string; created_at: string;
+      challenger_username: string; target_username: string;
+    }>;
+}
+
+export function getRandomSwapLog(limit = 30) {
+  return getDb()
+    .prepare(
+      `SELECT rs.id, rs.challenger_id, rs.target_id, rs.challenger_player_id, rs.target_player_id,
+              rs.completed_at, u1.username AS challenger_username, u2.username AS target_username
+       FROM random_swaps rs
+       JOIN users u1 ON u1.id = rs.challenger_id
+       JOIN users u2 ON u2.id = rs.target_id
+       WHERE rs.status = 'completed'
+       ORDER BY rs.completed_at DESC
+       LIMIT ?`
+    )
+    .all(limit) as Array<{
+      id: number; challenger_id: number; target_id: number;
+      challenger_player_id: number; target_player_id: number;
+      completed_at: string; challenger_username: string; target_username: string;
+    }>;
+}
+
+export function getAllOtherUsers(userId: number): Array<{ id: number; username: string }> {
+  return getDb().prepare("SELECT id, username FROM users WHERE id != ? ORDER BY username").all(userId) as Array<{ id: number; username: string }>;
 }
 
 function seedFixtureResults(database: DatabaseSync) {

@@ -5,7 +5,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { Badge, type BadgeTone } from "@/components/Badge";
 import { formatDate } from "@/lib/formatDate";
 
-const REACTIONS = ["👍", "👎", "🔥", "❤️", "😂", "🤡", "💩", "🫪"];
+const REACTIONS = ["🔥", "❤️", "😂", "🫡", "🤩", "💀", "🐐", "📖", "🤡", "💩"];
 
 type ReactionCount = { reaction: string; count: number; user_reacted: boolean; users: string[] };
 
