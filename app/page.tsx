@@ -214,9 +214,8 @@ export default function Home() {
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(239,68,68,0.10),transparent_70%)]" />
           <div className="relative flex items-center justify-between gap-4">
             <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.25em] text-red-400/70">Reward</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.25em] text-red-400/70">Dangerous</p>
               <p className="mt-1 text-lg font-black text-white">Something&apos;s waiting for you.</p>
-              <p className="mt-0.5 text-sm font-semibold text-red-200/40">A card has been set aside. Claim it before it disappears.</p>
             </div>
             <button
               onClick={claimDangerReward}
