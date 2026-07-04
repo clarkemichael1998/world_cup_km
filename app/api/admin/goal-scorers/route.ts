@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import {
-  createAdminChatMessage,
   deleteAssistScorer,
   deleteGoalScorer,
   getBoostLog,
@@ -57,12 +56,6 @@ export async function POST(request: Request) {
     const status = body.playerId != null ? "matched" : "ignored";
     if (isAssist) resolveAssistScorer(body.id, body.playerId ?? null, status);
     else resolveGoalScorer(body.id, body.playerId ?? null, status);
-    const eventLabel = isAssist ? "assist" : "goal";
-    createAdminChatMessage(
-      body.playerId != null
-        ? `Admin confirmed ${eventLabel}: ${existing?.scorer_name_raw ?? `record #${body.id}`} matched to player #${body.playerId}${existing?.match_id ? ` (${existing.match_id})` : ""}.`
-        : `Admin ignored ${eventLabel} record: ${existing?.scorer_name_raw ?? `record #${body.id}`}${existing?.match_id ? ` (${existing.match_id})` : ""}.`
-    );
     const settle = settleAllLiveAwards();
     return NextResponse.json({ ok: true, usersSettled: settle.usersSettled });
   }
@@ -76,11 +69,6 @@ export async function POST(request: Request) {
     } else {
       upsertGoalScorer(body.matchId, body.scorerName, match?.player.id ?? null, match ? "matched" : "pending", "manual", count);
     }
-    createAdminChatMessage(
-      `Admin added ${isAssist ? "assist" : "goal"} record: ${body.scorerName} x${count} (${body.matchId})${
-        match ? ` — matched to ${match.player.name}` : " — pending match"
-      }.`
-    );
     if (match) settleAllLiveAwards();
     return NextResponse.json({ ok: true, matchedPlayer: match?.player ?? null });
   }
@@ -91,13 +79,11 @@ export async function POST(request: Request) {
     const player = getPlayerById(body.playerId);
     if (!player) return NextResponse.json({ error: "Unknown player" }, { status: 400 });
     const count = Math.max(1, Math.min(10, body.count ?? 1));
-    const eventLabel = isAssist ? "assist" : "goal";
     if (isAssist) {
       upsertAssistScorer(body.matchId, player.name, player.id, "matched", "manual", count);
     } else {
       upsertGoalScorer(body.matchId, player.name, player.id, "matched", "manual", count);
     }
-    createAdminChatMessage(`Admin recorded ${count} ${eventLabel}${count === 1 ? "" : "s"} for ${player.name} (${body.matchId}).`);
     const settle = settleAllLiveAwards();
     return NextResponse.json({ ok: true, player: { id: player.id, name: player.name }, usersSettled: settle.usersSettled });
   }

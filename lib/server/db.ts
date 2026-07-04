@@ -1344,7 +1344,41 @@ export function repairUserGoalBoost(username: string, playerId: number, matchDat
 }
 
 export function setScorersConfirmed(matchId: string, confirmed: boolean) {
-  getDb().prepare("UPDATE fixture_results SET scorers_confirmed = ? WHERE match_id = ?").run(confirmed ? 1 : 0, matchId);
+  const db = getDb();
+  db.prepare("UPDATE fixture_results SET scorers_confirmed = ? WHERE match_id = ?").run(confirmed ? 1 : 0, matchId);
+
+  if (!confirmed) return;
+
+  // Build a single summary chat message for this game, updating any existing one.
+  const game = db.prepare("SELECT home_team, away_team, chat_message_id FROM fixture_results WHERE match_id = ?").get(matchId) as
+    | { home_team: string; away_team: string; chat_message_id: number | null }
+    | undefined;
+  if (!game) return;
+
+  const goalRows = db.prepare("SELECT scorer_name_raw, goal_count, player_id FROM goal_scorers WHERE match_id = ? AND status = 'matched'").all(matchId) as
+    Array<{ scorer_name_raw: string; goal_count: number; player_id: number | null }>;
+  const assistRows = db.prepare("SELECT scorer_name_raw, assist_count, player_id FROM assist_scorers WHERE match_id = ? AND status = 'matched'").all(matchId) as
+    Array<{ scorer_name_raw: string; assist_count: number; player_id: number | null }>;
+  const playerMap = new Map(getAllPlayers().map((p) => [p.id, p]));
+  const nameFor = (playerId: number | null, raw: string) => (playerId != null ? playerMap.get(playerId)?.name ?? raw : raw);
+
+  const scorerParts = goalRows.map((r) => `${nameFor(r.player_id, r.scorer_name_raw)}${r.goal_count > 1 ? ` ×${r.goal_count}` : ""}`);
+  const assistParts = assistRows.map((r) => `${nameFor(r.player_id, r.scorer_name_raw)}${r.assist_count > 1 ? ` ×${r.assist_count}` : ""}`);
+
+  const lines: string[] = [`⚽ ${game.home_team} vs ${game.away_team}`];
+  if (scorerParts.length) lines.push(`Goals: ${scorerParts.join(", ")}`);
+  if (assistParts.length) lines.push(`Assists: ${assistParts.join(", ")}`);
+  if (!scorerParts.length && !assistParts.length) lines.push("No scorers or assists recorded.");
+  const message = lines.join(" · ");
+
+  if (game.chat_message_id != null) {
+    db.prepare("UPDATE chat_messages SET message = ?, created_at = CURRENT_TIMESTAMP WHERE id = ?").run(message, game.chat_message_id);
+  } else {
+    const newMsgId = createAdminChatMessage(message);
+    if (newMsgId != null) {
+      db.prepare("UPDATE fixture_results SET chat_message_id = ? WHERE match_id = ?").run(newMsgId, matchId);
+    }
+  }
 }
 
 // Delete a scorer record and reverse any boosts it awarded, so removal/correction
@@ -2331,12 +2365,6 @@ export function confirmTradeProposal(offererId: number, proposalId: number): str
     db.prepare("UPDATE trade_proposals SET status = 'rejected' WHERE offer_id = ? AND status = 'pending'").run(proposal.offer_id);
     db.exec("COMMIT");
 
-    const playerMap = new Map(getAllPlayers().map((p) => [p.id, p]));
-    const offererName = (db.prepare("SELECT username FROM users WHERE id = ?").get(offererId) as { username: string } | undefined)?.username ?? "Someone";
-    const proposerName = (db.prepare("SELECT username FROM users WHERE id = ?").get(proposal.user_id) as { username: string } | undefined)?.username ?? "Someone";
-    const gave = playerMap.get(proposal.offer_player_id)?.name ?? `Player ${proposal.offer_player_id}`;
-    const got = playerMap.get(proposal.player_id)?.name ?? `Player ${proposal.player_id}`;
-    createAdminChatMessage(`🔁 Trade complete: ${offererName} swapped ${gave} to ${proposerName} for ${got}.`);
     return null;
   } catch (error) {
     db.exec("ROLLBACK");
@@ -2986,6 +3014,7 @@ function migrateFixtureResults(database: DatabaseSync) {
   if (!fixtureColumnNames.has("updated_at")) database.exec("ALTER TABLE fixture_results ADD COLUMN updated_at TEXT");
   if (!fixtureColumnNames.has("goals_synced")) database.exec("ALTER TABLE fixture_results ADD COLUMN goals_synced INTEGER NOT NULL DEFAULT 0");
   if (!fixtureColumnNames.has("scorers_confirmed")) database.exec("ALTER TABLE fixture_results ADD COLUMN scorers_confirmed INTEGER NOT NULL DEFAULT 0");
+  if (!fixtureColumnNames.has("chat_message_id")) database.exec("ALTER TABLE fixture_results ADD COLUMN chat_message_id INTEGER");
 
   database.prepare("UPDATE fixture_results SET verified = 1 WHERE source = 'seed' OR source = 'manual'").run();
   database.prepare("UPDATE fixture_results SET updated_at = CURRENT_TIMESTAMP WHERE updated_at IS NULL").run();
