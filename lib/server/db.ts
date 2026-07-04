@@ -2087,6 +2087,65 @@ export function getOpenTradeOffers() {
     .all() as Array<{ id: number; user_id: number; player_id: number; created_at: string; username: string }>;
 }
 
+export function expireStaleTradeProposals() {
+  const db = getDb();
+  db.prepare(
+    `UPDATE trade_proposals
+     SET status = 'rejected'
+     WHERE status = 'pending'
+       AND created_at <= datetime('now', '-1 day')`
+  ).run();
+  db.prepare(
+    `UPDATE trade_offers
+     SET status = 'cancelled'
+     WHERE status = 'open'
+       AND id NOT IN (SELECT offer_id FROM trade_proposals WHERE status = 'pending')`
+  ).run();
+}
+
+export function getAutoTradeMarket(currentUserId: number) {
+  expireStaleTradeProposals();
+  return getDb()
+    .prepare(
+      `SELECT up.user_id, users.username, up.player_id, up.duplicate_count
+       FROM user_players up
+       JOIN users ON users.id = up.user_id
+       WHERE up.user_id != ? AND up.duplicate_count > 0
+       ORDER BY users.username, up.duplicate_count DESC`
+    )
+    .all(currentUserId) as Array<{ user_id: number; username: string; player_id: number; duplicate_count: number }>;
+}
+
+export function getActiveDirectTradeProposals(userId: number) {
+  expireStaleTradeProposals();
+  return getDb()
+    .prepare(
+      `SELECT p.id, p.user_id AS proposer_id, proposer.username AS proposer_username,
+              p.player_id AS offered_player_id, p.created_at, datetime(p.created_at, '+1 day') AS expires_at,
+              t.id AS offer_id, t.user_id AS target_user_id, target.username AS target_username,
+              t.player_id AS wanted_player_id
+       FROM trade_proposals p
+       JOIN trade_offers t ON t.id = p.offer_id AND t.status = 'open'
+       JOIN users proposer ON proposer.id = p.user_id
+       JOIN users target ON target.id = t.user_id
+       WHERE p.status = 'pending'
+         AND (p.user_id = ? OR t.user_id = ?)
+       ORDER BY p.created_at DESC`
+    )
+    .all(userId, userId) as Array<{
+      id: number;
+      proposer_id: number;
+      proposer_username: string;
+      offered_player_id: number;
+      created_at: string;
+      expires_at: string;
+      offer_id: number;
+      target_user_id: number;
+      target_username: string;
+      wanted_player_id: number;
+    }>;
+}
+
 export function getRecentCompletedTrades(limit = 10) {
   return getDb()
     .prepare(
@@ -2100,6 +2159,46 @@ export function getRecentCompletedTrades(limit = 10) {
        LIMIT ?`
     )
     .all(limit) as Array<{ player_id: number; accepted_player_id: number; completed_at: string; offerer_username: string; acceptor_username: string }>;
+}
+
+export function createDirectTradeProposal(proposerId: number, targetUserId: number, wantedPlayerId: number, offeredPlayerId: number): string | null {
+  const db = getDb();
+  expireStaleTradeProposals();
+  if (targetUserId === proposerId) return "You can't propose a trade with yourself.";
+  if (wantedPlayerId === offeredPlayerId) return "Choose two different cards for the swap.";
+
+  const targetDupe = db.prepare("SELECT duplicate_count FROM user_players WHERE user_id = ? AND player_id = ?").get(targetUserId, wantedPlayerId) as { duplicate_count: number } | undefined;
+  if (!targetDupe || targetDupe.duplicate_count < 1) return "That player is no longer available as a duplicate.";
+
+  const proposerDupe = db.prepare("SELECT duplicate_count FROM user_players WHERE user_id = ? AND player_id = ?").get(proposerId, offeredPlayerId) as { duplicate_count: number } | undefined;
+  if (!proposerDupe || proposerDupe.duplicate_count < 1) return "You can only offer a card you hold a duplicate of.";
+
+  const existing = db
+    .prepare(
+      `SELECT p.id, t.id AS offer_id
+       FROM trade_proposals p
+       JOIN trade_offers t ON t.id = p.offer_id
+       WHERE p.user_id = ? AND t.user_id = ? AND t.player_id = ?
+         AND p.status = 'pending' AND t.status = 'open'`
+    )
+    .get(proposerId, targetUserId, wantedPlayerId) as { id: number; offer_id: number } | undefined;
+
+  if (existing) {
+    db.prepare("UPDATE trade_proposals SET player_id = ?, created_at = CURRENT_TIMESTAMP WHERE id = ?").run(offeredPlayerId, existing.id);
+    db.prepare("UPDATE trade_offers SET created_at = CURRENT_TIMESTAMP WHERE id = ?").run(existing.offer_id);
+    return null;
+  }
+
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    const offer = db.prepare("INSERT INTO trade_offers (user_id, player_id) VALUES (?, ?)").run(targetUserId, wantedPlayerId);
+    db.prepare("INSERT INTO trade_proposals (offer_id, user_id, player_id) VALUES (?, ?, ?)").run(Number(offer.lastInsertRowid), proposerId, offeredPlayerId);
+    db.exec("COMMIT");
+    return null;
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
 }
 
 export function createTradeOffer(userId: number, playerId: number): string | null {
