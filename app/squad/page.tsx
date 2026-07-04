@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/Badge";
-import { Button, buttonClasses } from "@/components/Button";
+import { buttonClasses } from "@/components/Button";
+import { PageTitle } from "@/components/PageTitle";
 import { autoPickBestXI, calculateSquadRating, canPlaySlot, getOwnedPlayers, getPlayer, slotAllowedPositions, squadSlots } from "@/lib/squadUtils";
 import { loadUserStateAsync, saveUserState } from "@/lib/storage";
 import { flagUrl } from "@/lib/flags";
@@ -27,7 +28,6 @@ const formationRows: Array<{ label: string; slots: SquadSlot[] }> = [
 ];
 
 const positionOrder: Position[] = ["GK", "DF", "MF", "FW"];
-
 
 export default function SquadPage() {
   const [state, setState] = useState<UserState | null>(null);
@@ -74,11 +74,7 @@ export default function SquadPage() {
   function updateSlot(slot: SquadSlot, playerId?: number) {
     if (!state) return;
     const squad = { ...state.squad };
-    if (playerId) {
-      squad[slot] = playerId;
-    } else {
-      delete squad[slot];
-    }
+    if (playerId) { squad[slot] = playerId; } else { delete squad[slot]; }
     const updated = { ...state, squad };
     setState(updated);
     saveUserState(updated);
@@ -100,7 +96,6 @@ export default function SquadPage() {
       setLockNotice(`No fixtures listed for ${lockStatus.lockDate}, so there are no playing nations to auto-pick from.`);
       return;
     }
-
     const updated = autoPickBestXIFromNations(state, playingNations, playerPool);
     setState(updated);
     saveUserState(updated);
@@ -146,104 +141,111 @@ export default function SquadPage() {
 
   return (
     <div>
-      <div className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-center">
-        <div className="flex items-center gap-3">
-          {rating ? (
-            <span className="flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-xl bg-gradient-to-br from-amber-200 to-gold shadow-sm">
-              <span className="text-xl font-black leading-none text-green-950">{rating.toFixed(1)}</span>
-              <span className="text-[8px] font-black uppercase tracking-wide text-green-950/60">avg</span>
-            </span>
-          ) : null}
-          <div>
-            <h1 className="text-4xl font-black tracking-tight text-green-950">Squad</h1>
-            <p className="mt-1 text-sm font-bold text-green-900/60">{selectedPlayers.length}/11 selected · 4-3-3</p>
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-2 self-start md:justify-end">
-          <Link href="/matchday-guide" className={buttonClasses("outline", "md")}>
-            Matchday Guide
-          </Link>
-          <Button variant="danger" onClick={autoPick}>
+      <PageTitle
+        title="Build Your XI"
+        subtitle={`4-3-3 formation · ${selectedPlayers.length}/11 selected${rating ? ` · ${rating.toFixed(1)} avg rating` : ""}`}
+      />
+
+      {/* Action bar */}
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={autoPick}
+            className="rounded-lg bg-white/10 px-4 py-2 text-sm font-black text-white/85 transition hover:bg-white/15"
+          >
             Auto-pick Best XI
-          </Button>
-          <Button
-            variant="primary"
+          </button>
+          <button
             onClick={autoPickPlayingToday}
             disabled={!lockStatus || lockStatus.upcomingFixtures.length === 0}
             title={!lockStatus || lockStatus.upcomingFixtures.length === 0 ? "No fixtures loaded for the lock date." : "Pick the best XI from nations playing on the lock date."}
+            className="rounded-lg bg-amber-400/15 px-4 py-2 text-sm font-black text-amber-300 transition hover:bg-amber-400/25 disabled:cursor-not-allowed disabled:opacity-40"
           >
             Auto-pick Playing Today
-          </Button>
+          </button>
         </div>
+        <Link href="/matchday-guide" className={buttonClasses("outline", "md")}>
+          Matchday Guide
+        </Link>
       </div>
 
-      {lockStatus && (
-        <section className={`mb-4 rounded-lg border shadow-sm ${lockStatus.isLocked ? "border-amber-300 bg-amber-50" : "border-green-900/10 bg-white"}`}>
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 p-3">
+      {/* Lock panel */}
+      {lockStatus ? (
+        <section className={`mb-4 overflow-hidden rounded-xl border shadow-sm transition-colors ${lockStatus.isLocked ? "border-amber-400/30 bg-amber-950/20" : "border-white/10 bg-white/6"}`}>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
             <Badge tone={lockStatus.isLocked ? "amber" : "green"} className="shrink-0">
               {lockStatus.isLocked ? "🔒 Locked" : "Unlocked"}
             </Badge>
-            <p className="text-sm font-black text-green-950">
-              Next lock {new Date(lockStatus.lockAt).toLocaleString("en-GB", { weekday: "short", hour: "2-digit", minute: "2-digit", timeZone: "Europe/London" })}
-            </p>
-            <span className="hidden text-xs font-bold text-green-900/55 sm:inline">
-              {selectedPlayingCount}/{selectedPlayers.length || 11} playing · {coveredFixtures}/{lockStatus.upcomingFixtures.length} fixtures covered
-            </span>
-            <div className="ml-auto flex items-center gap-2">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-black text-white">
+                Lock deadline{" "}
+                <span className={lockStatus.isLocked ? "text-amber-300" : "text-amber-400"}>
+                  {new Date(lockStatus.lockAt).toLocaleString("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Europe/London" })}
+                </span>
+              </p>
+              <p className="mt-0.5 text-xs font-semibold text-white/45">
+                {selectedPlayingCount}/{selectedPlayers.length || 11} playing · {coveredFixtures}/{lockStatus.upcomingFixtures.length} fixtures covered
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
               <button
                 onClick={toggleLock}
                 disabled={lockBusy}
-                className={`rounded-md px-4 py-1.5 text-xs font-black text-white transition disabled:opacity-50 ${lockStatus.isLocked ? "bg-amber-600 hover:bg-amber-700" : "bg-pitch hover:bg-green-800"}`}
+                className={`rounded-lg px-4 py-1.5 text-xs font-black text-white transition disabled:opacity-50 ${lockStatus.isLocked ? "bg-amber-600 hover:bg-amber-700" : "bg-pitch hover:bg-green-800"}`}
               >
-                {lockBusy ? "..." : lockStatus.isLocked ? "Unlock" : "Lock for matchday"}
+                {lockBusy ? "…" : lockStatus.isLocked ? "Unlock" : "Lock XI"}
               </button>
               <button
                 onClick={() => setLockExpanded((v) => !v)}
-                className="rounded-md px-2 py-1.5 text-xs font-black text-green-900/60 hover:bg-green-950/5"
+                className="rounded-lg px-2.5 py-1.5 text-xs font-black text-white/45 transition hover:bg-white/8 hover:text-white/70"
                 aria-expanded={lockExpanded}
-                aria-label={lockExpanded ? "Hide matchday details" : "Show matchday details"}
               >
-                {lockExpanded ? "Hide ▲" : "Details ▼"}
+                {lockExpanded ? "▲" : "▼"}
               </button>
             </div>
           </div>
 
           {lockExpanded ? (
-            <div className="border-t border-green-900/10 p-3">
+            <div className="border-t border-white/8 px-4 pb-4 pt-3">
               {lockNotice ? (
-                <div className="mb-3 rounded-md border border-emerald-200 bg-emerald-50 p-2 text-xs font-bold text-emerald-900">{lockNotice}</div>
+                <div className="mb-3 rounded-lg bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-300 ring-1 ring-emerald-500/20">{lockNotice}</div>
               ) : null}
 
-              <div className="grid gap-2 sm:grid-cols-3">
-                <LockSummary label="Playing Today" value={`${selectedPlayingCount}/${selectedPlayers.length || 11}`} />
-                <LockSummary label="Bench Risks" value={String(selectedBenchRisks)} />
-                <LockSummary label="Fixtures Covered" value={`${coveredFixtures}/${lockStatus.upcomingFixtures.length}`} />
+              <div className="grid grid-cols-3 gap-2">
+                <LockStat label="Playing today" value={`${selectedPlayingCount}/${selectedPlayers.length || 11}`} />
+                <LockStat label="Bench risks" value={String(selectedBenchRisks)} />
+                <LockStat label="Fixtures covered" value={`${coveredFixtures}/${lockStatus.upcomingFixtures.length}`} />
               </div>
 
               {lockStatus.upcomingFixtures.length > 0 ? (
                 <div className="mt-3">
-                  <p className="mb-1.5 text-[10px] font-black uppercase tracking-wide text-green-900/50">Fixtures on {lockStatus.lockDate}</p>
+                  <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-white/35">Fixtures · {lockStatus.lockDate}</p>
                   <div className="flex flex-wrap gap-1.5">
                     {lockStatus.upcomingFixtures.map((f) => (
-                      <div key={f.matchId} className="rounded-md border border-green-900/10 bg-green-950/5 px-2 py-1 text-[11px] font-bold text-green-950">
+                      <div
+                        key={f.matchId}
+                        className={`rounded-lg px-2.5 py-1.5 text-[11px] font-bold ring-1 ${
+                          f.winner ? "bg-green-500/10 text-green-200 ring-green-500/20" : "bg-white/6 text-white/70 ring-white/10"
+                        }`}
+                      >
                         {f.homeTeam} v {f.awayTeam}
-                        {f.winner && <span className="ml-1 text-green-700">— {f.winner} win</span>}
-                        {f.status === "FINISHED" && !f.winner && <span className="ml-1 text-green-900/50">Draw</span>}
+                        {f.winner ? <span className="ml-1 font-black text-green-300">— {f.winner}</span> : null}
+                        {f.status === "FINISHED" && !f.winner ? <span className="ml-1 text-white/40">draw</span> : null}
                       </div>
                     ))}
                   </div>
                 </div>
               ) : (
-                <p className="mt-3 text-xs font-semibold text-green-900/50">No fixtures listed for {lockStatus.lockDate} yet.</p>
+                <p className="mt-3 text-xs font-semibold text-white/40">No fixtures listed for {lockStatus.lockDate} yet.</p>
               )}
 
               {lockStatus.isLocked && lockStatus.lockedPlayers.length > 0 ? (
                 <div className="mt-3">
-                  <p className="mb-1.5 text-[10px] font-black uppercase tracking-wide text-green-900/50">Locked XI</p>
+                  <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-white/35">Locked XI</p>
                   <div className="flex flex-wrap gap-1.5">
                     {lockStatus.lockedPlayers.map(({ slot, player }) => (
-                      <span key={slot} className="rounded-md bg-green-950/5 px-2 py-1 text-[11px] font-bold text-green-950">
-                        {player.name} <span className="text-green-900/50">{player.nation}</span>
+                      <span key={slot} className="rounded-lg bg-amber-400/10 px-2.5 py-1.5 text-[11px] font-bold text-amber-200 ring-1 ring-amber-400/20">
+                        {player.name} <span className="text-amber-300/60">{player.nation}</span>
                       </span>
                     ))}
                   </div>
@@ -252,12 +254,14 @@ export default function SquadPage() {
             </div>
           ) : null}
         </section>
-      )}
+      ) : null}
 
+      {/* Pitch + player picker */}
       <section className="grid gap-4 md:grid-cols-[minmax(0,1fr)_300px] xl:grid-cols-[minmax(0,1fr)_340px]">
-        <div className="rounded-lg bg-gradient-to-b from-emerald-700 via-pitch to-green-900 p-3 text-white shadow-md">
+        {/* Pitch */}
+        <div className="rounded-xl bg-gradient-to-b from-emerald-700 via-pitch to-green-900 p-3 text-white shadow-md">
           <div
-            className="relative overflow-hidden rounded-md border border-white/20 p-3"
+            className="relative overflow-hidden rounded-lg border border-white/20 p-3"
             style={{ backgroundImage: "repeating-linear-gradient(0deg, rgba(255,255,255,0.05) 0px, rgba(255,255,255,0.05) 26px, rgba(0,0,0,0.05) 26px, rgba(0,0,0,0.05) 52px)" }}
           >
             <div className="pointer-events-none absolute inset-4 rounded-[50%] border border-white/15" />
@@ -265,7 +269,6 @@ export default function SquadPage() {
             <div className="pointer-events-none absolute left-1/2 top-0 h-full w-px bg-white/10" />
             <div className="pointer-events-none absolute left-1/2 top-0 h-10 w-24 -translate-x-1/2 rounded-b-md border border-t-0 border-white/15" />
             <div className="pointer-events-none absolute bottom-0 left-1/2 h-10 w-24 -translate-x-1/2 rounded-t-md border border-b-0 border-white/15" />
-
             <div className="relative space-y-2">
               {formationRows.map((row) => (
                 <div key={row.label} className="grid grid-cols-[28px_1fr] items-center gap-2">
@@ -289,75 +292,97 @@ export default function SquadPage() {
 
           <div className="mt-3 grid grid-cols-4 gap-2">
             {positionCounts.map((item) => (
-              <div key={item.position} className="rounded-md bg-white/10 px-2 py-1 text-center text-xs font-black">
+              <div key={item.position} className="rounded-lg bg-white/10 px-2 py-1.5 text-center text-xs font-black">
                 <p>{item.position}</p>
-                <p className="text-green-100/75">
-                  {item.selected}/{item.owned}
-                </p>
+                <p className="text-green-100/70">{item.selected}/{item.owned}</p>
               </div>
             ))}
           </div>
         </div>
 
-        <aside className="rounded-lg border border-green-900/10 bg-white p-4 shadow-sm">
+        {/* Player picker */}
+        <aside className="rounded-xl border border-white/10 bg-white/6 p-4">
           {activeSlot && activePosition ? (
             <>
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-xs font-bold uppercase tracking-wide text-green-900/60">Swap {slotLabel(activeSlot)}</p>
-                  <p className="mt-1 text-2xl font-black text-green-950">{activePosition}</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-white/40">{slotLabel(activeSlot)}</p>
+                  <p className="mt-1 text-2xl font-black text-white">{activePosition}</p>
                 </div>
                 {activePlayer ? <RatingBadge player={activePlayer} /> : null}
               </div>
 
               {activePlayer ? (
-                <div className="mt-3 rounded-md bg-green-950/5 p-3">
-                  <div className="flex items-center gap-2">
+                <div className="mt-3 rounded-lg bg-white/8 p-3 ring-1 ring-white/10">
+                  <div className="flex items-center gap-2.5">
                     <Flag nation={activePlayer.nation} />
                     <div className="min-w-0">
-                      <p className="truncate text-lg font-black text-green-950">{activePlayer.name}</p>
-                      <p className="truncate text-sm font-bold text-green-900/70">{activePlayer.nation}</p>
+                      <p className="truncate font-black text-white">{activePlayer.name}</p>
+                      <p className="truncate text-xs font-semibold text-white/55">{activePlayer.nation} · {activePlayer.club}</p>
                     </div>
                   </div>
-                  <div className="mt-3 grid grid-cols-2 gap-2 text-xs font-bold text-green-950">
-                    <Detail label="Club" value={activePlayer.club} />
-                    <Detail label="DOB" value={activePlayer.dob} />
-                    <Detail label="Caps" value={activePlayer.caps ?? "Unknown"} />
-                    <Detail label="Goals" value={activePlayer.goals ?? "Unknown"} />
+                  <div className="mt-3 grid grid-cols-2 gap-1.5 text-xs">
+                    <PlayerStat label="Caps" value={activePlayer.caps ?? "—"} />
+                    <PlayerStat label="Goals" value={activePlayer.goals ?? "—"} />
                   </div>
-                  <button className="mt-3 rounded-md bg-green-950/10 px-3 py-2 text-xs font-black text-green-950 hover:bg-green-950/15" onClick={() => updateSlot(activeSlot)}>
+                  <button
+                    className="mt-3 w-full rounded-lg bg-white/8 py-1.5 text-xs font-black text-white/55 transition hover:bg-white/12 hover:text-white/80"
+                    onClick={() => updateSlot(activeSlot)}
+                  >
                     Clear slot
                   </button>
                 </div>
               ) : (
-                <p className="mt-3 rounded-md bg-green-950/5 p-3 text-sm font-bold text-green-900/70">Choose a player for this slot.</p>
+                <p className="mt-3 rounded-lg bg-white/6 p-3 text-sm font-semibold text-white/40">Choose a player for this slot.</p>
               )}
 
-              <input className="mt-4 w-full rounded-md border border-green-900/20 px-3 py-2 text-sm font-semibold" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={`Search ${activePosition} players`} />
+              <input
+                className="mt-4 w-full rounded-lg border border-white/12 bg-white/8 px-3 py-2 text-sm font-semibold text-white placeholder:text-white/30 focus:border-amber-400/50 focus:outline-none focus:ring-1 focus:ring-amber-400/25"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={`Search ${activePosition} players…`}
+              />
 
-              <div className="mt-3 max-h-[360px] space-y-2 overflow-y-auto pr-1">
-                {benchPlayers.map((player) => (
-                  <button key={player.id} className={`w-full rounded-md border px-3 py-2 text-left hover:border-green-800 ${player.id === activePlayer?.id ? "border-green-900 bg-green-950 text-white" : "border-green-900/10 bg-white text-green-950"}`} onClick={() => updateSlot(activeSlot, player.id)}>
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex min-w-0 items-center gap-2">
-                        <Flag nation={player.nation} />
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-black">{player.name}</p>
-                          <p className="truncate text-xs font-semibold opacity-75">
-                            {player.nation} - {player.club}
-                          </p>
+              <div className="mt-3 max-h-[360px] space-y-1.5 overflow-y-auto pr-1">
+                {benchPlayers.map((player) => {
+                  const isSelected = player.id === activePlayer?.id;
+                  return (
+                    <button
+                      key={player.id}
+                      className={`w-full rounded-lg border px-3 py-2 text-left transition ${
+                        isSelected
+                          ? "border-amber-400/40 bg-amber-950/30 text-white"
+                          : "border-white/8 bg-white/5 text-white hover:border-white/15 hover:bg-white/10"
+                      }`}
+                      onClick={() => updateSlot(activeSlot, player.id)}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex min-w-0 items-center gap-2">
+                          <Flag nation={player.nation} compact />
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-black">{player.name}</p>
+                            <p className="truncate text-[11px] font-semibold text-white/50">{player.nation} · {player.club}</p>
+                          </div>
+                          {playingNations.has(player.nation) ? (
+                            <span className="shrink-0 rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[9px] font-black uppercase text-emerald-300">Today</span>
+                          ) : null}
                         </div>
-                        {playingNations.has(player.nation) ? <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[9px] font-black uppercase text-emerald-800">Today</span> : null}
+                        <RatingPill rating={player.rating} />
                       </div>
-                      <span className="rounded-md bg-gold px-2 py-1 text-xs font-black text-green-950">{player.rating}</span>
-                    </div>
-                  </button>
-                ))}
-                {benchPlayers.length === 0 ? <p className="rounded-md bg-green-950/5 p-3 text-sm font-bold text-green-900/70">No available {activePosition} players match that search.</p> : null}
+                    </button>
+                  );
+                })}
+                {benchPlayers.length === 0 ? (
+                  <p className="rounded-lg bg-white/5 p-3 text-sm font-semibold text-white/40">
+                    No available {activePosition} players{query ? " match that search" : ""}.
+                  </p>
+                ) : null}
               </div>
             </>
           ) : (
-            <div className="flex h-full min-h-40 items-center justify-center rounded-md bg-green-950/5 p-4 text-center text-sm font-bold text-green-900/70">Click a squad slot to see player details and swap options.</div>
+            <div className="flex h-full min-h-48 items-center justify-center p-4 text-center text-sm font-semibold text-white/35">
+              Tap a squad slot to swap players.
+            </div>
           )}
         </aside>
       </section>
@@ -365,11 +390,11 @@ export default function SquadPage() {
   );
 }
 
-function LockSummary({ label, value }: { label: string; value: string }) {
+function LockStat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md bg-green-950/5 px-3 py-2">
-      <p className="text-[10px] font-black uppercase tracking-wide text-green-900/50">{label}</p>
-      <p className="mt-0.5 text-lg font-black text-green-950">{value}</p>
+    <div className="rounded-lg bg-white/6 px-3 py-2.5 ring-1 ring-white/8">
+      <p className="text-[10px] font-black uppercase tracking-wide text-white/40">{label}</p>
+      <p className="mt-0.5 text-lg font-black text-white">{value}</p>
     </div>
   );
 }
@@ -389,14 +414,7 @@ function SquadToken({ slot, selected, active, playingToday, onClick }: { slot: S
       <p className="mt-1 break-words text-[10px] font-black leading-tight text-green-950">{selected?.name ?? slotLabel(slot)}</p>
       <p className="mt-0.5 truncate text-[9px] font-bold text-green-900/70">{selected ? selected.club : position}</p>
       {playingToday ? <p className="mt-0.5 rounded-full bg-emerald-100 px-1 text-center text-[8px] font-black uppercase text-emerald-800">Playing today</p> : null}
-      <div
-        className="mt-1 h-1 overflow-hidden rounded-full bg-green-950/10"
-        role="progressbar"
-        aria-valuenow={selected?.rating ?? 0}
-        aria-valuemin={0}
-        aria-valuemax={199}
-        aria-label={selected ? `${selected.name} rating` : "No player"}
-      >
+      <div className="mt-1 h-1 overflow-hidden rounded-full bg-green-950/10" role="progressbar" aria-valuenow={selected?.rating ?? 0} aria-valuemin={0} aria-valuemax={199} aria-label={selected ? `${selected.name} rating` : "No player"}>
         <div className={`h-full rounded-full bg-gradient-to-r ${ratingTone}`} style={{ width: `${ratingPercent}%` }} />
       </div>
     </button>
@@ -405,31 +423,32 @@ function SquadToken({ slot, selected, active, playingToday, onClick }: { slot: S
 
 function RatingBadge({ player }: { player: Player }) {
   return (
-    <div className="rounded-md bg-gold px-3 py-2 text-center text-green-950">
+    <div className="rounded-lg bg-gold px-3 py-2 text-center text-green-950">
       <p className="text-2xl font-black leading-none">{player.rating}</p>
-      <p className="text-[11px] font-black uppercase">{player.rarity}</p>
+      <p className="text-[10px] font-black uppercase">{player.rarity}</p>
     </div>
   );
 }
 
-function Detail({ label, value }: { label: string; value: string | number }) {
+function RatingPill({ rating }: { rating: number }) {
+  const tone = rating >= 90 ? "bg-amber-400/20 text-amber-300" : rating >= 82 ? "bg-fuchsia-400/15 text-fuchsia-300" : rating >= 74 ? "bg-sky-400/15 text-sky-300" : "bg-white/10 text-white/55";
+  return <span className={`shrink-0 rounded-md px-2 py-0.5 text-xs font-black ${tone}`}>{rating}</span>;
+}
+
+function PlayerStat({ label, value }: { label: string; value: string | number }) {
   return (
-    <div className="rounded-md bg-white px-2 py-1">
-      <p className="text-[10px] font-black uppercase tracking-wide text-green-900/55">{label}</p>
-      <p className="mt-0.5 truncate">{value}</p>
+    <div className="rounded-md bg-white/6 px-2 py-1.5">
+      <p className="text-[9px] font-black uppercase tracking-wide text-white/35">{label}</p>
+      <p className="mt-0.5 text-xs font-black text-white/80">{value}</p>
     </div>
   );
 }
 
 function Flag({ nation, compact = false }: { nation: string; compact?: boolean }) {
   const url = flagUrl(nation);
-  const className = compact ? "h-3.5 w-5" : "h-5 w-7";
-
-  if (!url) {
-    return <span className={`inline-flex ${className} items-center justify-center rounded-sm bg-green-950/10 text-[9px] font-black`}>{nation.slice(0, 2).toUpperCase()}</span>;
-  }
-
-  return <img className={`${className} shrink-0 rounded-sm object-cover shadow-sm`} src={url} alt={`${nation} flag`} />;
+  const cls = compact ? "h-3.5 w-5" : "h-5 w-7";
+  if (!url) return <span className={`inline-flex ${cls} items-center justify-center rounded-sm bg-white/10 text-[9px] font-black text-white/50`}>{nation.slice(0, 2).toUpperCase()}</span>;
+  return <img className={`${cls} shrink-0 rounded-sm object-cover shadow-sm`} src={url} alt={`${nation} flag`} />;
 }
 
 function slotLabel(slot: SquadSlot) {
@@ -442,18 +461,16 @@ function syncDraftSquad(squad: Partial<Record<SquadSlot, number>>) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ squad })
-  }).catch(() => {
-    // Login is optional while browsing locally; the Live page will prompt for it.
-  });
+  }).catch(() => {});
 }
 
 function getFixtureNations(lockStatus: LockStatus) {
-  return new Set(lockStatus.upcomingFixtures.flatMap((fixture) => [fixture.homeTeam, fixture.awayTeam]));
+  return new Set(lockStatus.upcomingFixtures.flatMap((f) => [f.homeTeam, f.awayTeam]));
 }
 
 function autoPickBestXIFromNations(state: UserState, nations: Set<string>, playerPool: Player[]): UserState {
   const owned = getOwnedPlayers(state, playerPool);
-  const playing = owned.filter((player) => nations.has(player.nation));
+  const playing = owned.filter((p) => nations.has(p.nation));
   const used = new Set<number>();
   const squad: UserState["squad"] = {};
 
@@ -461,19 +478,13 @@ function autoPickBestXIFromNations(state: UserState, nations: Set<string>, playe
     for (const slot of squadSlots) {
       if (squad[slot]) continue;
       const pick = pool
-        .filter((player) => canPlaySlot(player, slot) && !used.has(player.id))
+        .filter((p) => canPlaySlot(p, slot) && !used.has(p.id))
         .sort((a, b) => b.rating - a.rating || a.name.localeCompare(b.name))[0];
-      if (pick) {
-        used.add(pick.id);
-        squad[slot] = pick.id;
-      }
+      if (pick) { used.add(pick.id); squad[slot] = pick.id; }
     }
   };
 
-  // Prioritise players whose nations play today, then backfill any empty
-  // slots with the best of the rest so the XI is never left half-full.
   fillFrom(playing);
   fillFrom(owned);
-
   return { ...state, squad };
 }

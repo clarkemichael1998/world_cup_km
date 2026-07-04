@@ -29,15 +29,15 @@ export default function SuggestionsPage() {
   useEffect(() => {
     loadSuggestions();
     fetch("/api/auth/me", { credentials: "include" })
-      .then((response) => response.json())
-      .then((payload) => setIsAdmin(Boolean(payload.user?.isAdmin)))
+      .then((r) => r.json())
+      .then((p) => setIsAdmin(Boolean(p.user?.isAdmin)))
       .catch(() => setIsAdmin(false));
   }, []);
 
   async function loadSuggestions() {
-    const response = await fetch("/api/suggestions");
-    const payload = await response.json();
-    const loaded = payload.suggestions ?? [];
+    const r = await fetch("/api/suggestions");
+    const p = await r.json();
+    const loaded = p.suggestions ?? [];
     setSuggestions(loaded);
     markImplementedSuggestionsSeen(loaded);
   }
@@ -46,166 +46,184 @@ export default function SuggestionsPage() {
     event.preventDefault();
     setBusy(true);
     setError("");
-
-    const response = await fetch("/api/suggestions", {
+    const r = await fetch("/api/suggestions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
       body: JSON.stringify({ title, details })
     });
-    const payload = await response.json();
+    const p = await r.json();
     setBusy(false);
-
-    if (!response.ok) {
-      setError(payload.error ?? "Could not add suggestion.");
-      return;
-    }
-
+    if (!r.ok) { setError(p.error ?? "Could not add suggestion."); return; }
     setTitle("");
     setDetails("");
-    setSuggestions(payload.suggestions ?? []);
+    setSuggestions(p.suggestions ?? []);
   }
 
   async function vote(suggestionId: number, value: -1 | 1) {
-    const response = await fetch("/api/suggestions/vote", {
+    const r = await fetch("/api/suggestions/vote", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
       body: JSON.stringify({ suggestionId, vote: value })
     });
-    const payload = await response.json();
-    if (!response.ok) {
-      setError(payload.error ?? "Login required to vote.");
-      return;
-    }
+    const p = await r.json();
+    if (!r.ok) { setError(p.error ?? "Login required to vote."); return; }
     setError("");
-    setSuggestions(payload.suggestions ?? []);
+    setSuggestions(p.suggestions ?? []);
   }
 
   async function toggleImplemented(suggestion: Suggestion) {
-    const response = await fetch("/api/suggestions/implement", {
+    const r = await fetch("/api/suggestions/implement", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
       body: JSON.stringify({ suggestionId: suggestion.id, implemented: !suggestion.implemented_at })
     });
-    const payload = await response.json();
-    if (!response.ok) {
-      setError(payload.error ?? "Could not update suggestion.");
-      return;
-    }
+    const p = await r.json();
+    if (!r.ok) { setError(p.error ?? "Could not update suggestion."); return; }
     setError("");
-    setSuggestions(payload.suggestions ?? []);
+    setSuggestions(p.suggestions ?? []);
   }
+
+  const titleNearLimit = title.length >= 100;
 
   return (
     <div>
-      <PageTitle title="Suggestions" subtitle="Pitch improvements, vote ideas up or down, and help shape what gets built next." />
+      <PageTitle title="Proposals" subtitle="Pitch an improvement, vote ideas up or down, and help shape what gets built next." />
 
-      <section className="grid gap-5 lg:grid-cols-[360px_1fr]">
-        <aside className="rounded-lg border border-green-900/10 bg-white p-5 shadow-sm">
-          <p className="text-sm font-bold uppercase tracking-wide text-green-900/60">Add Suggestion</p>
-          <form onSubmit={submit} className="mt-3 space-y-3">
-            <input
-              className="w-full rounded-md border border-green-900/20 px-3 py-2 text-sm font-semibold"
-              maxLength={120}
-              placeholder="Short title"
-              value={title}
-              onChange={(event) => setTitle(event.target.value)}
-            />
-            <textarea
-              className="min-h-32 w-full resize-none rounded-md border border-green-900/20 px-3 py-2 text-sm font-semibold"
-              maxLength={1000}
-              placeholder="What should improve?"
-              value={details}
-              onChange={(event) => setDetails(event.target.value)}
-            />
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-xs font-bold text-green-900/50">{title.length}/120</p>
-              <button className="rounded-md bg-pitch px-4 py-2 text-sm font-black text-white hover:bg-green-800 disabled:opacity-50" disabled={busy}>
-                {busy ? "Adding..." : "Add"}
-              </button>
+      <div className="grid gap-6 lg:grid-cols-[340px_1fr]">
+        {/* Submission form */}
+        <aside className="h-fit rounded-xl border border-white/10 bg-white/8 p-5">
+          <p className="text-xs font-black uppercase tracking-widest text-white/50">New Proposal</p>
+          <form onSubmit={submit} className="mt-4 space-y-3">
+            <div>
+              <input
+                className="w-full rounded-lg border border-white/15 bg-white/10 px-3 py-2.5 text-sm font-semibold text-white placeholder:text-white/35 focus:border-amber-400/60 focus:outline-none focus:ring-1 focus:ring-amber-400/30"
+                maxLength={120}
+                placeholder="One-line title"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+              />
+              <p className={`mt-1 text-right text-[10px] font-bold ${titleNearLimit ? "text-amber-400" : "text-white/30"}`}>{title.length}/120</p>
             </div>
+            <textarea
+              className="min-h-28 w-full resize-none rounded-lg border border-white/15 bg-white/10 px-3 py-2.5 text-sm font-semibold text-white placeholder:text-white/35 focus:border-amber-400/60 focus:outline-none focus:ring-1 focus:ring-amber-400/30"
+              maxLength={1000}
+              placeholder="What should change, and why? (optional)"
+              value={details}
+              onChange={(e) => setDetails(e.target.value)}
+            />
+            <button
+              className="w-full rounded-lg bg-amber-400 py-2.5 text-sm font-black text-amber-950 transition hover:bg-amber-300 disabled:opacity-40"
+              disabled={busy || !title.trim()}
+            >
+              {busy ? "Submitting…" : "Submit Proposal"}
+            </button>
           </form>
           {error ? (
-            <div className="mt-4 rounded-md bg-amber-50 p-3 text-sm font-bold text-amber-950">
-              <p>{error}</p>
-              {error.toLowerCase().includes("login") ? <Link className="mt-2 inline-flex underline" href="/login">Login</Link> : null}
+            <div className="mt-3 rounded-lg bg-red-950/30 px-3 py-2.5 text-sm font-semibold text-red-200">
+              {error}
+              {error.toLowerCase().includes("login") ? <Link className="ml-1 font-black underline" href="/login">Log in</Link> : null}
             </div>
           ) : null}
         </aside>
 
+        {/* Suggestions list */}
         <div className="space-y-3">
           {suggestions.length === 0 ? (
-            <p className="rounded-lg bg-white p-6 text-sm font-bold text-green-900/60 shadow-sm">No suggestions yet.</p>
+            <div className="rounded-xl border border-white/10 bg-white/5 p-8 text-center">
+              <p className="text-sm font-bold text-white/50">No proposals yet — be the first.</p>
+            </div>
           ) : (
-            suggestions.map((suggestion) => (
-              <article key={suggestion.id} className={`rounded-lg border p-4 shadow-sm ${suggestion.implemented_at ? "border-green-700/25 bg-green-50/80" : "border-green-900/10 bg-white"}`}>
-                <div className="flex items-start justify-between gap-4">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="break-words text-lg font-black text-green-950">{suggestion.title}</h2>
-                      {suggestion.implemented_at ? (
-                        <span className="rounded-full bg-green-700 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-white">Implemented</span>
-                      ) : null}
+            suggestions.map((s) => {
+              const net = s.upvotes - s.downvotes;
+              const scoreColour = net > 0 ? "bg-green-500/15 text-green-300 ring-green-500/20" : net < 0 ? "bg-red-500/15 text-red-300 ring-red-500/20" : "bg-white/8 text-white/40 ring-white/10";
+              return (
+                <article
+                  key={s.id}
+                  className={`rounded-xl border p-4 shadow-sm transition ${
+                    s.implemented_at
+                      ? "border-green-500/25 bg-green-950/20"
+                      : "border-white/10 bg-white/6"
+                  }`}
+                >
+                  <div className="flex items-start gap-4">
+                    {/* Net score */}
+                    <div className={`mt-0.5 flex h-10 w-10 shrink-0 flex-col items-center justify-center rounded-lg ring-1 ${scoreColour}`}>
+                      <span className="text-sm font-black leading-none">{net > 0 ? `+${net}` : net}</span>
                     </div>
-                    <p className="mt-1 text-xs font-bold text-green-900/50">
-                      {suggestion.username} · {formatDate(suggestion.created_at)}
-                    </p>
-                    {suggestion.implemented_at ? (
-                      <p className="mt-1 text-xs font-bold text-green-800">
-                        Marked implemented {formatDate(suggestion.implemented_at)}
-                        {suggestion.implemented_by_username ? ` by ${suggestion.implemented_by_username}` : ""}
+
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h2 className="break-words font-black text-white">{s.title}</h2>
+                        {s.implemented_at ? (
+                          <span className="rounded-full bg-green-500/20 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-green-300">
+                            ✓ Done
+                          </span>
+                        ) : null}
+                      </div>
+
+                      <p className="mt-0.5 text-xs font-semibold text-white/40">
+                        {s.username} · {formatDate(s.created_at)}
+                        {s.implemented_at ? ` · shipped ${formatDate(s.implemented_at)}${s.implemented_by_username ? ` by ${s.implemented_by_username}` : ""}` : ""}
                       </p>
-                    ) : null}
+
+                      {s.details ? (
+                        <p className="mt-2.5 whitespace-pre-wrap break-words text-sm leading-relaxed text-white/65">{s.details}</p>
+                      ) : null}
+
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <button
+                          onClick={() => vote(s.id, 1)}
+                          className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-black transition ${
+                            s.user_vote === 1
+                              ? "bg-green-500/20 text-green-300 ring-1 ring-green-500/30"
+                              : "bg-white/8 text-white/55 hover:bg-white/12 hover:text-white/80"
+                          }`}
+                        >
+                          ▲ {s.upvotes}
+                        </button>
+                        <button
+                          onClick={() => vote(s.id, -1)}
+                          className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-black transition ${
+                            s.user_vote === -1
+                              ? "bg-red-500/20 text-red-300 ring-1 ring-red-500/30"
+                              : "bg-white/8 text-white/55 hover:bg-white/12 hover:text-white/80"
+                          }`}
+                        >
+                          ▼ {s.downvotes}
+                        </button>
+                        {isAdmin ? (
+                          <button
+                            onClick={() => toggleImplemented(s)}
+                            className={`rounded-lg px-3 py-1.5 text-xs font-black transition ${
+                              s.implemented_at
+                                ? "bg-amber-500/15 text-amber-300 hover:bg-amber-500/25"
+                                : "bg-green-500/15 text-green-300 hover:bg-green-500/25"
+                            }`}
+                          >
+                            {s.implemented_at ? "Mark undone" : "Mark done"}
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
                   </div>
-                  <p className="rounded-md bg-green-950/5 px-3 py-2 text-center text-sm font-black text-pitch">
-                    {suggestion.upvotes - suggestion.downvotes}
-                  </p>
-                </div>
-
-                {suggestion.details ? <p className="mt-3 whitespace-pre-wrap break-words text-sm font-semibold leading-relaxed text-green-900/75">{suggestion.details}</p> : null}
-
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <button
-                    className={`rounded-md border px-3 py-1.5 text-sm font-black ${suggestion.user_vote === 1 ? "border-green-700 bg-green-100 text-green-900" : "border-green-900/15 bg-white text-green-900/70 hover:bg-green-50"}`}
-                    onClick={() => vote(suggestion.id, 1)}
-                  >
-                    Upvote {suggestion.upvotes}
-                  </button>
-                  <button
-                    className={`rounded-md border px-3 py-1.5 text-sm font-black ${suggestion.user_vote === -1 ? "border-red-700 bg-red-100 text-red-900" : "border-green-900/15 bg-white text-green-900/70 hover:bg-green-50"}`}
-                    onClick={() => vote(suggestion.id, -1)}
-                  >
-                    Downvote {suggestion.downvotes}
-                  </button>
-                  {isAdmin ? (
-                    <button
-                      className={`rounded-md border px-3 py-1.5 text-sm font-black ${
-                        suggestion.implemented_at
-                          ? "border-amber-700 bg-amber-50 text-amber-900 hover:bg-amber-100"
-                          : "border-green-700 bg-green-100 text-green-900 hover:bg-green-200"
-                      }`}
-                      onClick={() => toggleImplemented(suggestion)}
-                    >
-                      {suggestion.implemented_at ? "Mark Not Implemented" : "Mark Implemented"}
-                    </button>
-                  ) : null}
-                </div>
-              </article>
-            ))
+                </article>
+              );
+            })
           )}
         </div>
-      </section>
+      </div>
     </div>
   );
 }
 
 function markImplementedSuggestionsSeen(suggestions: Suggestion[]) {
-  const implementedTimes = suggestions
-    .map((suggestion) => suggestion.implemented_at)
-    .filter((value): value is string => Boolean(value))
-    .map((value) => new Date(value).getTime());
-  if (implementedTimes.length === 0) return;
-  window.localStorage.setItem("kmxi-last-implemented-idea-seen", String(Math.max(...implementedTimes)));
+  const times = suggestions
+    .map((s) => s.implemented_at)
+    .filter((v): v is string => Boolean(v))
+    .map((v) => new Date(v).getTime());
+  if (times.length === 0) return;
+  window.localStorage.setItem("kmxi-last-implemented-idea-seen", String(Math.max(...times)));
 }
