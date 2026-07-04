@@ -342,7 +342,7 @@ export default function TradePage() {
             ) : (
               <div className="space-y-3">
                 {incoming.map((p) => (
-                  <ProposalCard key={p.id} proposal={p} playerById={playerById} tradeBusy={tradeBusy} tradeAction={tradeAction} />
+                  <ProposalCard key={p.id} proposal={p} playerById={playerById} ownedIds={ownedIds} tradeBusy={tradeBusy} tradeAction={tradeAction} />
                 ))}
               </div>
             )
@@ -352,7 +352,7 @@ export default function TradePage() {
             ) : (
               <div className="space-y-3">
                 {outgoing.map((p) => (
-                  <ProposalCard key={p.id} proposal={p} playerById={playerById} tradeBusy={tradeBusy} tradeAction={tradeAction} />
+                  <ProposalCard key={p.id} proposal={p} playerById={playerById} ownedIds={ownedIds} tradeBusy={tradeBusy} tradeAction={tradeAction} />
                 ))}
               </div>
             )
@@ -558,7 +558,7 @@ function MarketCard({
           ) : (
             <>
               <select
-                className="min-w-0 flex-1 rounded-lg border border-white/12 bg-white/8 px-2 py-2 text-xs font-bold text-white focus:border-amber-400/50 focus:outline-none"
+                className="min-w-0 flex-1 rounded-lg border border-white/12 bg-green-950 px-2 py-2 text-xs font-bold text-white focus:border-amber-400/50 focus:outline-none"
                 value={selectedPlayerId ?? ""}
                 onChange={(e) => setOfferSelections((prev) => ({ ...prev, [key]: Number(e.target.value) }))}
               >
@@ -641,15 +641,18 @@ function Showcase({
 // ── Proposals ─────────────────────────────────────────────────
 
 function ProposalCard({
-  proposal, playerById, tradeBusy, tradeAction
+  proposal, playerById, ownedIds, tradeBusy, tradeAction
 }: {
   proposal: DirectProposal;
   playerById: Map<number, Player>;
+  ownedIds: Set<number>;
   tradeBusy: boolean;
   tradeAction: (body: Record<string, unknown>, successNotice: string) => Promise<void>;
 }) {
   const offered = playerById.get(proposal.offeredPlayerId);
   const wanted = playerById.get(proposal.wantedPlayerId);
+  // For incoming proposals: offeredPlayerId is what you'd receive
+  const wouldReceiveDuplicate = proposal.isIncoming && ownedIds.has(proposal.offeredPlayerId);
   return (
     <div className={`overflow-hidden rounded-2xl border ${proposal.isIncoming ? "border-amber-400/25 bg-amber-950/15" : "border-white/10 bg-white/5"}`}>
       {/* Meta row */}
@@ -675,6 +678,13 @@ function ProposalCard({
         </div>
         <ProposalPlayerChip player={wanted} label={proposal.isIncoming ? "You receive" : `${proposal.targetUsername} gives`} />
       </div>
+
+      {/* Already-owned warning */}
+      {wouldReceiveDuplicate ? (
+        <div className="mx-4 mt-3 rounded-xl bg-amber-400/10 px-3 py-2 ring-1 ring-amber-400/25">
+          <p className="text-xs font-black text-amber-300">⚠ You already own {offered?.name ?? "this player"} — accepting gives you a duplicate.</p>
+        </div>
+      ) : null}
 
       {/* Actions */}
       <div className="mt-4 flex gap-2 border-t border-white/8 px-4 py-3">
@@ -790,12 +800,17 @@ function NationTargetCard({
             <>
               {available.map((missingPlayer) => {
           const matchingEntries = market.filter((e) => e.playerId === missingPlayer.id);
-          const hasAvailable = matchingEntries.length > 0;
-          const key = `${matchingEntries[0]?.userId}:${missingPlayer.id}`;
-          const selectedPlayerId = offerSelections[key];
+          // Key for "which duplicate am I offering" selection
+          const offerKey = `offer:${missingPlayer.id}`;
+          // Key for "which provider am I targeting" — only needed when >1 has it
+          const targetKey = `target:${missingPlayer.id}`;
+          const selectedPlayerId = offerSelections[offerKey];
+          const selectedTargetUserId = offerSelections[targetKey] ?? matchingEntries[0]?.userId;
+          const targetEntry = matchingEntries.find((e) => e.userId === selectedTargetUserId) ?? matchingEntries[0];
           const matchingDuplicates = myDuplicates.filter((d) => d.id !== missingPlayer.id && d.rarity === missingPlayer.rarity);
           const rarity = missingPlayer.rarity;
           const pFlag = flagUrl(missingPlayer.nation);
+          const multipleProviders = matchingEntries.length > 1;
 
           return (
             <div key={missingPlayer.id} className="px-4 py-3">
@@ -812,52 +827,64 @@ function NationTargetCard({
                   </div>
                   <p className={`mt-0.5 text-[10px] font-bold uppercase ${RARITY_COLOUR[rarity] ?? "text-white/40"}`}>{rarity}</p>
                 </div>
-                {hasAvailable ? (
-                  <span className="shrink-0 rounded-full bg-green-500/15 px-2.5 py-1 text-[10px] font-black text-green-300">
-                    {matchingEntries.length} available
+                <div className="flex shrink-0 flex-col items-end gap-1">
+                  <span className="rounded-full bg-green-500/15 px-2.5 py-1 text-[10px] font-black text-green-300">
+                    {matchingEntries.length === 1
+                      ? `${matchingEntries[0].username} has spare`
+                      : `${matchingEntries.length} players have spare`}
                   </span>
-                ) : (
-                  <span className="shrink-0 rounded-full bg-white/6 px-2.5 py-1 text-[10px] font-semibold text-white/25">Not listed</span>
-                )}
+                </div>
               </div>
 
-              {/* Offer row — only when someone has this card */}
-              {hasAvailable ? (
-                <div className="mt-2.5 flex items-center gap-2 rounded-xl bg-white/5 p-2 ring-1 ring-white/8">
-                  {matchingDuplicates.length === 0 ? (
-                    <p className="flex-1 px-1 text-xs font-semibold text-white/30">No spare {rarity} to offer in return</p>
-                  ) : (
-                    <>
-                      <select
-                        className="min-w-0 flex-1 rounded-lg border border-white/12 bg-white/8 px-2 py-2 text-xs font-bold text-white focus:border-amber-400/50 focus:outline-none"
-                        value={selectedPlayerId ?? ""}
-                        onChange={(e) => setOfferSelections((prev) => ({ ...prev, [key]: Number(e.target.value) }))}
-                      >
-                        <option value="" className="bg-green-950">Your spare {rarity}…</option>
-                        {matchingDuplicates.map((d) => (
-                          <option key={d.id} value={d.id} className="bg-green-950">
-                            {d.name} ×{duplicateCounts[d.id] ?? 0} · {d.nation}
-                          </option>
-                        ))}
-                      </select>
-                      <button
-                        className="shrink-0 rounded-lg bg-amber-400 px-4 py-2 text-xs font-black text-amber-950 transition hover:bg-amber-300 disabled:opacity-40"
-                        disabled={tradeBusy || !selectedPlayerId}
-                        onClick={() =>
-                          selectedPlayerId &&
-                          matchingEntries[0] &&
-                          tradeAction(
-                            { action: "propose", targetUserId: matchingEntries[0].userId, wantedPlayerId: missingPlayer.id, offeredPlayerId: selectedPlayerId },
-                            "Trade proposed — it expires in 24 hours."
-                          )
-                        }
-                      >
-                        Propose
-                      </button>
-                    </>
-                  )}
-                </div>
-              ) : null}
+              {/* Offer row */}
+              <div className="mt-2.5 space-y-2 rounded-xl bg-white/5 p-2 ring-1 ring-white/8">
+                {/* If multiple providers, let user pick which one */}
+                {multipleProviders ? (
+                  <select
+                    className="w-full rounded-lg border border-white/12 bg-green-950 px-2 py-1.5 text-xs font-bold text-white focus:border-amber-400/50 focus:outline-none"
+                    value={selectedTargetUserId ?? ""}
+                    onChange={(e) => setOfferSelections((prev) => ({ ...prev, [targetKey]: Number(e.target.value) }))}
+                  >
+                    {matchingEntries.map((e) => (
+                      <option key={e.userId} value={e.userId} className="bg-green-950">
+                        Get from {e.username} (×{e.duplicateCount} spare)
+                      </option>
+                    ))}
+                  </select>
+                ) : null}
+                {matchingDuplicates.length === 0 ? (
+                  <p className="px-1 text-xs font-semibold text-white/30">No spare {rarity} to offer in return</p>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <select
+                      className="min-w-0 flex-1 rounded-lg border border-white/12 bg-green-950 px-2 py-2 text-xs font-bold text-white focus:border-amber-400/50 focus:outline-none"
+                      value={selectedPlayerId ?? ""}
+                      onChange={(e) => setOfferSelections((prev) => ({ ...prev, [offerKey]: Number(e.target.value) }))}
+                    >
+                      <option value="" className="bg-green-950">Your spare {rarity}…</option>
+                      {matchingDuplicates.map((d) => (
+                        <option key={d.id} value={d.id} className="bg-green-950">
+                          {d.name} ×{duplicateCounts[d.id] ?? 0} · {d.nation}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      className="shrink-0 rounded-lg bg-amber-400 px-4 py-2 text-xs font-black text-amber-950 transition hover:bg-amber-300 disabled:opacity-40"
+                      disabled={tradeBusy || !selectedPlayerId || !targetEntry}
+                      onClick={() =>
+                        selectedPlayerId &&
+                        targetEntry &&
+                        tradeAction(
+                          { action: "propose", targetUserId: targetEntry.userId, wantedPlayerId: missingPlayer.id, offeredPlayerId: selectedPlayerId },
+                          "Trade proposed — it expires in 24 hours."
+                        )
+                      }
+                    >
+                      Propose
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           );
         })}

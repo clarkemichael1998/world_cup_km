@@ -63,6 +63,7 @@ export default function Home() {
   const [redeeming, setRedeeming] = useState(false);
   const [matchdayScore, setMatchdayScore] = useState<MatchdayScore | null>(null);
   const [cupStatuses, setCupStatuses] = useState<CupStatus[] | null>(null);
+  const [incomingProposals, setIncomingProposals] = useState<number>(0);
   const router = useRouter();
   const countdown = useCountdown();
 
@@ -86,6 +87,10 @@ export default function Home() {
     fetch("/api/matchday/score", { credentials: "include" })
       .then((r) => (r.ok ? r.json() : null))
       .then((p) => setMatchdayScore(p))
+      .catch(() => {});
+    fetch("/api/trades", { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((p) => setIncomingProposals((p?.proposals ?? []).filter((pr: { isIncoming: boolean }) => pr.isIncoming).length))
       .catch(() => {});
   }, []);
 
@@ -142,7 +147,7 @@ export default function Home() {
         )}
       </div>
 
-      <TradingHero cupStatuses={cupStatuses ?? []} />
+      <TradingHero cupStatuses={cupStatuses ?? []} incomingProposals={incomingProposals} />
 
       {matchdayScore ? <MatchdayScoreCard data={matchdayScore} /> : null}
 
@@ -192,7 +197,7 @@ export default function Home() {
   );
 }
 
-function TradingHero({ cupStatuses }: { cupStatuses: CupStatus[] }) {
+function TradingHero({ cupStatuses, incomingProposals }: { cupStatuses: CupStatus[]; incomingProposals: number }) {
   const fixtureCup = cupStatuses.find((status) => status.state === "live" && status.opponent)
     ?? cupStatuses.find((status) => status.state === "upcoming" && status.opponent)
     ?? cupStatuses.find((status) => status.state === "live")
@@ -211,14 +216,22 @@ function TradingHero({ cupStatuses }: { cupStatuses: CupStatus[] }) {
           <p className="mt-3 max-w-2xl text-sm font-semibold text-white/75">
             Every duplicate is automatically on the market. Swap same-status cards one-for-one to finish nation pages. Complete every sticker for a nation and you earn 25 pack credits, plus every player you own from that nation gets +3 added to their rating for Best XI, profiles, squads, and the leaderboard.
           </p>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <Link href="/trade" className="rounded-md bg-white px-4 py-2 text-sm font-black text-green-950 shadow-sm transition hover:bg-amber-50">
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <Link href="/trade" className="flex items-center gap-2 rounded-md bg-white px-4 py-2 text-sm font-black text-green-950 shadow-sm transition hover:bg-amber-50">
               Find best swaps
+              {incomingProposals > 0 ? (
+                <span className="rounded-full bg-amber-400 px-1.5 py-0.5 text-[10px] font-black text-amber-950">{incomingProposals}</span>
+              ) : null}
             </Link>
             <Link href="/collection" className="rounded-md bg-white/10 px-4 py-2 text-sm font-black text-white ring-1 ring-white/20 transition hover:bg-white/15">
               View album
             </Link>
           </div>
+          {incomingProposals > 0 ? (
+            <p className="mt-2 text-xs font-semibold text-amber-200">
+              You have {incomingProposals} incoming trade proposal{incomingProposals === 1 ? "" : "s"} waiting.
+            </p>
+          ) : null}
         </div>
         <div className="rounded-xl bg-white/10 p-3 ring-1 ring-white/15">
           <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/50">Cup pulse</p>
