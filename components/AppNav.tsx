@@ -38,12 +38,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       className="min-h-screen pb-16 md:pb-0"
       style={{ paddingBottom: "calc(4rem + env(safe-area-inset-bottom, 0px))" }}
     >
-      <header className="nav-blur hidden border-b border-green-900/10 bg-white/80 md:block sticky top-0 z-40">
+      <header className="nav-blur sticky top-0 z-40 hidden border-b border-white/10 bg-green-950/82 shadow-lg shadow-green-950/20 md:block">
         <nav className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
           <Link href="/" aria-label="KMXI home">
             <BrandLogo variant="nav" />
           </Link>
-          <div className="flex items-center gap-1 text-sm font-semibold text-green-950">
+          <div className="flex items-center gap-1 text-sm font-semibold text-white/78">
             <NavLink href="/add-km" label="Log" />
             <NavLink href="/collection" label="Stickers" />
             <NavLink href="/squad" label="Squad" badge={badges.squadNeedsLock ? "Lock" : undefined} />
@@ -52,34 +52,34 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <NavLink href="/cups" label="Cups" />
             <NavLink href="/leaderboard" label="Leaderboard" />
             <NavLink href="/squads" label="Rivals" />
-            <span className="mx-1 h-5 w-px bg-green-900/10" />
+            <span className="mx-1 h-5 w-px bg-white/10" />
             <NavLink href="/matchday-guide" label="Guide" />
             <NavLink href="/rules" label="Rules" />
             <NavLink href="/suggestions" label="Ideas" />
-            {isAdmin ? <Link className="rounded-md bg-amber-100 px-3 py-2 font-black text-amber-900 hover:bg-amber-200" href="/admin">Admin</Link> : null}
-            {badges.credits > 0 ? <span className="rounded-full bg-amber-100 px-2 py-1 text-xs font-black text-amber-900">{badges.credits} packs</span> : null}
+            {isAdmin ? <Link className="rounded-md bg-amber-400 px-3 py-2 font-black text-amber-950 hover:bg-amber-300" href="/admin">Admin</Link> : null}
+            {badges.credits > 0 ? <span className="rounded-full bg-amber-300 px-2 py-1 text-xs font-black text-amber-950 shadow-sm">{badges.credits} packs</span> : null}
             <NavActions />
           </div>
         </nav>
       </header>
 
       <header
-        className="nav-blur sticky top-0 z-40 flex items-center justify-between gap-3 border-b border-green-900/10 bg-white/80 px-4 py-3 md:hidden"
+        className="nav-blur sticky top-0 z-40 flex items-center justify-between gap-3 border-b border-white/10 bg-green-950/88 px-4 py-3 shadow-lg shadow-green-950/20 md:hidden"
         style={{ paddingTop: "max(0.75rem, env(safe-area-inset-top, 0px))" }}
       >
         <Link href="/" className="shrink-0" aria-label="KMXI home"><BrandLogo variant="nav" /></Link>
         <div className="flex min-w-0 items-center gap-2">
-          <Link href="/suggestions" className="whitespace-nowrap rounded-md bg-green-950/5 px-2 py-1 text-xs font-bold uppercase tracking-wide text-green-900 hover:bg-green-950/10">
+          <Link href="/suggestions" className="whitespace-nowrap rounded-md bg-white/10 px-2 py-1 text-xs font-bold uppercase tracking-wide text-white/80 hover:bg-white/15">
             Ideas
           </Link>
-          <Link href="/rules" className="whitespace-nowrap rounded-md bg-green-950/5 px-2 py-1 text-xs font-bold uppercase tracking-wide text-green-900 hover:bg-green-950/10">
+          <Link href="/rules" className="whitespace-nowrap rounded-md bg-white/10 px-2 py-1 text-xs font-bold uppercase tracking-wide text-white/80 hover:bg-white/15">
             Rules
           </Link>
-          <Link href="/cups" className="whitespace-nowrap rounded-md bg-amber-100 px-2 py-1 text-xs font-bold uppercase tracking-wide text-amber-900 hover:bg-amber-200">
+          <Link href="/cups" className="whitespace-nowrap rounded-md bg-amber-300 px-2 py-1 text-xs font-bold uppercase tracking-wide text-amber-950 hover:bg-amber-200">
             Cups
           </Link>
           {isAdmin ? (
-            <Link href="/admin" className="whitespace-nowrap rounded-md bg-amber-100 px-2 py-1 text-xs font-bold uppercase tracking-wide text-amber-900 hover:bg-amber-200">
+            <Link href="/admin" className="whitespace-nowrap rounded-md bg-amber-300 px-2 py-1 text-xs font-bold uppercase tracking-wide text-amber-950 hover:bg-amber-200">
               Admin
             </Link>
           ) : null}
@@ -97,9 +97,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
 function NavLink({ href, label, badge }: { href: string; label: string; badge?: string }) {
   return (
-    <Link className="relative rounded-md px-3 py-2 hover:bg-green-100" href={href}>
+    <Link className="relative rounded-md px-3 py-2 transition hover:bg-white/10 hover:text-white" href={href}>
       {label}
-      {badge ? <span className="ml-1 rounded-full bg-amber-200 px-1.5 py-0.5 text-[10px] font-black text-amber-950">{badge}</span> : null}
+      {badge ? <span className="ml-1 rounded-full bg-amber-300 px-1.5 py-0.5 text-[10px] font-black text-amber-950">{badge}</span> : null}
     </Link>
   );
 }
@@ -121,7 +121,7 @@ function NewsBanner() {
   if (!news.isActive) return null;
 
   return (
-    <div className="news-reel border-y border-green-900/10 bg-pitch text-white">
+    <div className="news-reel border-y border-white/10 bg-gradient-to-r from-amber-600 via-amber-500 to-green-700 text-white shadow-sm">
       <div className="news-reel-track">
         <NewsReelGroup message={news.message} />
         <NewsReelGroup message={news.message} ariaHidden />

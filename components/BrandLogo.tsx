@@ -25,7 +25,7 @@ export function BrandLogo({ variant = "hero" }: { variant?: "hero" | "nav" }) {
     return (
       <span className="flex items-center gap-2">
         <BrandCrest className="h-7 w-7" />
-        <span className="bg-gradient-to-br from-green-900 via-pitch to-emerald-500 bg-clip-text text-xl font-black tracking-tight text-transparent">KMXI</span>
+        <span className="bg-gradient-to-br from-white via-amber-100 to-emerald-200 bg-clip-text text-xl font-black tracking-tight text-transparent drop-shadow-sm">KMXI</span>
       </span>
     );
   }
@@ -34,8 +34,8 @@ export function BrandLogo({ variant = "hero" }: { variant?: "hero" | "nav" }) {
     <div className="flex items-center gap-2.5 sm:gap-3">
       <BrandCrest className="h-11 w-11 shrink-0 drop-shadow-sm sm:h-14 sm:w-14" />
       <div className="leading-none">
-        <span className="block bg-gradient-to-br from-green-900 via-pitch to-emerald-500 bg-clip-text text-4xl font-black tracking-tight text-transparent sm:text-5xl">KMXI</span>
-        <span className="mt-1 block text-[9px] font-black uppercase tracking-[0.3em] text-green-900/45 sm:mt-1.5 sm:text-[10px] sm:tracking-[0.32em]">World Cup 2026</span>
+        <span className="block bg-gradient-to-br from-white via-amber-100 to-emerald-200 bg-clip-text text-4xl font-black tracking-tight text-transparent drop-shadow-sm sm:text-5xl">KMXI</span>
+        <span className="mt-1 block text-[9px] font-black uppercase tracking-[0.3em] text-white/55 sm:mt-1.5 sm:text-[10px] sm:tracking-[0.32em]">World Cup 2026</span>
       </div>
     </div>
   );

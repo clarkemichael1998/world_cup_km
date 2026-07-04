@@ -4,19 +4,34 @@
 
 :root {
   color-scheme: light;
-  background: #f4f7f2;
+  background: #06140d;
 }
 
 body {
   margin: 0;
   background:
-    linear-gradient(90deg, rgba(20, 83, 45, 0.05) 1px, transparent 1px),
-    linear-gradient(180deg, rgba(20, 83, 45, 0.04) 1px, transparent 1px),
-    #f4f7f2;
-  background-size: 44px 44px;
+    radial-gradient(circle at 12% -8%, rgba(245, 158, 11, 0.28), transparent 30rem),
+    radial-gradient(circle at 92% 2%, rgba(34, 197, 94, 0.22), transparent 28rem),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(180deg, #06140d 0%, #0d2f1c 42%, #f4f1e8 42.1%, #f4f1e8 100%);
+  background-attachment: fixed;
+  background-size: auto, auto, 34px 34px, auto;
   color: #17201a;
   /* prevent horizontal scroll on mobile */
   overflow-x: hidden;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.055) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: linear-gradient(180deg, black 0%, transparent 55%);
+  z-index: -1;
 }
 
 /* Prevent iOS input zoom — inputs must be at least 16px */
@@ -37,6 +52,36 @@ button {
 .nav-blur {
   -webkit-backdrop-filter: blur(12px);
   backdrop-filter: blur(12px);
+}
+
+.premium-page-title {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.premium-page-title::before,
+.premium-page-title::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+}
+
+.premium-page-title::before {
+  inset: -45%;
+  background:
+    radial-gradient(circle at 25% 20%, rgba(255, 255, 255, 0.22), transparent 18%),
+    conic-gradient(from 150deg, rgba(255, 255, 255, 0), rgba(245, 158, 11, 0.32), rgba(34, 197, 94, 0.32), rgba(255, 255, 255, 0));
+  opacity: 0.75;
+  z-index: -1;
+}
+
+.premium-page-title::after {
+  inset: 0;
+  background:
+    linear-gradient(115deg, transparent 0 30%, rgba(255, 255, 255, 0.18) 42%, rgba(245, 158, 11, 0.14) 49%, transparent 62%);
+  opacity: 0.9;
+  z-index: -1;
 }
 
 .news-reel {

@@ -104,11 +104,11 @@ export function MobileNav() {
         <div className="fixed inset-0 z-50 md:hidden" onClick={() => setMoreOpen(false)}>
           <div className="absolute inset-0 bg-green-950/30 backdrop-blur-sm" />
           <div
-            className="absolute bottom-16 left-0 right-0 rounded-t-2xl border-t border-green-900/10 bg-white p-4 shadow-2xl"
+            className="absolute bottom-16 left-0 right-0 rounded-t-2xl border-t border-white/10 bg-green-950 p-4 text-white shadow-2xl"
             style={{ paddingBottom: "calc(1rem + env(safe-area-inset-bottom, 0px))" }}
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-green-950/15" />
+            <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-white/20" />
             <div className="grid grid-cols-3 gap-2">
               {moreLinks.map((link) => {
                 const active = pathname === link.href || pathname.startsWith(link.href + "/");
@@ -118,7 +118,7 @@ export function MobileNav() {
                     href={link.href}
                     onClick={() => setMoreOpen(false)}
                     className={`flex flex-col items-center gap-1 rounded-lg border px-2 py-3 text-center text-[11px] font-black transition ${
-                      active ? "border-pitch bg-pitch text-white" : "border-green-900/10 bg-green-950/5 text-green-950 hover:bg-green-950/10"
+                      active ? "border-amber-300 bg-amber-300 text-amber-950" : "border-white/10 bg-white/10 text-white/75 hover:bg-white/15 hover:text-white"
                     }`}
                   >
                     <span className="text-lg">{link.emoji}</span>
@@ -132,7 +132,7 @@ export function MobileNav() {
       ) : null}
 
       <nav
-        className="fixed bottom-0 left-0 right-0 z-50 border-t border-green-900/10 bg-white/95 backdrop-blur md:hidden"
+        className="fixed bottom-0 left-0 right-0 z-50 border-t border-white/10 bg-green-950/95 text-white backdrop-blur md:hidden"
         style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
       >
         <div className="grid grid-cols-6">
@@ -144,12 +144,12 @@ export function MobileNav() {
                 href={tab.href}
                 onClick={() => setMoreOpen(false)}
                 className={`flex flex-col items-center gap-0.5 px-1 py-2.5 text-[9px] font-black uppercase tracking-wide transition-colors ${
-                  active ? "text-pitch" : "text-green-900/50"
+                  active ? "text-amber-200" : "text-white/45"
                 }`}
               >
-                <span className={`relative ${active ? "text-pitch" : "text-green-900/40"}`}>
+                <span className={`relative ${active ? "text-amber-200" : "text-white/40"}`}>
                   {tab.icon}
-                  {tab.href === "/" && hasUnread ? <span className="absolute -right-1 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-boot" /> : null}
+                  {tab.href === "/" && hasUnread ? <span className="absolute -right-1 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-green-950 bg-boot" /> : null}
                 </span>
                 {tab.label}
               </Link>
@@ -159,11 +159,11 @@ export function MobileNav() {
             type="button"
             onClick={() => setMoreOpen((v) => !v)}
             className={`flex flex-col items-center gap-0.5 px-1 py-2.5 text-[9px] font-black uppercase tracking-wide transition-colors ${
-              moreOpen || moreActive ? "text-pitch" : "text-green-900/50"
+              moreOpen || moreActive ? "text-amber-200" : "text-white/45"
             }`}
             aria-expanded={moreOpen}
           >
-            <span className={moreOpen || moreActive ? "text-pitch" : "text-green-900/40"}>{icons.more}</span>
+            <span className={moreOpen || moreActive ? "text-amber-200" : "text-white/40"}>{icons.more}</span>
             More
           </button>
         </div>

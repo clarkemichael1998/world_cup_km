@@ -4,10 +4,10 @@ export type ButtonVariant = "primary" | "accent" | "danger" | "outline" | "ghost
 export type ButtonSize = "sm" | "md" | "lg";
 
 const VARIANTS: Record<ButtonVariant, string> = {
-  primary: "bg-pitch text-white hover:bg-green-800",
-  accent: "bg-amber-600 text-white hover:bg-amber-700",
+  primary: "bg-gradient-to-r from-green-950 via-green-800 to-amber-700 text-white shadow-sm hover:from-green-900 hover:to-amber-600",
+  accent: "bg-amber-400 text-amber-950 shadow-sm hover:bg-amber-300",
   danger: "bg-boot text-white hover:bg-red-700",
-  outline: "border border-green-900/15 bg-white text-green-950 hover:bg-green-50",
+  outline: "border border-green-900/15 bg-white/85 text-green-950 shadow-sm hover:bg-white",
   ghost: "bg-green-950/10 text-green-950 hover:bg-green-950/15"
 };
 
