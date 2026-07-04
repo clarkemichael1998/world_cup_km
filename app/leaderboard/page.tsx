@@ -83,7 +83,7 @@ export default function LeaderboardPage() {
               <button
                 key={key}
                 onClick={() => setSort(key)}
-                className={`rounded-md px-3 py-1.5 text-xs font-black transition ${sort === key ? "bg-green-950 text-white" : "bg-green-950/5 text-green-950 hover:bg-green-950/10"}`}
+                className={`rounded-md px-3 py-1.5 text-xs font-black transition ${sort === key ? "bg-white text-green-950 shadow-sm" : "bg-white/10 text-white/80 hover:bg-white/15"}`}
               >
                 {METRICS[key].label}
               </button>
@@ -160,12 +160,12 @@ function MatchdayView({ matchdays, loading }: { matchdays: Matchday[]; loading: 
 
   return (
     <div>
-      <div className="mb-3 space-y-1.5 rounded-lg border border-green-900/10 bg-green-950/5 p-3 text-xs font-bold text-green-900/70">
+      <div className="mb-3 space-y-1.5 rounded-lg border border-white/10 bg-white/8 p-3 text-xs font-bold text-white/70">
         {hasLive ? (
           <p>
-            From today onward — same formula as a cup match: <span className="text-green-950">Activity points</span> (1 per activity credit logged, capped at 40) +{" "}
-            <span className="text-green-950">Football points</span> (+2 per locked player whose nation won, plus goal/assist boost amounts, capped at 40) ={" "}
-            <span className="text-green-950">Total</span>. Tied totals are broken by whoever logged more uncapped activity that day.
+            From today onward — same formula as a cup match: <span className="text-white">Activity points</span> (1 per activity credit logged, capped at 40) +{" "}
+            <span className="text-white">Football points</span> (+2 per locked player whose nation won, plus goal/assist boost amounts, capped at 40) ={" "}
+            <span className="text-white">Total</span>. Tied totals are broken by whoever logged more uncapped activity that day.
           </p>
         ) : null}
         {hasLegacy ? (

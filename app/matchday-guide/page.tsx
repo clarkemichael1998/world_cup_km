@@ -79,8 +79,8 @@ export default function MatchdayGuidePage() {
           </ul>
         </Step>
 
-        <section className="rounded-lg border border-green-900/10 bg-green-950/5 p-5">
-          <p className="text-sm font-bold uppercase tracking-wide text-green-900/60">Quick reference</p>
+        <section className="rounded-lg border border-white/10 bg-white/8 p-5">
+          <p className="text-sm font-bold uppercase tracking-wide text-white/70">Quick reference</p>
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
             <Ref label="Formation" value="4-3-3 (GK · 4 DF · 3 MF · 3 FW)" />
             <Ref label="Lock time" value="3:00 PM UK daily" />
@@ -100,8 +100,8 @@ export default function MatchdayGuidePage() {
         </section>
       </div>
 
-      <p className="mt-8 text-center text-sm font-semibold text-green-900/55">
-        Want the whole picture? See the full <Link href="/rules" className="font-black text-pitch underline">Rules</Link>.
+      <p className="mt-8 text-center text-sm font-semibold text-white/55">
+        Want the whole picture? See the full <Link href="/rules" className="font-black text-amber-400 underline">Rules</Link>.
       </p>
     </div>
   );
