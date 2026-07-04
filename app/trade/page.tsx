@@ -2,7 +2,6 @@
 
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
-import { Button } from "@/components/Button";
 import { PageTitle } from "@/components/PageTitle";
 import { flagUrl } from "@/lib/flags";
 import { basePlayerPool, loadPlayerPool } from "@/lib/playerPool";
@@ -30,22 +29,31 @@ type NationProgress = { nation: string; total: number; owned: number; missing: P
 
 const COLLECTION_BOOST = 3;
 
-const rarityRing: Record<string, string> = {
-  icon: "ring-zinc-400 bg-gradient-to-br from-zinc-50 to-zinc-200",
-  legend: "ring-amber-400 bg-gradient-to-br from-amber-50 to-amber-200",
-  epic: "ring-fuchsia-400 bg-gradient-to-br from-fuchsia-50 to-fuchsia-200",
-  rare: "ring-sky-400 bg-gradient-to-br from-sky-50 to-sky-200",
-  common: "ring-slate-300 bg-gradient-to-br from-slate-50 to-slate-200",
-  clowns: "ring-red-400 bg-gradient-to-br from-red-50 to-red-200"
+const RARITY_COLOUR: Record<string, string> = {
+  icon: "text-zinc-300",
+  legend: "text-amber-300",
+  epic: "text-fuchsia-300",
+  rare: "text-sky-300",
+  common: "text-white/55",
+  clowns: "text-red-300"
 };
 
-const rarityBadge: Record<string, string> = {
-  icon: "bg-zinc-800 text-white",
-  legend: "bg-amber-500 text-amber-950",
-  epic: "bg-fuchsia-600 text-white",
-  rare: "bg-sky-500 text-white",
-  common: "bg-slate-400 text-white",
-  clowns: "bg-red-500 text-white"
+const RARITY_RING: Record<string, string> = {
+  icon: "ring-zinc-400/60 bg-zinc-900/60",
+  legend: "ring-amber-400/60 bg-amber-900/40",
+  epic: "ring-fuchsia-400/60 bg-fuchsia-900/40",
+  rare: "ring-sky-400/60 bg-sky-900/40",
+  common: "ring-white/20 bg-white/8",
+  clowns: "ring-red-400/60 bg-red-900/40"
+};
+
+const RARITY_ACCENT: Record<string, string> = {
+  icon: "border-zinc-400/25 bg-zinc-400/8",
+  legend: "border-amber-400/25 bg-amber-400/8",
+  epic: "border-fuchsia-400/25 bg-fuchsia-400/8",
+  rare: "border-sky-400/25 bg-sky-400/8",
+  common: "border-white/15 bg-white/5",
+  clowns: "border-red-400/25 bg-red-400/8"
 };
 
 export default function TradePage() {
@@ -99,16 +107,16 @@ export default function TradePage() {
     }
   }
 
-  const playerById = useMemo(() => new Map(playerPool.map((player) => [player.id, player])), [playerPool]);
+  const playerById = useMemo(() => new Map(playerPool.map((p) => [p.id, p])), [playerPool]);
   const ownedIds = useMemo(() => new Set(state?.ownedPlayerIds ?? []), [state]);
-  const collectionPlayers = useMemo(() => playerPool.filter((player) => !player.cupId), [playerPool]);
+  const collectionPlayers = useMemo(() => playerPool.filter((p) => !p.cupId), [playerPool]);
 
   const myDuplicates = useMemo(
     () =>
       Object.entries(state?.duplicateCounts ?? {})
         .filter(([, count]) => (count ?? 0) > 0)
         .map(([id]) => playerById.get(Number(id)))
-        .filter((player): player is Player => Boolean(player))
+        .filter((p): p is Player => Boolean(p))
         .sort((a, b) => b.rating - a.rating || a.name.localeCompare(b.name)),
     [state, playerById]
   );
@@ -122,29 +130,29 @@ export default function TradePage() {
     }
     return [...byNation.entries()]
       .map(([nation, players]) => {
-        const missing = players.filter((player) => !ownedIds.has(player.id)).sort((a, b) => b.rating - a.rating || a.name.localeCompare(b.name));
+        const missing = players.filter((p) => !ownedIds.has(p.id)).sort((a, b) => b.rating - a.rating || a.name.localeCompare(b.name));
         const owned = players.length - missing.length;
         return { nation, total: players.length, owned, missing, percent: Math.round((owned / players.length) * 100) };
       })
       .sort((a, b) => a.missing.length - b.missing.length || b.percent - a.percent || a.nation.localeCompare(b.nation));
   }, [collectionPlayers, ownedIds]);
 
-  const progressByNation = useMemo(() => new Map(nationProgress.map((progress) => [progress.nation, progress])), [nationProgress]);
-  const missingTargets = nationProgress.filter((progress) => progress.missing.length > 0).slice(0, 6);
-  const completedNations = nationProgress.filter((progress) => progress.missing.length === 0).length;
+  const progressByNation = useMemo(() => new Map(nationProgress.map((p) => [p.nation, p])), [nationProgress]);
+  const missingTargets = nationProgress.filter((p) => p.missing.length > 0).slice(0, 6);
+  const completedNations = nationProgress.filter((p) => p.missing.length === 0).length;
 
   const recommendedMarket = useMemo(() => {
     return market
       .filter((entry) => !ownedIds.has(entry.playerId))
       .sort((a, b) => {
-        const aPlayer = playerById.get(a.playerId);
-        const bPlayer = playerById.get(b.playerId);
-        const aProgress = aPlayer ? progressByNation.get(aPlayer.nation) : undefined;
-        const bProgress = bPlayer ? progressByNation.get(bPlayer.nation) : undefined;
+        const aP = playerById.get(a.playerId);
+        const bP = playerById.get(b.playerId);
+        const aProg = aP ? progressByNation.get(aP.nation) : undefined;
+        const bProg = bP ? progressByNation.get(bP.nation) : undefined;
         return (
-          Number(bProgress?.missing.length === 1) - Number(aProgress?.missing.length === 1) ||
-          (aProgress?.missing.length ?? 999) - (bProgress?.missing.length ?? 999) ||
-          (bPlayer?.rating ?? 0) - (aPlayer?.rating ?? 0)
+          Number(bProg?.missing.length === 1) - Number(aProg?.missing.length === 1) ||
+          (aProg?.missing.length ?? 999) - (bProg?.missing.length ?? 999) ||
+          (bP?.rating ?? 0) - (aP?.rating ?? 0)
         );
       });
   }, [market, ownedIds, playerById, progressByNation]);
@@ -153,9 +161,9 @@ export default function TradePage() {
     return market
       .filter((entry) => !ownedIds.has(entry.playerId))
       .sort((a, b) => {
-        const aPlayer = playerById.get(a.playerId);
-        const bPlayer = playerById.get(b.playerId);
-        return (bPlayer?.rating ?? 0) - (aPlayer?.rating ?? 0) || (b.duplicateCount ?? 0) - (a.duplicateCount ?? 0);
+        const aP = playerById.get(a.playerId);
+        const bP = playerById.get(b.playerId);
+        return (bP?.rating ?? 0) - (aP?.rating ?? 0) || (b.duplicateCount ?? 0) - (a.duplicateCount ?? 0);
       });
   }, [market, ownedIds, playerById]);
 
@@ -165,48 +173,116 @@ export default function TradePage() {
     if (!query) return market;
     return market.filter((entry) => {
       const player = playerById.get(entry.playerId);
-      return [entry.username, player?.name, player?.nation, player?.rarity].some((value) => value?.toLowerCase().includes(query));
+      return [entry.username, player?.name, player?.nation, player?.rarity].some((v) => v?.toLowerCase().includes(query));
     });
   }, [market, playerById, search]);
 
-  const incoming = proposals.filter((proposal) => proposal.isIncoming);
-  const outgoing = proposals.filter((proposal) => proposal.isMine);
+  const incoming = proposals.filter((p) => p.isIncoming);
+  const outgoing = proposals.filter((p) => p.isMine);
+
+  const sharedProps = {
+    playerById,
+    ownedIds,
+    duplicateCounts: state?.duplicateCounts ?? {},
+    myDuplicates,
+    offerSelections,
+    setOfferSelections,
+    progressByNation,
+    tradeBusy,
+    tradeAction
+  };
 
   return (
     <div>
       <PageTitle title="Trading Hub" subtitle="Every duplicate is automatically available. Send a one-for-one proposal that expires after 24 hours." />
 
-      {tradeNotice ? <p className="mb-4 rounded-md bg-amber-100 px-3 py-2 text-sm font-black text-amber-900">{tradeNotice}</p> : null}
+      {tradeNotice ? (
+        <p className="mb-4 rounded-xl bg-amber-400/15 px-4 py-3 text-sm font-black text-amber-200 ring-1 ring-amber-400/25">{tradeNotice}</p>
+      ) : null}
 
+      {/* Persistent tab navigation */}
+      <nav className="mb-5 flex gap-1 overflow-x-auto rounded-xl bg-white/5 p-1 ring-1 ring-white/10">
+        <TabButton active={activeView === "home"} onClick={() => setActiveView("home")}>
+          Home
+        </TabButton>
+        <TabButton active={activeView === "recommended"} onClick={() => setActiveView("recommended")}>
+          Best Swaps
+          {recommendedMarket.length > 0 ? (
+            <span className="ml-1.5 rounded-full bg-white/15 px-1.5 py-0.5 text-[9px] font-black tabular-nums">{recommendedMarket.length}</span>
+          ) : null}
+        </TabButton>
+        <TabButton active={activeView === "proposals"} onClick={() => setActiveView("proposals")}>
+          Proposals
+          {incoming.length > 0 ? (
+            <span className="ml-1.5 rounded-full bg-amber-400/30 px-1.5 py-0.5 text-[9px] font-black text-amber-200 tabular-nums">{incoming.length}</span>
+          ) : null}
+        </TabButton>
+        <TabButton active={activeView === "teams"} onClick={() => setActiveView("teams")}>
+          Finish Team
+        </TabButton>
+        <TabButton active={activeView === "market"} onClick={() => setActiveView("market")}>
+          All Cards
+        </TabButton>
+      </nav>
+
+      {/* ── HOME ─────────────────────────────────────────────── */}
       {activeView === "home" ? (
         <>
-          <section className="mb-5 overflow-hidden rounded-2xl border border-green-900/10 bg-gradient-to-br from-green-950 via-green-900 to-amber-700 p-5 text-white shadow-sm">
-            <p className="text-xs font-black uppercase tracking-[0.2em] text-white/65">Trading is automatic now</p>
-            <h2 className="mt-2 max-w-2xl text-2xl font-black sm:text-3xl">Pick a card you want, choose the duplicate you give back.</h2>
-            <p className="mt-2 max-w-2xl text-sm font-semibold text-white/75">
-              No listing needed. Proposed swaps are active for one day, then auto-rejected.
-            </p>
-            <div className="mt-4 grid gap-2 sm:grid-cols-4">
-              <MiniStat label="Useful cards" value={recommendedMarket.length} />
-              <MiniStat label="My duplicates" value={myDuplicates.length} />
-              <MiniStat label="Incoming" value={incoming.length} />
-              <MiniStat label="Teams done" value={completedNations} />
+          <section className="mb-5 overflow-hidden rounded-2xl bg-gradient-to-br from-green-950 via-green-900 to-amber-800 p-5 text-white ring-1 ring-white/10">
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/50">Overview</p>
+            <h2 className="mt-1 text-2xl font-black sm:text-3xl">
+              Pick a card you want.<br />Choose the duplicate you give back.
+            </h2>
+            <p className="mt-2 text-sm font-semibold text-white/65">No listing needed. Proposed swaps auto-expire after 24 hours.</p>
+            <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <HeroStat label="Useful cards" value={recommendedMarket.length} />
+              <HeroStat label="My duplicates" value={myDuplicates.length} />
+              <HeroStat label="Incoming" value={incoming.length} accent={incoming.length > 0} />
+              <HeroStat label="Teams done" value={completedNations} />
             </div>
           </section>
 
-          <div className="grid gap-3 md:grid-cols-2">
-            <ActionCard title="Best swaps for me" text="Cards on the market that you do not own yet." meta={`${recommendedMarket.length} useful cards`} tone="green" onClick={() => setActiveView("recommended")} />
-            <ActionCard title="Proposals" text="Accept incoming swaps or withdraw your outgoing ones." meta={`${incoming.length} incoming, ${outgoing.length} sent`} tone="amber" onClick={() => setActiveView("proposals")} />
-            <ActionCard title="Finish a team" text={`Target the closest nations for the +${COLLECTION_BOOST} boost.`} meta={`${missingTargets.length} close teams`} tone="white" onClick={() => setActiveView("teams")} />
-            <ActionCard title="Full market" text="Search every duplicate currently available." meta={`${market.length} duplicate cards`} tone="white" onClick={() => setActiveView("market")} />
+          <div className="grid gap-3 sm:grid-cols-2">
+            <QuickCard
+              icon="⚡"
+              title="Best swaps for me"
+              desc="Cards you don't own yet, ranked by how close they get you to a full nation."
+              badge={`${recommendedMarket.length} useful`}
+              accent="green"
+              onClick={() => setActiveView("recommended")}
+            />
+            <QuickCard
+              icon="🔔"
+              title="Proposals"
+              desc="Accept, reject, or withdraw one-for-one swap proposals."
+              badge={incoming.length > 0 ? `${incoming.length} incoming` : "None pending"}
+              accent={incoming.length > 0 ? "amber" : "neutral"}
+              onClick={() => setActiveView("proposals")}
+            />
+            <QuickCard
+              icon="🏳"
+              title="Finish a team"
+              desc={`Complete a nation for +${COLLECTION_BOOST} rating on all its players.`}
+              badge={`${missingTargets.length} close teams`}
+              accent="neutral"
+              onClick={() => setActiveView("teams")}
+            />
+            <QuickCard
+              icon="🗂"
+              title="Full market"
+              desc="Browse every duplicate card currently available from all players."
+              badge={`${market.length} cards`}
+              accent="neutral"
+              onClick={() => setActiveView("market")}
+            />
           </div>
 
           {recentTrades.length > 0 ? (
-            <section className="premium-card mt-5 rounded-2xl p-4">
-              <SectionHeader title="Latest Swaps" text="Recently completed one-for-one trades." />
-              <div className="mt-3 space-y-2">
-                {recentTrades.slice(0, 3).map((trade, index) => (
-                  <RecentTradeRow key={index} trade={trade} playerById={playerById} />
+            <section className="mt-5 rounded-2xl bg-white/5 p-4 ring-1 ring-white/10">
+              <p className="mb-3 text-xs font-black uppercase tracking-widest text-white/40">Latest Swaps</p>
+              <div className="space-y-2">
+                {recentTrades.slice(0, 3).map((trade, i) => (
+                  <RecentTradeRow key={i} trade={trade} playerById={playerById} />
                 ))}
               </div>
             </section>
@@ -214,146 +290,155 @@ export default function TradePage() {
         </>
       ) : null}
 
-      {activeView !== "home" ? (
-        <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
-          <button
-            type="button"
-            onClick={() => setActiveView("home")}
-            className="flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-black text-white/70 transition hover:bg-white/15 hover:text-white"
-          >
-            ← Back
-          </button>
-          {activeView !== "market" ? (
-            <button type="button" onClick={() => setActiveView("market")} className="text-xs font-black text-white/40 underline hover:text-white/60">
-              Full market
-            </button>
-          ) : null}
-        </div>
-      ) : null}
-
+      {/* ── BEST SWAPS ───────────────────────────────────────── */}
       {activeView === "recommended" ? (
-        <section className="premium-card rounded-2xl p-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <SectionHeader
-              title="Best Swaps For Me"
-              text={bestSwapMode === "collections" ? "Cards that get you closest to completing teams and unlocking boosts." : "Highest-rated available cards you do not own yet."}
-            />
-            <div className="inline-flex rounded-full bg-green-950/10 p-1">
+        <section>
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-xs font-black uppercase tracking-widest text-white/45">Best Swaps For Me</p>
+              <p className="mt-1 text-sm font-semibold text-white/55">
+                {bestSwapMode === "collections"
+                  ? "Cards that complete teams and unlock boosts."
+                  : "Highest-rated cards you don't own yet."}
+              </p>
+            </div>
+            <div className="inline-flex gap-1 rounded-xl bg-white/6 p-1 ring-1 ring-white/10">
               <ModeButton active={bestSwapMode === "collections"} onClick={() => setBestSwapMode("collections")}>
                 Complete teams
               </ModeButton>
               <ModeButton active={bestSwapMode === "ranking"} onClick={() => setBestSwapMode("ranking")}>
-                Top ranked
+                Top rated
               </ModeButton>
             </div>
           </div>
-          <BestSwapShowcase entries={activeBestSwaps.slice(0, 3)} playerById={playerById} progressByNation={progressByNation} mode={bestSwapMode} />
-          <MarketList
-            entries={activeBestSwaps}
-            playerById={playerById}
-            ownedIds={ownedIds}
-            duplicateCounts={state?.duplicateCounts ?? {}}
-            myDuplicates={myDuplicates}
-            offerSelections={offerSelections}
-            setOfferSelections={setOfferSelections}
-            progressByNation={progressByNation}
-            tradeBusy={tradeBusy}
-            tradeAction={tradeAction}
-            emptyText="No available duplicate currently improves your collection."
-          />
+          <Showcase entries={activeBestSwaps.slice(0, 3)} playerById={playerById} progressByNation={progressByNation} mode={bestSwapMode} />
+          <MarketList entries={activeBestSwaps} emptyText="No available duplicate currently improves your collection." {...sharedProps} />
         </section>
       ) : null}
 
+      {/* ── PROPOSALS ───────────────────────────────────────── */}
       {activeView === "proposals" ? (
         <section>
-          <div className="mb-5">
+          <div className="mb-4">
             <p className="text-xs font-black uppercase tracking-widest text-white/45">Proposed Trades</p>
-            <p className="mt-1 text-sm font-semibold text-white/55">Incoming proposals can be accepted or rejected. Your sent proposals can be withdrawn.</p>
+            <p className="mt-1 text-sm font-semibold text-white/55">
+              Incoming proposals can be accepted or rejected. Your sent proposals can be withdrawn.
+            </p>
           </div>
           <div className="grid gap-5 lg:grid-cols-2">
             <ProposalColumn title="Incoming" count={incoming.length} emptyText="No one has proposed a swap to you yet.">
-              {incoming.map((proposal) => (
-                <ProposalCard key={proposal.id} proposal={proposal} playerById={playerById} tradeBusy={tradeBusy} tradeAction={tradeAction} />
+              {incoming.map((p) => (
+                <ProposalCard key={p.id} proposal={p} playerById={playerById} tradeBusy={tradeBusy} tradeAction={tradeAction} />
               ))}
             </ProposalColumn>
-            <ProposalColumn title="Sent" count={outgoing.length} emptyText="You have not sent any active proposals.">
-              {outgoing.map((proposal) => (
-                <ProposalCard key={proposal.id} proposal={proposal} playerById={playerById} tradeBusy={tradeBusy} tradeAction={tradeAction} />
+            <ProposalColumn title="Sent" count={outgoing.length} emptyText="You haven't sent any active proposals.">
+              {outgoing.map((p) => (
+                <ProposalCard key={p.id} proposal={p} playerById={playerById} tradeBusy={tradeBusy} tradeAction={tradeAction} />
               ))}
             </ProposalColumn>
           </div>
         </section>
       ) : null}
 
+      {/* ── FINISH A TEAM ────────────────────────────────────── */}
       {activeView === "teams" ? (
         <section>
-          <div className="mb-5">
+          <div className="mb-4">
             <p className="text-xs font-black uppercase tracking-widest text-white/45">Finish A Team</p>
-            <p className="mt-1 text-sm font-semibold text-white/55">Complete any nation to unlock a <span className="font-black text-amber-300">+{COLLECTION_BOOST}</span> rating boost on all of its players.</p>
+            <p className="mt-1 text-sm font-semibold text-white/55">
+              Complete any nation to unlock a <span className="font-black text-amber-300">+{COLLECTION_BOOST}</span> rating boost on all its players.
+            </p>
           </div>
           <div className="grid gap-3 lg:grid-cols-2">
             {missingTargets.map((progress) => (
-              <NationTargetCard
-                key={progress.nation}
-                progress={progress}
-                market={market}
-                playerById={playerById}
-                ownedIds={ownedIds}
-                duplicateCounts={state?.duplicateCounts ?? {}}
-                myDuplicates={myDuplicates}
-                offerSelections={offerSelections}
-                setOfferSelections={setOfferSelections}
-                progressByNation={progressByNation}
-                tradeBusy={tradeBusy}
-                tradeAction={tradeAction}
-              />
+              <NationTargetCard key={progress.nation} progress={progress} market={market} {...sharedProps} />
             ))}
           </div>
         </section>
       ) : null}
 
+      {/* ── FULL MARKET ─────────────────────────────────────── */}
       {activeView === "market" ? (
-        <section className="premium-card rounded-2xl p-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-            <SectionHeader title="Full Duplicate Market" text="Every spare card is automatically available here." />
+        <section>
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-xs font-black uppercase tracking-widest text-white/45">Full Duplicate Market</p>
+              <p className="mt-1 text-sm font-semibold text-white/55">Every spare card is automatically listed here.</p>
+            </div>
             <input
-              className="rounded-md border border-green-900/15 bg-white px-3 py-2 text-sm font-bold text-green-950 placeholder:text-green-900/35"
-              placeholder="Search player, nation, rarity, user..."
+              className="rounded-xl border border-white/12 bg-white/8 px-3 py-2 text-sm font-semibold text-white placeholder:text-white/30 focus:border-amber-400/50 focus:outline-none focus:ring-1 focus:ring-amber-400/25 sm:w-64"
+              placeholder="Player, nation, rarity, user…"
               value={search}
-              onChange={(event) => setSearch(event.target.value)}
+              onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-          <MarketList
-            entries={visibleMarket}
-            playerById={playerById}
-            ownedIds={ownedIds}
-            duplicateCounts={state?.duplicateCounts ?? {}}
-            myDuplicates={myDuplicates}
-            offerSelections={offerSelections}
-            setOfferSelections={setOfferSelections}
-            progressByNation={progressByNation}
-            tradeBusy={tradeBusy}
-            tradeAction={tradeAction}
-            emptyText="No matching duplicates are available right now."
-          />
+          <MarketList entries={visibleMarket} emptyText="No matching duplicates are available right now." {...sharedProps} />
         </section>
       ) : null}
     </div>
   );
 }
 
+// ── Tab navigation ────────────────────────────────────────────
+
+function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex shrink-0 items-center whitespace-nowrap rounded-lg px-3 py-2 text-xs font-black transition ${
+        active ? "bg-white text-green-950 shadow-sm" : "text-white/55 hover:bg-white/8 hover:text-white/80"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+// ── Home helpers ──────────────────────────────────────────────
+
+function HeroStat({ label, value, accent }: { label: string; value: number; accent?: boolean }) {
+  return (
+    <div className={`rounded-xl px-3 py-2.5 ring-1 ${accent ? "bg-amber-400/15 ring-amber-400/30" : "bg-white/10 ring-white/15"}`}>
+      <p className={`text-xl font-black tabular-nums leading-none ${accent ? "text-amber-200" : ""}`}>{value}</p>
+      <p className="mt-1 text-[10px] font-black uppercase tracking-wide text-white/50">{label}</p>
+    </div>
+  );
+}
+
+function QuickCard({
+  icon, title, desc, badge, accent, onClick
+}: {
+  icon: string; title: string; desc: string; badge: string;
+  accent: "green" | "amber" | "neutral"; onClick: () => void;
+}) {
+  const card = {
+    green: "border-green-500/25 bg-green-500/8 hover:bg-green-500/12",
+    amber: "border-amber-400/30 bg-amber-400/10 hover:bg-amber-400/15",
+    neutral: "border-white/10 bg-white/5 hover:bg-white/8"
+  }[accent];
+  const badgeCls = {
+    green: "bg-green-500/20 text-green-300",
+    amber: "bg-amber-400/20 text-amber-300",
+    neutral: "bg-white/10 text-white/40"
+  }[accent];
+  return (
+    <button type="button" onClick={onClick} className={`rounded-2xl border p-5 text-left transition ${card}`}>
+      <div className="flex items-start justify-between gap-3">
+        <span className="text-2xl leading-none">{icon}</span>
+        <span className={`rounded-full px-2.5 py-1 text-[10px] font-black ${badgeCls}`}>{badge}</span>
+      </div>
+      <p className="mt-3 text-base font-black text-white">{title}</p>
+      <p className="mt-1 text-sm font-semibold text-white/50">{desc}</p>
+    </button>
+  );
+}
+
+// ── Market ────────────────────────────────────────────────────
+
 function MarketList({
-  entries,
-  playerById,
-  ownedIds,
-  duplicateCounts,
-  myDuplicates,
-  offerSelections,
-  setOfferSelections,
-  progressByNation,
-  tradeBusy,
-  tradeAction,
-  emptyText
+  entries, playerById, ownedIds, duplicateCounts, myDuplicates, offerSelections, setOfferSelections,
+  progressByNation, tradeBusy, tradeAction, emptyText
 }: {
   entries: MarketEntry[];
   playerById: Map<number, Player>;
@@ -367,8 +452,13 @@ function MarketList({
   tradeAction: (body: Record<string, unknown>, successNotice: string) => Promise<void>;
   emptyText: string;
 }) {
-  if (entries.length === 0) return <p className="mt-3 text-sm font-semibold text-green-900/55">{emptyText}</p>;
-
+  if (entries.length === 0) {
+    return (
+      <div className="mt-3 rounded-xl border border-white/8 bg-white/4 p-6 text-center text-sm font-semibold text-white/35">
+        {emptyText}
+      </div>
+    );
+  }
   return (
     <div className="mt-3 grid gap-3 xl:grid-cols-2">
       {entries.map((entry) => (
@@ -390,63 +480,9 @@ function MarketList({
   );
 }
 
-function BestSwapShowcase({
-  entries,
-  playerById,
-  progressByNation,
-  mode
-}: {
-  entries: MarketEntry[];
-  playerById: Map<number, Player>;
-  progressByNation: Map<string, NationProgress>;
-  mode: BestSwapMode;
-}) {
-  if (entries.length === 0) return null;
-
-  return (
-    <div className="mt-4 grid gap-3 md:grid-cols-3">
-      {entries.map((entry, index) => {
-        const player = playerById.get(entry.playerId);
-        const progress = player ? progressByNation.get(player.nation) : undefined;
-        const helper =
-          mode === "collections"
-            ? progress?.missing.length === 1
-              ? `Completes ${player?.nation}`
-              : `${player?.nation ?? "Team"}: ${progress?.owned ?? 0}/${progress?.total ?? 0}`
-            : `${player?.rating ?? "-"} rated ${player?.rarity ?? "card"}`;
-
-        return (
-          <div key={`${entry.userId}:${entry.playerId}:showcase`} className="overflow-hidden rounded-2xl border border-green-900/10 bg-gradient-to-br from-green-950 to-green-800 p-4 text-white shadow-sm">
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/50">#{index + 1} target</p>
-            <div className="mt-3 flex items-center justify-between gap-3">
-              <div className={`flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-xl ring-2 ${rarityRing[player?.rarity ?? "common"] ?? rarityRing.common}`}>
-                <span className="text-lg font-black leading-none text-green-950">{player?.rating ?? "-"}</span>
-                <span className="text-[8px] font-black uppercase leading-none text-green-950/70">{player?.pos ?? ""}</span>
-              </div>
-              <div className="min-w-0 flex-1 text-right">
-                <p className="truncate text-sm font-black">{player?.name ?? `Player ${entry.playerId}`}</p>
-                <p className="mt-1 text-xs font-bold text-white/65">{helper}</p>
-                <p className="mt-1 text-[10px] font-black uppercase tracking-wide text-amber-200">{entry.username} has spare x{entry.duplicateCount}</p>
-              </div>
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 function MarketCard({
-  entry,
-  playerById,
-  ownedIds,
-  duplicateCounts,
-  myDuplicates,
-  offerSelections,
-  setOfferSelections,
-  progressByNation,
-  tradeBusy,
-  tradeAction
+  entry, playerById, ownedIds, duplicateCounts, myDuplicates, offerSelections, setOfferSelections,
+  progressByNation, tradeBusy, tradeAction
 }: {
   entry: MarketEntry;
   playerById: Map<number, Player>;
@@ -463,58 +499,126 @@ function MarketCard({
   const progress = player ? progressByNation.get(player.nation) : undefined;
   const key = `${entry.userId}:${entry.playerId}`;
   const selectedPlayerId = offerSelections[key];
-  const matchingDuplicates = myDuplicates.filter((duplicate) => duplicate.id !== entry.playerId && duplicate.rarity === player?.rarity);
-  const blockedByStatus = Boolean(player) && matchingDuplicates.length === 0;
+  const alreadyOwned = ownedIds.has(entry.playerId);
+  const matchingDuplicates = myDuplicates.filter((d) => d.id !== entry.playerId && d.rarity === player?.rarity);
+  const rarity = player?.rarity ?? "common";
+  const flag = flagUrl(player?.nation ?? "");
 
   return (
-    <div className="rounded-xl border border-green-900/10 bg-green-950/[0.03] p-3">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <StickerCard player={player} fallbackId={entry.playerId} label={`${entry.username} has spare`} />
-        <div className="flex flex-wrap justify-end gap-1.5">
-          <Badge tone={ownedIds.has(entry.playerId) ? "muted" : "good"}>{ownedIds.has(entry.playerId) ? "Already owned" : "You need this"}</Badge>
-          {progress?.missing.length === 1 ? <Badge tone="gold">Completes {player?.nation}</Badge> : null}
-          {player ? <Badge tone="muted">{player.rarity} only</Badge> : null}
-          <Badge tone="muted">Spare x{entry.duplicateCount}</Badge>
+    <div className={`overflow-hidden rounded-2xl border ${RARITY_ACCENT[rarity] ?? RARITY_ACCENT.common}`}>
+      <div className="flex items-start gap-3 p-4">
+        <div className={`flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-xl ring-2 ${RARITY_RING[rarity] ?? RARITY_RING.common}`}>
+          <span className={`text-xl font-black leading-none ${RARITY_COLOUR[rarity] ?? "text-white/80"}`}>{player?.rating ?? "?"}</span>
+          <span className="text-[8px] font-black uppercase leading-none text-white/40">{player?.pos ?? ""}</span>
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5">
+            {flag ? <img src={flag} alt="" className="h-3.5 w-5 shrink-0 rounded-sm object-cover" /> : null}
+            <p className="truncate text-sm font-black text-white">{player?.name ?? `Player ${entry.playerId}`}</p>
+          </div>
+          <p className={`mt-0.5 text-[10px] font-black uppercase tracking-wide ${RARITY_COLOUR[rarity] ?? "text-white/50"}`}>{rarity}</p>
+          <p className="mt-1 text-[10px] font-semibold text-white/40">{entry.username} · spare ×{entry.duplicateCount}</p>
+        </div>
+        <div className="flex shrink-0 flex-col items-end gap-1">
+          {alreadyOwned ? (
+            <span className="rounded-full bg-white/8 px-2 py-0.5 text-[9px] font-black text-white/35">Owned</span>
+          ) : (
+            <span className="rounded-full bg-green-500/20 px-2 py-0.5 text-[9px] font-black text-green-300">Need this</span>
+          )}
+          {progress?.missing.length === 1 ? (
+            <span className="rounded-full bg-amber-400/20 px-2 py-0.5 text-[9px] font-black text-amber-300">Completes {player?.nation}</span>
+          ) : null}
         </div>
       </div>
-      {blockedByStatus ? (
-        <p className="mt-3 rounded-md bg-amber-100 px-2 py-1.5 text-xs font-bold text-amber-900">
-          You need a spare {player?.rarity} card to propose for this one.
-        </p>
+
+      {!alreadyOwned ? (
+        <div className="flex items-center gap-2 border-t border-white/8 bg-white/4 px-4 py-3">
+          {matchingDuplicates.length === 0 ? (
+            <p className="flex-1 text-xs font-semibold text-white/30">No spare {rarity} to offer</p>
+          ) : (
+            <>
+              <select
+                className="min-w-0 flex-1 rounded-lg border border-white/12 bg-white/8 px-2 py-2 text-xs font-bold text-white focus:border-amber-400/50 focus:outline-none"
+                value={selectedPlayerId ?? ""}
+                onChange={(e) => setOfferSelections((prev) => ({ ...prev, [key]: Number(e.target.value) }))}
+              >
+                <option value="" className="bg-green-950">Your spare {rarity}…</option>
+                {matchingDuplicates.map((d) => (
+                  <option key={d.id} value={d.id} className="bg-green-950">
+                    {d.name} ×{duplicateCounts[d.id] ?? 0} · {d.nation}
+                  </option>
+                ))}
+              </select>
+              <button
+                className="shrink-0 rounded-lg bg-amber-400 px-4 py-2 text-xs font-black text-amber-950 transition hover:bg-amber-300 disabled:opacity-40"
+                disabled={tradeBusy || !selectedPlayerId}
+                onClick={() =>
+                  selectedPlayerId &&
+                  tradeAction(
+                    { action: "propose", targetUserId: entry.userId, wantedPlayerId: entry.playerId, offeredPlayerId: selectedPlayerId },
+                    "Trade proposed — it expires in 24 hours."
+                  )
+                }
+              >
+                Propose
+              </button>
+            </>
+          )}
+        </div>
       ) : null}
-      <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-green-900/10 pt-3">
-        <span className="text-xs font-black uppercase tracking-wide text-green-900/50">Offer</span>
-        <select
-          className="min-w-0 flex-1 rounded-md border border-green-900/20 bg-white px-2 py-1.5 text-xs font-bold text-green-950"
-          value={selectedPlayerId ?? ""}
-          onChange={(event) => setOfferSelections((prev) => ({ ...prev, [key]: Number(event.target.value) }))}
-        >
-          <option value="">{matchingDuplicates.length > 0 ? `Choose your ${player?.rarity} duplicate...` : `No spare ${player?.rarity ?? "matching"} card`}</option>
-          {matchingDuplicates.map((duplicate) => (
-            <option key={duplicate.id} value={duplicate.id}>
-              {duplicate.name} - spare x{duplicateCounts[duplicate.id] ?? 0} - {duplicate.nation}
-            </option>
-          ))}
-        </select>
-        <Button
-          variant="primary"
-          size="sm"
-          className="shrink-0"
-          onClick={() =>
-            selectedPlayerId &&
-            tradeAction(
-              { action: "propose", targetUserId: entry.userId, wantedPlayerId: entry.playerId, offeredPlayerId: selectedPlayerId },
-              "Trade proposed. It expires in 24 hours."
-            )
-          }
-          disabled={tradeBusy || !selectedPlayerId || blockedByStatus}
-        >
-          Propose
-        </Button>
-      </div>
     </div>
   );
 }
+
+// ── Showcase ──────────────────────────────────────────────────
+
+function Showcase({
+  entries, playerById, progressByNation, mode
+}: {
+  entries: MarketEntry[];
+  playerById: Map<number, Player>;
+  progressByNation: Map<string, NationProgress>;
+  mode: BestSwapMode;
+}) {
+  if (entries.length === 0) return null;
+  return (
+    <div className="mb-4 grid gap-3 md:grid-cols-3">
+      {entries.map((entry, i) => {
+        const player = playerById.get(entry.playerId);
+        const progress = player ? progressByNation.get(player.nation) : undefined;
+        const rarity = player?.rarity ?? "common";
+        const flag = flagUrl(player?.nation ?? "");
+        const helper =
+          mode === "collections"
+            ? progress?.missing.length === 1
+              ? `Completes ${player?.nation}`
+              : `${player?.nation ?? "Team"}: ${progress?.owned ?? 0}/${progress?.total ?? 0}`
+            : `${player?.rating ?? "-"} rated ${rarity}`;
+        return (
+          <div key={`${entry.userId}:${entry.playerId}:sc`} className="overflow-hidden rounded-2xl bg-gradient-to-br from-green-950 to-green-800 p-4 ring-1 ring-white/10">
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">#{i + 1} target</p>
+            <div className="mt-3 flex items-center gap-3">
+              <div className={`flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-xl ring-2 ${RARITY_RING[rarity] ?? RARITY_RING.common}`}>
+                <span className={`text-xl font-black leading-none ${RARITY_COLOUR[rarity] ?? "text-white/80"}`}>{player?.rating ?? "?"}</span>
+                <span className="text-[8px] font-black uppercase leading-none text-white/40">{player?.pos ?? ""}</span>
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5">
+                  {flag ? <img src={flag} alt="" className="h-3.5 w-5 shrink-0 rounded-sm object-cover" /> : null}
+                  <p className="truncate text-sm font-black text-white">{player?.name ?? `Player ${entry.playerId}`}</p>
+                </div>
+                <p className="mt-0.5 text-xs font-semibold text-white/55">{helper}</p>
+                <p className="mt-1 text-[10px] font-black text-amber-300">{entry.username} ×{entry.duplicateCount} spare</p>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Proposals ─────────────────────────────────────────────────
 
 function ProposalColumn({ title, count, emptyText, children }: { title: string; count: number; emptyText: string; children: ReactNode }) {
   const hasChildren = Array.isArray(children) ? children.length > 0 : Boolean(children);
@@ -528,7 +632,7 @@ function ProposalColumn({ title, count, emptyText, children }: { title: string; 
       </div>
       <div className="space-y-3">
         {hasChildren ? children : (
-          <div className="rounded-xl border border-white/8 bg-white/4 p-4 text-sm font-semibold text-white/35">{emptyText}</div>
+          <div className="rounded-xl border border-white/8 bg-white/4 p-5 text-sm font-semibold text-white/30">{emptyText}</div>
         )}
       </div>
     </div>
@@ -536,10 +640,7 @@ function ProposalColumn({ title, count, emptyText, children }: { title: string; 
 }
 
 function ProposalCard({
-  proposal,
-  playerById,
-  tradeBusy,
-  tradeAction
+  proposal, playerById, tradeBusy, tradeAction
 }: {
   proposal: DirectProposal;
   playerById: Map<number, Player>;
@@ -549,36 +650,38 @@ function ProposalCard({
   const offered = playerById.get(proposal.offeredPlayerId);
   const wanted = playerById.get(proposal.wantedPlayerId);
   return (
-    <div className={`rounded-xl border p-4 ${proposal.isIncoming ? "border-amber-400/25 bg-amber-950/15" : "border-white/10 bg-white/5"}`}>
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-xs font-semibold text-white/50">
-          <span className="font-black text-white/80">{proposal.proposerUsername}</span>
-          {" → "}
-          <span className="font-black text-white/80">{proposal.targetUsername}</span>
+    <div className={`overflow-hidden rounded-2xl border ${proposal.isIncoming ? "border-amber-400/25 bg-amber-950/15" : "border-white/10 bg-white/5"}`}>
+      <div className="flex items-center justify-between gap-2 px-4 pt-4">
+        <p className="text-xs font-semibold text-white/45">
+          <span className="font-black text-white/75">{proposal.proposerUsername}</span>
+          <span className="mx-1 text-white/25">→</span>
+          <span className="font-black text-white/75">{proposal.targetUsername}</span>
         </p>
-        <span className="rounded-full bg-white/8 px-2 py-0.5 text-[10px] font-black text-white/40">
+        <span className="rounded-full bg-white/8 px-2 py-0.5 text-[9px] font-black text-white/35">
           Expires {formatExpiry(proposal.expiresAt)}
         </span>
       </div>
 
-      <div className="mt-3 flex items-center gap-2">
+      <div className="mt-3 flex items-stretch gap-2 px-4">
         <ProposalPlayerChip player={offered} label="Offered" />
-        <span className="shrink-0 text-sm font-black text-white/30">→</span>
+        <div className="flex items-center px-1">
+          <span className="text-sm font-black text-white/20">⇄</span>
+        </div>
         <ProposalPlayerChip player={wanted} label="Wanted" />
       </div>
 
-      <div className="mt-4 flex gap-2 border-t border-white/8 pt-3">
+      <div className={`mt-4 flex gap-2 px-4 pb-4 ${proposal.isIncoming ? "flex-col sm:flex-row" : ""}`}>
         {proposal.isIncoming ? (
           <>
             <button
-              className="flex-1 rounded-lg bg-amber-400 py-2 text-xs font-black text-amber-950 transition hover:bg-amber-300 disabled:opacity-40"
+              className="flex-1 rounded-xl bg-amber-400 py-2.5 text-xs font-black text-amber-950 transition hover:bg-amber-300 disabled:opacity-40"
               onClick={() => tradeAction({ action: "confirm", proposalId: proposal.id }, "Trade complete.")}
               disabled={tradeBusy}
             >
               Accept
             </button>
             <button
-              className="flex-1 rounded-lg bg-white/8 py-2 text-xs font-black text-white/55 transition hover:bg-white/12 disabled:opacity-40"
+              className="flex-1 rounded-xl bg-white/8 py-2.5 text-xs font-black text-white/50 transition hover:bg-white/12 disabled:opacity-40"
               onClick={() => tradeAction({ action: "decline", proposalId: proposal.id }, "Proposal rejected.")}
               disabled={tradeBusy}
             >
@@ -587,7 +690,7 @@ function ProposalCard({
           </>
         ) : (
           <button
-            className="rounded-lg bg-white/8 px-4 py-2 text-xs font-black text-white/55 transition hover:bg-white/12 disabled:opacity-40"
+            className="rounded-xl bg-white/8 px-5 py-2.5 text-xs font-black text-white/50 transition hover:bg-white/12 disabled:opacity-40"
             onClick={() => tradeAction({ action: "withdraw", proposalId: proposal.id }, "Proposal withdrawn.")}
             disabled={tradeBusy}
           >
@@ -601,38 +704,31 @@ function ProposalCard({
 
 function ProposalPlayerChip({ player, label }: { player: Player | undefined; label: string }) {
   const flag = flagUrl(player?.nation ?? "");
-  const rarityColour: Record<string, string> = {
-    icon: "text-zinc-300", legend: "text-amber-300", epic: "text-fuchsia-300",
-    rare: "text-sky-300", common: "text-white/50", clowns: "text-red-300"
-  };
+  const rarity = player?.rarity ?? "common";
   return (
-    <div className="flex min-w-0 flex-1 items-center gap-2 rounded-lg bg-white/6 px-2.5 py-2 ring-1 ring-white/8">
-      {flag ? <img src={flag} alt="" className="h-4 w-5 shrink-0 rounded-sm object-cover" /> : null}
+    <div className="flex min-w-0 flex-1 items-center gap-2.5 rounded-xl bg-white/6 px-3 py-2.5 ring-1 ring-white/8">
+      <div className={`flex h-10 w-10 shrink-0 flex-col items-center justify-center rounded-lg ring-2 ${RARITY_RING[rarity] ?? RARITY_RING.common}`}>
+        <span className={`text-base font-black leading-none ${RARITY_COLOUR[rarity] ?? "text-white/80"}`}>{player?.rating ?? "?"}</span>
+      </div>
       <div className="min-w-0">
-        <p className="text-[9px] font-black uppercase tracking-wide text-white/35">{label}</p>
-        <p className="truncate text-xs font-black text-white/85">{player?.name ?? "Unknown"}</p>
+        <p className="text-[9px] font-black uppercase tracking-wide text-white/30">{label}</p>
+        <div className="flex items-center gap-1">
+          {flag ? <img src={flag} alt="" className="h-3 w-4 shrink-0 rounded-sm object-cover" /> : null}
+          <p className="truncate text-xs font-black text-white/85">{player?.name ?? "Unknown"}</p>
+        </div>
         {player ? (
-          <p className={`text-[10px] font-bold ${rarityColour[player.rarity] ?? "text-white/50"}`}>
-            {player.rating} · {player.rarity}
-          </p>
+          <p className={`text-[9px] font-bold uppercase ${RARITY_COLOUR[rarity] ?? "text-white/40"}`}>{rarity}</p>
         ) : null}
       </div>
     </div>
   );
 }
 
+// ── Nation targets ────────────────────────────────────────────
+
 function NationTargetCard({
-  progress,
-  market,
-  playerById,
-  ownedIds,
-  duplicateCounts,
-  myDuplicates,
-  offerSelections,
-  setOfferSelections,
-  progressByNation,
-  tradeBusy,
-  tradeAction
+  progress, market, playerById, ownedIds, duplicateCounts, myDuplicates, offerSelections,
+  setOfferSelections, progressByNation: _progressByNation, tradeBusy, tradeAction
 }: {
   progress: NationProgress;
   market: MarketEntry[];
@@ -650,61 +746,69 @@ function NationTargetCard({
   const almostDone = progress.missing.length === 1;
 
   return (
-    <div className={`rounded-xl border p-4 ${almostDone ? "border-amber-400/25 bg-amber-950/15" : "border-white/10 bg-white/5"}`}>
-      {/* Nation header */}
-      <div className="flex items-center justify-between gap-3">
+    <div className={`overflow-hidden rounded-2xl border ${almostDone ? "border-amber-400/25 bg-amber-950/15" : "border-white/10 bg-white/5"}`}>
+      <div className="flex items-center justify-between gap-3 p-4 pb-3">
         <div className="flex items-center gap-2.5">
           {flag ? <img src={flag} alt="" className="h-5 w-7 shrink-0 rounded-sm object-cover shadow-sm" /> : null}
           <div>
             <p className="font-black text-white">{progress.nation}</p>
-            <p className="text-xs font-semibold text-white/45">{progress.owned}/{progress.total} collected</p>
+            <p className="text-[10px] font-semibold text-white/40">{progress.owned}/{progress.total} collected</p>
           </div>
         </div>
-        <span className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wide ${almostDone ? "bg-amber-400/20 text-amber-300" : "bg-white/8 text-white/45"}`}>
+        <span className={`rounded-full px-2.5 py-1 text-[9px] font-black uppercase tracking-wide ${almostDone ? "bg-amber-400/20 text-amber-300" : "bg-white/8 text-white/40"}`}>
           {progress.missing.length} to go
         </span>
       </div>
 
-      {/* Progress bar */}
-      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/10">
+      <div className="mx-4 h-1 overflow-hidden rounded-full bg-white/10">
         <div
           className={`h-full rounded-full transition-all ${almostDone ? "bg-amber-400" : "bg-pitch"}`}
           style={{ width: `${progress.percent}%` }}
         />
       </div>
 
-      {/* Missing players */}
-      <div className="mt-4 space-y-2.5">
+      <div className="mt-3 space-y-px">
         {progress.missing.slice(0, 5).map((missingPlayer) => {
-          const matchingEntries = market.filter((entry) => entry.playerId === missingPlayer.id);
+          const matchingEntries = market.filter((e) => e.playerId === missingPlayer.id);
           const hasAvailable = matchingEntries.length > 0;
           const key = `${matchingEntries[0]?.userId}:${missingPlayer.id}`;
           const selectedPlayerId = offerSelections[key];
           const matchingDuplicates = myDuplicates.filter((d) => d.id !== missingPlayer.id && d.rarity === missingPlayer.rarity);
+          const rarity = missingPlayer.rarity;
+          const pFlag = flagUrl(missingPlayer.nation);
 
           return (
-            <div key={missingPlayer.id} className="rounded-lg bg-white/6 p-3 ring-1 ring-white/8">
-              <div className="flex items-center justify-between gap-2">
-                <StickerChip player={missingPlayer} />
-                <span className={`rounded-full px-2 py-0.5 text-[10px] font-black ${hasAvailable ? "bg-green-500/15 text-green-300" : "bg-white/6 text-white/30"}`}>
-                  {hasAvailable ? `${matchingEntries.length} available` : "None available"}
+            <div key={missingPlayer.id} className="border-t border-white/6 px-4 py-3">
+              <div className="flex items-center gap-2">
+                <div className={`flex h-9 w-9 shrink-0 flex-col items-center justify-center rounded-lg ring-2 ${RARITY_RING[rarity] ?? RARITY_RING.common}`}>
+                  <span className={`text-sm font-black leading-none ${RARITY_COLOUR[rarity] ?? "text-white/80"}`}>{missingPlayer.rating}</span>
+                  <span className="text-[7px] font-black uppercase leading-none text-white/35">{missingPlayer.pos}</span>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1">
+                    {pFlag ? <img src={pFlag} alt="" className="h-3 w-4 shrink-0 rounded-sm object-cover" /> : null}
+                    <p className="truncate text-xs font-black text-white/80">{missingPlayer.name}</p>
+                  </div>
+                  <p className={`text-[9px] font-bold uppercase ${RARITY_COLOUR[rarity] ?? "text-white/40"}`}>{rarity}</p>
+                </div>
+                <span className={`rounded-full px-2 py-0.5 text-[9px] font-black ${hasAvailable ? "bg-green-500/15 text-green-300" : "bg-white/6 text-white/25"}`}>
+                  {hasAvailable ? `${matchingEntries.length} avail` : "None"}
                 </span>
               </div>
 
               {hasAvailable ? (
-                <div className="mt-2.5 flex items-center gap-2 border-t border-white/8 pt-2.5">
-                  <span className="shrink-0 text-[10px] font-black uppercase tracking-wide text-white/35">Offer</span>
+                <div className="mt-2.5 flex items-center gap-2">
                   <select
-                    className="min-w-0 flex-1 rounded-lg border border-white/12 bg-white/8 px-2 py-1.5 text-xs font-bold text-white focus:outline-none"
+                    className="min-w-0 flex-1 rounded-lg border border-white/12 bg-white/8 px-2 py-1.5 text-xs font-bold text-white focus:border-amber-400/50 focus:outline-none"
                     value={selectedPlayerId ?? ""}
                     onChange={(e) => setOfferSelections((prev) => ({ ...prev, [key]: Number(e.target.value) }))}
                   >
                     <option value="" className="bg-green-950">
-                      {matchingDuplicates.length > 0 ? `Your spare ${missingPlayer.rarity}…` : `No spare ${missingPlayer.rarity}`}
+                      {matchingDuplicates.length > 0 ? `Your spare ${rarity}…` : `No spare ${rarity}`}
                     </option>
                     {matchingDuplicates.map((d) => (
                       <option key={d.id} value={d.id} className="bg-green-950">
-                        {d.name} (×{duplicateCounts[d.id] ?? 0}) · {d.nation}
+                        {d.name} ×{duplicateCounts[d.id] ?? 0} · {d.nation}
                       </option>
                     ))}
                   </select>
@@ -716,7 +820,7 @@ function NationTargetCard({
                       matchingEntries[0] &&
                       tradeAction(
                         { action: "propose", targetUserId: matchingEntries[0].userId, wantedPlayerId: missingPlayer.id, offeredPlayerId: selectedPlayerId },
-                        "Trade proposed. It expires in 24 hours."
+                        "Trade proposed — it expires in 24 hours."
                       )
                     }
                   >
@@ -732,115 +836,43 @@ function NationTargetCard({
   );
 }
 
-function ActionCard({
-  title,
-  text,
-  meta,
-  tone,
-  onClick
-}: {
-  title: string;
-  text: string;
-  meta: string;
-  tone: "green" | "amber" | "white";
-  onClick: () => void;
-}) {
-  const classes = {
-    green: "border-green-800 bg-green-950 text-white hover:bg-green-900",
-    amber: "border-amber-300 bg-amber-50 text-amber-950 hover:bg-amber-100",
-    white: "border-green-900/10 bg-white text-green-950 hover:bg-green-50"
-  };
+// ── Recent trades ─────────────────────────────────────────────
 
+function RecentTradeRow({ trade, playerById }: { trade: RecentTrade; playerById: Map<number, Player> }) {
   return (
-    <button type="button" onClick={onClick} className={`rounded-2xl border p-5 text-left shadow-sm transition ${classes[tone]}`}>
-      <p className="text-lg font-black">{title}</p>
-      <p className={`mt-1 text-sm font-semibold ${tone === "green" ? "text-white/75" : "text-green-900/60"}`}>{text}</p>
-      <p className={`mt-4 text-xs font-black uppercase tracking-wide ${tone === "green" ? "text-white/55" : "text-green-900/45"}`}>{meta}</p>
-    </button>
-  );
-}
-
-function MiniStat({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="rounded-xl bg-white/10 px-3 py-2 ring-1 ring-white/15">
-      <p className="text-xl font-black">{value}</p>
-      <p className="text-[10px] font-black uppercase tracking-wide text-white/60">{label}</p>
+    <div className="flex flex-wrap items-center gap-2 rounded-xl bg-white/5 px-3 py-2.5 ring-1 ring-white/8">
+      <span className="text-xs font-black text-white/65">{trade.offererUsername}</span>
+      <MiniChip player={playerById.get(trade.playerId)} />
+      <span className="text-[10px] font-black text-white/20">⇄</span>
+      <MiniChip player={playerById.get(trade.acceptedPlayerId)} />
+      <span className="text-xs font-black text-white/65">{trade.acceptorUsername}</span>
     </div>
   );
 }
 
-function SectionHeader({ title, text }: { title: string; text: string }) {
+function MiniChip({ player }: { player: Player | undefined }) {
+  if (!player) return <span className="rounded bg-white/8 px-1.5 py-0.5 text-xs font-bold text-white/30">?</span>;
+  const flag = flagUrl(player.nation);
+  const rarity = player.rarity;
   return (
-    <div>
-      <p className="text-sm font-black text-green-950">{title}</p>
-      <p className="mt-1 text-xs font-semibold text-green-900/60">{text}</p>
-    </div>
+    <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-black ${RARITY_ACCENT[rarity] ?? RARITY_ACCENT.common} ${RARITY_COLOUR[rarity] ?? "text-white/60"}`}>
+      {flag ? <img src={flag} alt="" className="h-2.5 w-3.5 rounded-sm object-cover" /> : null}
+      {player.name} {player.rating}
+    </span>
   );
 }
+
+// ── Mode toggle ───────────────────────────────────────────────
 
 function ModeButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-full px-3 py-1.5 text-xs font-black transition ${active ? "bg-green-950 text-white shadow-sm" : "text-green-950/55 hover:text-green-950"}`}
+      className={`rounded-lg px-3 py-1.5 text-xs font-black transition ${active ? "bg-white text-green-950 shadow-sm" : "text-white/45 hover:text-white/70"}`}
     >
       {children}
     </button>
-  );
-}
-
-function RecentTradeRow({ trade, playerById }: { trade: RecentTrade; playerById: Map<number, Player> }) {
-  return (
-    <div className="flex flex-wrap items-center gap-2 rounded-lg bg-green-950/5 px-3 py-2 text-xs font-bold text-green-950 ring-1 ring-green-900/8">
-      <span className="font-black">{trade.offererUsername}</span>
-      <StickerChip player={playerById.get(trade.playerId)} />
-      <span className="text-green-900/40">→</span>
-      <StickerChip player={playerById.get(trade.acceptedPlayerId)} />
-      <span className="font-black">{trade.acceptorUsername}</span>
-    </div>
-  );
-}
-
-function Badge({ tone, children }: { tone: "good" | "gold" | "muted" | "danger"; children: ReactNode }) {
-  const classes = {
-    good: "bg-emerald-100 text-emerald-900 ring-emerald-200",
-    gold: "bg-amber-100 text-amber-900 ring-amber-200",
-    muted: "bg-green-950/10 text-green-950 ring-green-900/10",
-    danger: "bg-red-100 text-red-900 ring-red-200"
-  };
-  return <span className={`inline-flex rounded-full px-2 py-1 text-[10px] font-black uppercase tracking-wide ring-1 ${classes[tone]}`}>{children}</span>;
-}
-
-function StickerCard({ player, fallbackId, label }: { player: Player | undefined; fallbackId: number; label: string }) {
-  if (!player) return <div className="text-sm font-bold text-green-900/60">{label}: Player {fallbackId}</div>;
-  const flag = flagUrl(player.nation);
-  return (
-    <div className="flex min-w-0 items-center gap-2">
-      <div className={`flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-md ring-2 ${rarityRing[player.rarity] ?? rarityRing.common}`}>
-        <span className="text-sm font-black leading-none text-green-950">{player.rating}</span>
-        <span className="text-[7px] font-black uppercase leading-none text-green-950/70">{player.pos}</span>
-      </div>
-      <div className="min-w-0">
-        <p className="text-[10px] font-black uppercase tracking-wide text-green-900/45">{label}</p>
-        <div className="flex items-center gap-1.5">
-          {flag ? <img src={flag} alt="" className="h-3 rounded-sm object-cover" style={{ width: "1.1rem" }} /> : null}
-          <p className="truncate text-sm font-black text-green-950">{player.name}</p>
-        </div>
-        <span className={`mt-0.5 inline-flex rounded-full px-1.5 py-0.5 text-[9px] font-black uppercase ${rarityBadge[player.rarity] ?? rarityBadge.common}`}>{player.rarity}</span>
-      </div>
-    </div>
-  );
-}
-
-function StickerChip({ player }: { player: Player | undefined }) {
-  if (!player) return <span className="rounded bg-green-950/10 px-1.5 py-0.5 text-xs font-bold">Unknown</span>;
-  const flag = flagUrl(player.nation);
-  return (
-    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-black ring-1 ${rarityBadge[player.rarity] ?? rarityBadge.common}`}>
-      {flag ? <img src={flag} alt="" className="h-3 rounded-sm object-cover" style={{ width: "1rem" }} /> : null}
-      {player.name} {player.rating}
-    </span>
   );
 }
 
