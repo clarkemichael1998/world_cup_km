@@ -3175,11 +3175,14 @@ export function respondToRandomSwap(swapId: number, userId: number, action: "acc
     const playerMap = new Map(getAllPlayers().map((p) => [p.id, p]));
     const cPlayer = playerMap.get(challengerPlayerId);
     const tPlayer = playerMap.get(targetPlayerId);
-    const challengerName = (db.prepare("SELECT username FROM users WHERE id = ?").get(swap.challenger_id) as { username: string } | undefined)?.username ?? "Someone";
-    const targetName = (db.prepare("SELECT username FROM users WHERE id = ?").get(userId) as { username: string } | undefined)?.username ?? "Someone";
-    createAdminChatMessage(
-      `🎲 DANGER SWAP — ${challengerName} lost ${cPlayer?.name ?? "Unknown"} (${cPlayer?.rarity ?? "?"}) · ${targetName} lost ${tPlayer?.name ?? "Unknown"} (${tPlayer?.rarity ?? "?"}). Pure chaos.`
-    );
+    const premiumRarities = new Set(["icon", "legend", "epic"]);
+    if (cPlayer && tPlayer && (premiumRarities.has(cPlayer.rarity) || premiumRarities.has(tPlayer.rarity))) {
+      const challengerName = (db.prepare("SELECT username FROM users WHERE id = ?").get(swap.challenger_id) as { username: string } | undefined)?.username ?? "Someone";
+      const targetName = (db.prepare("SELECT username FROM users WHERE id = ?").get(userId) as { username: string } | undefined)?.username ?? "Someone";
+      createAdminChatMessage(
+        `🎲 DANGER SWAP — ${challengerName} lost ${cPlayer.name} (${cPlayer.rarity}) · ${targetName} lost ${tPlayer.name} (${tPlayer.rarity}).`
+      );
+    }
     return { ok: true };
   } catch (err) {
     db.exec("ROLLBACK");

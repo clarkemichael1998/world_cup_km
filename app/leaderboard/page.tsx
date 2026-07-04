@@ -119,7 +119,7 @@ function RankRow({ entry, rank, value, display, maxVal, showMovement }: { entry:
   const barPct = Math.max(2, Math.min(100, (Math.max(0, value) / maxVal) * 100));
   const top = rank <= 3;
   return (
-    <div className={`flex items-center gap-3 rounded-lg border px-3 py-2.5 shadow-sm transition hover:shadow-md ${rank === 1 ? "border-gold/50 bg-amber-50/40" : "border-green-900/10 bg-white"}`}>
+    <div className={`flex items-center gap-3 rounded-lg border px-3 py-2.5 shadow-sm transition hover:shadow-md ${rank === 1 ? "border-amber-300/70 bg-gradient-to-r from-amber-100 via-yellow-50 to-amber-100 shadow-amber-200/60" : "border-green-900/10 bg-white"}`}>
       <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-black ${top ? RANK_CHIP[rank] : "bg-green-950/5 text-green-900/50"}`}>
         {rank}
       </span>
