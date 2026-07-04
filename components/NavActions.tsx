@@ -14,7 +14,7 @@ export function NavActions({ compact = false }: { compact?: boolean }) {
   return (
     <button
       onClick={logout}
-      className={`rounded-md font-semibold text-white/72 transition hover:bg-white/10 hover:text-white ${compact ? "px-2 py-1 text-xs" : "px-3 py-2 text-sm"}`}
+      className={`rounded-md bg-amber-300 font-black text-amber-950 shadow-sm transition hover:bg-amber-200 ${compact ? "px-2 py-1 text-xs" : "px-3 py-2 text-sm"}`}
     >
       Logout
     </button>

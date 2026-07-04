@@ -144,10 +144,10 @@ export function MobileNav() {
                 href={tab.href}
                 onClick={() => setMoreOpen(false)}
                 className={`flex flex-col items-center gap-0.5 px-1 py-2.5 text-[9px] font-black uppercase tracking-wide transition-colors ${
-                  active ? "text-amber-200" : "text-white/45"
+                  active ? "text-amber-200" : "text-white/62"
                 }`}
               >
-                <span className={`relative ${active ? "text-amber-200" : "text-white/40"}`}>
+                <span className={`relative ${active ? "text-amber-200" : "text-white/58"}`}>
                   {tab.icon}
                   {tab.href === "/" && hasUnread ? <span className="absolute -right-1 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-green-950 bg-boot" /> : null}
                 </span>
@@ -159,11 +159,11 @@ export function MobileNav() {
             type="button"
             onClick={() => setMoreOpen((v) => !v)}
             className={`flex flex-col items-center gap-0.5 px-1 py-2.5 text-[9px] font-black uppercase tracking-wide transition-colors ${
-              moreOpen || moreActive ? "text-amber-200" : "text-white/45"
+              moreOpen || moreActive ? "text-amber-200" : "text-white/62"
             }`}
             aria-expanded={moreOpen}
           >
-            <span className={moreOpen || moreActive ? "text-amber-200" : "text-white/40"}>{icons.more}</span>
+            <span className={moreOpen || moreActive ? "text-amber-200" : "text-white/58"}>{icons.more}</span>
             More
           </button>
         </div>

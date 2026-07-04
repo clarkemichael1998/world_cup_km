@@ -8,7 +8,7 @@ const VARIANTS: Record<ButtonVariant, string> = {
   accent: "bg-amber-400 text-amber-950 shadow-sm hover:bg-amber-300",
   danger: "bg-boot text-white hover:bg-red-700",
   outline: "border border-green-900/15 bg-white/85 text-green-950 shadow-sm hover:bg-white",
-  ghost: "bg-green-950/10 text-green-950 hover:bg-green-950/15"
+  ghost: "bg-white/85 text-green-950 shadow-sm ring-1 ring-green-900/10 hover:bg-white"
 };
 
 const SIZES: Record<ButtonSize, string> = {

@@ -43,7 +43,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <Link href="/" aria-label="KMXI home">
             <BrandLogo variant="nav" />
           </Link>
-          <div className="flex items-center gap-1 text-sm font-semibold text-white/78">
+          <div className="flex items-center gap-1 text-sm font-semibold text-white/88">
             <NavLink href="/add-km" label="Log" />
             <NavLink href="/collection" label="Stickers" />
             <NavLink href="/squad" label="Squad" badge={badges.squadNeedsLock ? "Lock" : undefined} />
@@ -69,10 +69,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       >
         <Link href="/" className="shrink-0" aria-label="KMXI home"><BrandLogo variant="nav" /></Link>
         <div className="flex min-w-0 items-center gap-2">
-          <Link href="/suggestions" className="whitespace-nowrap rounded-md bg-white/10 px-2 py-1 text-xs font-bold uppercase tracking-wide text-white/80 hover:bg-white/15">
+          <Link href="/suggestions" className="whitespace-nowrap rounded-md bg-white/12 px-2 py-1 text-xs font-bold uppercase tracking-wide text-white hover:bg-white/18">
             Ideas
           </Link>
-          <Link href="/rules" className="whitespace-nowrap rounded-md bg-white/10 px-2 py-1 text-xs font-bold uppercase tracking-wide text-white/80 hover:bg-white/15">
+          <Link href="/rules" className="whitespace-nowrap rounded-md bg-white/12 px-2 py-1 text-xs font-bold uppercase tracking-wide text-white hover:bg-white/18">
             Rules
           </Link>
           <Link href="/cups" className="whitespace-nowrap rounded-md bg-amber-300 px-2 py-1 text-xs font-bold uppercase tracking-wide text-amber-950 hover:bg-amber-200">
