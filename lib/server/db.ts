@@ -24,7 +24,7 @@ const DANGER_MILESTONE_PLAYERS: Player[] = [
   { id: 99002, slug: "nigel-de-jong-danger", name: "Nigel de Jong", sortName: "De Jong, Nigel", club: "—", nation: "Netherlands", pos: "MF", rating: 78, rarity: "dangerous", wiki: null, dob: "1984-11-30", caps: null, goals: null, clubWiki: null, clubCountry: "Netherlands", teamId: "netherlands" },
   { id: 99003, slug: "rene-higuita-danger", name: "René Higuita", sortName: "Higuita, René", club: "—", nation: "Colombia", pos: "GK", rating: 85, rarity: "dangerous", wiki: null, dob: "1966-08-27", caps: null, goals: null, clubWiki: null, clubCountry: "Colombia", teamId: "colombia" },
   { id: 99004, slug: "luis-suarez-danger", name: "Luis Suárez", sortName: "Suárez, Luis", club: "—", nation: "Uruguay", pos: "FW", rating: 95, rarity: "dangerous", wiki: null, dob: "1987-01-24", caps: null, goals: null, clubWiki: null, clubCountry: "Uruguay", teamId: "uruguay" },
-  { id: 99005, slug: "zinedine-zidane-danger", name: "Zinedine Zidane", sortName: "Zidane, Zinedine", club: "—", nation: "France", pos: "MF", rating: 120, rarity: "dangerous", wiki: null, dob: "1972-06-23", caps: null, goals: null, clubWiki: null, clubCountry: "France", teamId: "france" },
+  { id: 99005, slug: "zinedine-zidane-danger", name: "Zinedine Zidane", sortName: "Zidane, Zinedine", club: "—", nation: "France", pos: "MF", rating: 115, rarity: "dangerous", wiki: null, dob: "1972-06-23", caps: null, goals: null, clubWiki: null, clubCountry: "France", teamId: "france" },
 ];
 
 const DANGER_MILESTONES: Array<{ count: number; playerId: number }> = [
