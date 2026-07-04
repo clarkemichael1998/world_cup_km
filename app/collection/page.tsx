@@ -67,7 +67,7 @@ export default function CollectionPage() {
             <p className="text-sm font-bold text-green-950">{owned.length}/{playerPool.length} stickers placed</p>
           </div>
           <div className="flex items-center gap-3">
-            <p className="text-xs font-bold text-amber-700">📖 Complete a nation&apos;s page → +5 pack credits</p>
+            <p className="text-xs font-bold text-amber-700">📖 Complete a nation&apos;s page → +25 pack credits and +3 team boost</p>
             <p className="text-2xl font-black text-pitch">{albumPercent}%</p>
           </div>
         </div>
@@ -83,7 +83,7 @@ export default function CollectionPage() {
         >
           <div>
             <p className="text-sm font-black text-amber-900">🔁 You have {totalDuplicates} duplicate{totalDuplicates === 1 ? "" : "s"} to trade</p>
-            <p className="text-xs font-semibold text-amber-700">Swap spares one-for-one with the group on the Trading page.</p>
+            <p className="text-xs font-semibold text-amber-700">All spares are automatically on the market. Swap same-status cards one-for-one.</p>
           </div>
           <span className="rounded-md bg-amber-600 px-4 py-2 text-sm font-black text-white">Go to Trading</span>
         </Link>

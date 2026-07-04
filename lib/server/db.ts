@@ -882,7 +882,7 @@ export function getActivityStreak(userId: number): number {
   return streak;
 }
 
-const NATION_COMPLETION_CREDITS = 5;
+const NATION_COMPLETION_CREDITS = 25;
 export const COLLECTION_COMPLETION_BOOST = 3;
 
 export function getCompletedCollectionNationsForPlayerIds(playerIds: number[]): string[] {
@@ -932,11 +932,19 @@ export function awardNationCompletionRewards(userId: number): string[] {
   for (const [nation, playerIds] of byNation) {
     if (!playerIds.every((id) => ownedIds.has(id))) continue;
     const result = claim.run(userId, nation, NATION_COMPLETION_CREDITS);
-    if (result.changes === 0) continue;
-    db.prepare("UPDATE users SET reward_credits = reward_credits + ? WHERE id = ?").run(NATION_COMPLETION_CREDITS, userId);
+    let creditsToAward = result.changes > 0 ? NATION_COMPLETION_CREDITS : 0;
+    if (result.changes === 0) {
+      const existing = db.prepare("SELECT credits FROM nation_completion_rewards WHERE user_id = ? AND nation = ?").get(userId, nation) as { credits: number } | undefined;
+      if (existing && existing.credits < NATION_COMPLETION_CREDITS) {
+        creditsToAward = NATION_COMPLETION_CREDITS - existing.credits;
+        db.prepare("UPDATE nation_completion_rewards SET credits = ? WHERE user_id = ? AND nation = ?").run(NATION_COMPLETION_CREDITS, userId, nation);
+      }
+    }
+    if (creditsToAward <= 0) continue;
+    db.prepare("UPDATE users SET reward_credits = reward_credits + ? WHERE id = ?").run(creditsToAward, userId);
     awarded.push(nation);
     const username = (db.prepare("SELECT username FROM users WHERE id = ?").get(userId) as { username: string } | undefined)?.username ?? "Someone";
-    createAdminChatMessage(`📖 Album milestone: ${username} completed the ${nation} page and earned ${NATION_COMPLETION_CREDITS} pack credits!`);
+    createAdminChatMessage(`📖 Album milestone: ${username} completed the ${nation} page and earned ${creditsToAward} pack credits!`);
   }
   return awarded;
 }

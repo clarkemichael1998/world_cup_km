@@ -143,6 +143,8 @@ export default function Home() {
         )}
       </div>
 
+      <TradingHero rewardCredits={rewardCredits} cupStatuses={cupStatuses ?? []} />
+
       {cupStatuses && cupStatuses.length > 0 ? <CupStatusCard statuses={cupStatuses} /> : null}
 
       {matchdayScore ? <MatchdayScoreCard data={matchdayScore} /> : null}
@@ -190,6 +192,47 @@ export default function Home() {
 
       <ChatFeed />
     </div>
+  );
+}
+
+function TradingHero({ rewardCredits, cupStatuses }: { rewardCredits: number | null; cupStatuses: CupStatus[] }) {
+  const liveCup = cupStatuses.find((status) => status.state === "live") ?? cupStatuses.find((status) => status.state === "upcoming") ?? cupStatuses[0];
+  return (
+    <section className="overflow-hidden rounded-2xl border border-green-900/10 bg-gradient-to-br from-green-950 via-green-900 to-amber-700 p-5 text-white shadow-sm">
+      <div className="grid gap-4 lg:grid-cols-[1.45fr_0.55fr] lg:items-end">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.25em] text-white/55">New feature: trading market</p>
+          <h1 className="mt-2 max-w-3xl text-3xl font-black leading-tight sm:text-4xl">
+            Trade your spare stickers. Finish nations. Cash in huge bonuses.
+          </h1>
+          <p className="mt-3 max-w-2xl text-sm font-semibold text-white/75">
+            Every duplicate is automatically on the market. Swap same-status cards one-for-one, complete a team page, and earn 25 pack credits plus the +3 collection boost.
+          </p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Link href="/trade" className="rounded-md bg-white px-4 py-2 text-sm font-black text-green-950 shadow-sm transition hover:bg-amber-50">
+              Find best swaps
+            </Link>
+            <Link href="/collection" className="rounded-md bg-white/10 px-4 py-2 text-sm font-black text-white ring-1 ring-white/20 transition hover:bg-white/15">
+              View album
+            </Link>
+          </div>
+        </div>
+        <div className="rounded-xl bg-white/10 p-3 ring-1 ring-white/15">
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/50">Cup pulse</p>
+          <p className="mt-1 text-sm font-black">{liveCup ? `${liveCup.cupName}: ${CUP_STATE_LABEL[liveCup.state]}` : "Cup brackets are live"}</p>
+          <p className="mt-1 text-xs font-semibold text-white/65">
+            {liveCup?.opponent ? `Next: ${liveCup.round} vs ${liveCup.opponent}` : "Check brackets, fixtures, and rewards."}
+          </p>
+          <div className="mt-3 flex items-center justify-between rounded-lg bg-white/10 px-3 py-2">
+            <span className="text-xs font-bold text-white/65">Pack credits</span>
+            <span className="text-xl font-black">{rewardCredits ?? "..."}</span>
+          </div>
+          <Link href="/cups" className="mt-3 block text-xs font-black uppercase tracking-wide text-amber-100 underline">
+            View cups
+          </Link>
+        </div>
+      </div>
+    </section>
   );
 }
 
