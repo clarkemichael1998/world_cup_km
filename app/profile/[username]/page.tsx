@@ -20,12 +20,13 @@ type Profile = {
   ownedPlayerIds: number[];
   duplicateCounts: Record<number, number>;
   completedNations: string[];
+  collectionBoosts: Record<number, number>;
   boosts: Array<{ playerId: number; matchId: string; type: "goal" | "assist"; amount: number; createdAt: string }>;
   lockedHistory: Array<{ lockDate: string; players: Array<{ slot: string; playerId: number }> }>;
 };
 
 type PlayerBoost = { total: number; goal: number; assist: number };
-type XiPlayer = { slot: string; player: Player; boost: PlayerBoost; effectiveRating: number };
+type XiPlayer = { slot: string; player: Player; boost: PlayerBoost; collectionBoost: number; effectiveRating: number };
 
 const formationSlots = ["GK", "DF1", "DF2", "DF3", "DF4", "MF1", "MF2", "MF3", "FW1", "FW2", "FW3"];
 const formationRows = [["FW1", "FW2", "FW3"], ["MF1", "MF2", "MF3"], ["DF1", "DF2", "DF3", "DF4"], ["GK"]];
@@ -93,11 +94,12 @@ export default function ProfilePage() {
       const pos = slot.slice(0, 2);
       const best = owned
         .filter((player) => player.pos === pos && !used.has(player.id))
-        .sort((a, b) => effectiveRating(b, boostsByPlayer) - effectiveRating(a, boostsByPlayer) || a.name.localeCompare(b.name))[0];
+        .sort((a, b) => effectiveRating(b, boostsByPlayer, profile.collectionBoosts) - effectiveRating(a, boostsByPlayer, profile.collectionBoosts) || a.name.localeCompare(b.name))[0];
       if (!best) continue;
       used.add(best.id);
       const boost = boostsByPlayer.get(best.id) ?? emptyBoost();
-      picked.push({ slot, player: best, boost, effectiveRating: best.rating + boost.total });
+      const collectionBoost = profile.collectionBoosts[best.id] ?? 0;
+      picked.push({ slot, player: best, boost, collectionBoost, effectiveRating: best.rating + boost.total + collectionBoost });
     }
     return picked;
   }, [profile, playerById, boostsByPlayer]);
@@ -156,7 +158,7 @@ export default function ProfilePage() {
           <p className="text-sm font-bold uppercase tracking-wide text-green-900/60">Locked XI History</p>
           <div className="mt-3 grid gap-3 xl:grid-cols-2">
             {profile.lockedHistory.length ? profile.lockedHistory.map((lock, index) => {
-              const players = lock.players.map(({ slot, playerId }) => toXiPlayer(slot, playerById.get(playerId), boostsByPlayer)).filter((item): item is XiPlayer => Boolean(item));
+              const players = lock.players.map(({ slot, playerId }) => toXiPlayer(slot, playerById.get(playerId), boostsByPlayer, profile.collectionBoosts)).filter((item): item is XiPlayer => Boolean(item));
               const average = players.length ? players.reduce((sum, item) => sum + item.effectiveRating, 0) / players.length : 0;
               return (
                 <details key={lock.lockDate} open={index === 0} className="overflow-hidden rounded-lg border border-green-900/10 bg-green-950/5">
@@ -199,14 +201,16 @@ function XiCard({ slot, item, compact }: { slot: string; item?: XiPlayer; compac
       </div>
       <p className={`${compact ? "text-[9px]" : "text-[10px] sm:text-xs"} mt-1 line-clamp-2 font-black leading-tight`}>{item.player.name}</p>
       {!compact ? <p className="mt-0.5 hidden truncate text-[9px] font-bold opacity-75 sm:block">{cupTheme ? `${cupTheme.cupName} Legend` : item.player.nation}</p> : null}
-      {item.boost.total !== 0 ? <div className="mt-1 flex flex-wrap gap-1">{item.boost.goal !== 0 ? <AwardBadge type="goal" amount={item.boost.goal} compact /> : null}{item.boost.assist !== 0 ? <AwardBadge type="assist" amount={item.boost.assist} compact /> : null}</div> : null}
+      {item.boost.total !== 0 || item.collectionBoost !== 0 ? <div className="mt-1 flex flex-wrap gap-1">{item.boost.goal !== 0 ? <AwardBadge type="goal" amount={item.boost.goal} compact /> : null}{item.boost.assist !== 0 ? <AwardBadge type="assist" amount={item.boost.assist} compact /> : null}{item.collectionBoost !== 0 ? <AwardBadge type="collection" amount={item.collectionBoost} compact /> : null}</div> : null}
     </div>
   );
 }
 
-function AwardBadge({ type, amount, compact = false }: { type: "goal" | "assist"; amount: number; compact?: boolean }) {
+function AwardBadge({ type, amount, compact = false }: { type: "goal" | "assist" | "collection"; amount: number; compact?: boolean }) {
   const positive = amount > 0;
-  return <span title={`${type === "assist" ? "Assist" : "Goal"} boost ${signed(amount)}`} className={`inline-flex shrink-0 items-center gap-1 rounded-full px-1.5 py-0.5 font-black ring-1 ${compact ? "text-[8px]" : "text-[10px]"} ${positive ? "bg-emerald-100 text-emerald-800 ring-emerald-600/20" : "bg-red-100 text-red-700 ring-red-500/20"}`}><span className={`inline-flex h-3 w-3 items-center justify-center rounded-full text-[7px] text-white ${positive ? "bg-emerald-700" : "bg-red-600"}`}>{type === "assist" ? "A" : "G"}</span>{signed(amount)}</span>;
+  const label = type === "assist" ? "Assist" : type === "goal" ? "Goal" : "Collection";
+  const mark = type === "assist" ? "A" : type === "goal" ? "G" : "C";
+  return <span title={`${label} boost ${signed(amount)}`} className={`inline-flex shrink-0 items-center gap-1 rounded-full px-1.5 py-0.5 font-black ring-1 ${compact ? "text-[8px]" : "text-[10px]"} ${positive ? "bg-emerald-100 text-emerald-800 ring-emerald-600/20" : "bg-red-100 text-red-700 ring-red-500/20"}`}><span className={`inline-flex h-3 w-3 items-center justify-center rounded-full text-[7px] text-white ${positive ? "bg-emerald-700" : "bg-red-600"}`}>{mark}</span>{signed(amount)}</span>;
 }
 
 function NationProgress({ nation, owned, total, percent }: { nation: string; owned: number; total: number; percent: number }) {
@@ -226,10 +230,11 @@ function LoadingProfile({ username }: { username: string }) {
 }
 
 function emptyBoost(): PlayerBoost { return { total: 0, goal: 0, assist: 0 }; }
-function effectiveRating(player: Player, boosts: Map<number, PlayerBoost>) { return player.rating + (boosts.get(player.id)?.total ?? 0); }
+function effectiveRating(player: Player, boosts: Map<number, PlayerBoost>, collectionBoosts: Record<number, number>) { return player.rating + (boosts.get(player.id)?.total ?? 0) + (collectionBoosts[player.id] ?? 0); }
 function signed(value: number) { return value > 0 ? `+${value}` : String(value); }
-function toXiPlayer(slot: string, player: Player | undefined, boosts: Map<number, PlayerBoost>): XiPlayer | null {
+function toXiPlayer(slot: string, player: Player | undefined, boosts: Map<number, PlayerBoost>, collectionBoosts: Record<number, number>): XiPlayer | null {
   if (!player) return null;
   const boost = boosts.get(player.id) ?? emptyBoost();
-  return { slot, player, boost, effectiveRating: player.rating + boost.total };
+  const collectionBoost = collectionBoosts[player.id] ?? 0;
+  return { slot, player, boost, collectionBoost, effectiveRating: player.rating + boost.total + collectionBoost };
 }

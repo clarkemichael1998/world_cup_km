@@ -1,4 +1,4 @@
-import { getAllPlayers, getDb, awardGoalBoost, lockSquadForDate, claimBoostAnnouncement, createAdminChatMessage } from "./db";
+import { getAllPlayers, getDb, awardGoalBoost, lockSquadForDate, claimBoostAnnouncement, createAdminChatMessage, getCollectionBoostMapForPlayerIds } from "./db";
 import { getProviderStatus, type ProviderStatus } from "./fixtures";
 import { GOAL_BOOST_BY_RARITY, ASSIST_BOOST_BY_RARITY, getPlayerById } from "./goalScorers";
 import type { Player, SquadSlot } from "@/lib/types";
@@ -210,7 +210,8 @@ function getBestOwnedSquadLeaderboard(playerMap: Map<number, Player>) {
 
   return Array.from(byUser.entries())
     .map(([username, ids]) => {
-      const bestXi = pickBestFormation(ids, playerMap);
+      const collectionBoosts = getCollectionBoostMapForPlayerIds(ids);
+      const bestXi = pickBestFormation(ids, playerMap, collectionBoosts);
       const ratings = bestXi.map((player) => player.rating);
       return {
         username,
@@ -222,7 +223,7 @@ function getBestOwnedSquadLeaderboard(playerMap: Map<number, Player>) {
     .slice(0, 20);
 }
 
-function pickBestFormation(playerIds: number[], playerMap: Map<number, Player>) {
+function pickBestFormation(playerIds: number[], playerMap: Map<number, Player>, collectionBoosts: Map<number, number>) {
   const owned = playerIds
     .map((id) => playerMap.get(id))
     .filter((player): player is Player => Boolean(player));
@@ -233,10 +234,10 @@ function pickBestFormation(playerIds: number[], playerMap: Map<number, Player>) 
   for (const position of requiredPositions) {
     const player = owned
       .filter((candidate) => candidate.pos === position && !used.has(candidate.id))
-      .sort((a, b) => b.rating - a.rating || a.name.localeCompare(b.name))[0];
+      .sort((a, b) => b.rating + (collectionBoosts.get(b.id) ?? 0) - (a.rating + (collectionBoosts.get(a.id) ?? 0)) || a.name.localeCompare(b.name))[0];
     if (player) {
       used.add(player.id);
-      picked.push(player);
+      picked.push({ ...player, rating: player.rating + (collectionBoosts.get(player.id) ?? 0) });
     }
   }
 

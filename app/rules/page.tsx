@@ -111,7 +111,7 @@ function SimpleRules() {
         <ul className="mt-3 list-disc space-y-1 pl-5">
           <li>Boosts scale per goal: a brace is <strong>2x</strong>, a hattrick <strong>3x</strong>, and so on.</li>
           <li><strong>Clown stickers lose rating</strong> when they score or assist. High risk, high reward.</li>
-          <li>Boosts are permanent and stack all tournament. Only matter if the player was in your locked XI that day — no retroactive boosts for players you pack later.</li>
+          <li>Goal and assist boosts are permanent and stack all tournament. They only apply if the player was in your locked XI that day — no retroactive boosts for players you pack later.</li>
           <li>Viral World Cup moments can also swing ratings at admin discretion.</li>
         </ul>
       </Section>
@@ -119,7 +119,7 @@ function SimpleRules() {
       <Section title="How the Leaderboard Works">
         <ul className="list-disc space-y-1 pl-5">
           <li>Your main score is your <strong>Best Squad Rating</strong>.</li>
-          <li>Activity credits, games won, goal boosts, and assist boosts also show on the leaderboard.</li>
+          <li>Activity credits, games won, goal boosts, assist boosts, and collection boosts also show on the leaderboard.</li>
           <li>Each matchday has a <strong>head-to-head</strong>: the player earning the most match credits that day takes the daily crown — and gets to <strong>set the news reel</strong> for the next day.</li>
           <li>Everything locks at <strong>World Cup Final kick-off on 19 July 2026</strong>.</li>
         </ul>
@@ -212,6 +212,7 @@ function DetailedRules() {
             <li><strong>2 free credits</strong> are added to your balance every day you log in.</li>
             <li><strong>Activity streaks:</strong> log activity 7 days in a row and the daily grant becomes <strong>3 credits</strong> for as long as the streak holds. Miss a day and the streak resets.</li>
             <li><strong>Album milestones:</strong> collect every sticker on a nation&apos;s page and earn <strong>5 bonus credits</strong>, once per nation.</li>
+            <li><strong>Collection boost:</strong> completing a nation also gives every owned player from that nation a <strong>+3 rating boost</strong> for Best XI, squad, profile, and leaderboard ratings.</li>
             <li><strong>Sticker trading:</strong> offer a duplicate up for trade on the Sticker Album page. Other players propose one of their duplicates in return, and the original offerer confirms the swap they like — one for one. You only ever trade spares, so your placed stickers are safe.</li>
             <li><strong>Match credits</strong> are earned when players in your locked squad represent a winning nation.</li>
             <li>A match win gives <strong>1 credit per eligible locked player</strong>.</li>
@@ -282,7 +283,7 @@ function DetailedRules() {
             At the <strong>World Cup Final kick-off on 19 July 2026</strong>, all squad selections and activity logging are permanently locked. Your final squad is your entry.
           </p>
           <ul className="mt-3 list-disc space-y-1 pl-5 text-green-900/70">
-            <li><strong>Best Squad Rating:</strong> average rating of your strongest possible 4-3-3 XI, including boosts.</li>
+            <li><strong>Best Squad Rating:</strong> average rating of your strongest possible 4-3-3 XI, including goal, assist, and collection boosts.</li>
             <li><strong>Activity Credits:</strong> cumulative reward-equivalent activity logged across the tournament.</li>
             <li><strong>Games Won:</strong> matches where at least one locked player represented a winning nation.</li>
           </ul>

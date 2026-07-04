@@ -112,7 +112,7 @@ export function PlayerCard({
           <div className={`shrink-0 rounded-lg border px-3 py-2 text-center shadow-sm ${cupTheme ? "border-white/60 bg-white/80 text-slate-950" : "border-black/5 bg-white/80 text-green-950"}`}>
             <div className={`${large ? "text-3xl" : "text-xl"} font-black`}>{hideRating ? "??" : effectiveRating}</div>
             <div className="text-xs font-bold">{player.pos}</div>
-            {!hideRating && ratingBoost > 0 && <div className={`text-[10px] font-black ${cupTheme ? "text-slate-950" : "text-green-600"}`}>+{ratingBoost} ⚽</div>}
+            {!hideRating && ratingBoost > 0 && <div className={`text-[10px] font-black ${cupTheme ? "text-slate-950" : "text-green-600"}`}>+{ratingBoost} boost</div>}
           </div>
         </div>
 

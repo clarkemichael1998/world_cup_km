@@ -15,6 +15,7 @@ type SquadPlayer = {
   rarity: string;
   rating: number;
   boost: number;
+  collectionBoost: number;
   goalBoost: number;
   assistBoost: number;
   winCredits: number;
@@ -151,6 +152,7 @@ function MiniCard({ slot, player }: { slot: string; player?: SquadPlayer }) {
       <p className="mt-0.5 truncate text-[9px] font-bold text-green-900/60">{player.nation}</p>
       <div className="mt-1 flex flex-wrap gap-1">
         {player.winCredits > 0 ? <AwardPill label={`Win +${player.winCredits}`} tone="gold" /> : null}
+        {player.collectionBoost > 0 ? <AwardPill label={`Collection +${player.collectionBoost}`} tone="gold" /> : null}
         {player.goalBoost !== 0 ? <AwardPill label={`Goal ${goalLabel}`} tone="green" /> : null}
         {player.assistBoost !== 0 ? <AwardPill label={`Assist ${assistLabel}`} tone="green" /> : null}
         {!hasSplitBoost && player.boost !== 0 ? <AwardPill label={`Boost ${boostLabel}`} tone="green" /> : null}

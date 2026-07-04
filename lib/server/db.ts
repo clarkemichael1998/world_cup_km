@@ -834,7 +834,12 @@ export function getRatingBoosts(userId: number): Record<number, number> {
   const rows = getDb()
     .prepare("SELECT player_id, SUM(boost_amount) AS total FROM goal_boosts WHERE user_id = ? GROUP BY player_id")
     .all(userId) as Array<{ player_id: number; total: number }>;
-  return Object.fromEntries(rows.map((row) => [row.player_id, row.total]));
+  const boosts = new Map<number, number>(rows.map((row) => [row.player_id, row.total]));
+  const playerIds = (getDb().prepare("SELECT player_id FROM user_players WHERE user_id = ?").all(userId) as Array<{ player_id: number }>).map((row) => row.player_id);
+  for (const [playerId, boost] of getCollectionBoostMapForPlayerIds(playerIds)) {
+    boosts.set(playerId, (boosts.get(playerId) ?? 0) + boost);
+  }
+  return Object.fromEntries(boosts);
 }
 
 const DAILY_FREE_CREDITS = 2;
@@ -878,6 +883,34 @@ export function getActivityStreak(userId: number): number {
 }
 
 const NATION_COMPLETION_CREDITS = 5;
+export const COLLECTION_COMPLETION_BOOST = 3;
+
+export function getCompletedCollectionNationsForPlayerIds(playerIds: number[]): string[] {
+  const owned = new Set(playerIds);
+  const byNation = new Map<string, number[]>();
+  for (const player of getAllPlayers()) {
+    if (player.cupId) continue;
+    const list = byNation.get(player.nation) ?? [];
+    list.push(player.id);
+    byNation.set(player.nation, list);
+  }
+  return Array.from(byNation.entries())
+    .filter(([, ids]) => ids.length > 0 && ids.every((id) => owned.has(id)))
+    .map(([nation]) => nation)
+    .sort((a, b) => a.localeCompare(b));
+}
+
+export function getCollectionBoostMapForPlayerIds(playerIds: number[]): Map<number, number> {
+  const owned = new Set(playerIds);
+  const completedNations = new Set(getCompletedCollectionNationsForPlayerIds(playerIds));
+  if (completedNations.size === 0) return new Map();
+  const boosts = new Map<number, number>();
+  for (const player of getAllPlayers()) {
+    if (player.cupId || !owned.has(player.id) || !completedNations.has(player.nation)) continue;
+    boosts.set(player.id, COLLECTION_COMPLETION_BOOST);
+  }
+  return boosts;
+}
 
 export function awardNationCompletionRewards(userId: number): string[] {
   const db = getDb();
@@ -888,6 +921,7 @@ export function awardNationCompletionRewards(userId: number): string[] {
 
   const byNation = new Map<string, number[]>();
   for (const player of getAllPlayers()) {
+    if (player.cupId) continue;
     const list = byNation.get(player.nation) ?? [];
     list.push(player.id);
     byNation.set(player.nation, list);
@@ -2007,9 +2041,9 @@ export function getProfileData(username: string) {
   const boosts = db
     .prepare("SELECT player_id, match_id, boost_amount, created_at FROM goal_boosts WHERE user_id = ? ORDER BY created_at DESC")
     .all(user.id) as Array<{ player_id: number; match_id: string; boost_amount: number; created_at: string }>;
-  const completedNations = db
-    .prepare("SELECT nation FROM nation_completion_rewards WHERE user_id = ? ORDER BY created_at")
-    .all(user.id) as Array<{ nation: string }>;
+  const ownedPlayerIds = ownedRows.map((row) => row.player_id);
+  const collectionBoosts = getCollectionBoostMapForPlayerIds(ownedPlayerIds);
+  const completedNations = getCompletedCollectionNationsForPlayerIds(ownedPlayerIds);
 
   const locks = db
     .prepare("SELECT id, lock_date FROM locked_squads WHERE user_id = ? ORDER BY lock_date DESC LIMIT 14")
@@ -2023,9 +2057,10 @@ export function getProfileData(username: string) {
     gamesWon: wins.games,
     winCredits: wins.credits,
     streak: getActivityStreak(user.id),
-    ownedPlayerIds: ownedRows.map((row) => row.player_id),
+    ownedPlayerIds,
     duplicateCounts: Object.fromEntries(ownedRows.map((row) => [row.player_id, row.duplicate_count])),
-    completedNations: completedNations.map((row) => row.nation),
+    completedNations,
+    collectionBoosts: Object.fromEntries(collectionBoosts),
     boosts: boosts.map((row) => ({
       playerId: row.player_id,
       matchId: row.match_id.endsWith(":assist") ? row.match_id.slice(0, -7) : row.match_id,
@@ -2339,6 +2374,7 @@ function computeBestSquadRating(playerIds: number[], boosts = new Map<number, nu
   if (playerIds.length === 0) return 0;
   const allPlayersForRating = getAllPlayers();
   const owned = playerIds.map((id) => allPlayersForRating.find((p) => p.id === id)).filter((player): player is Player => Boolean(player));
+  const collectionBoosts = getCollectionBoostMapForPlayerIds(playerIds);
   const used = new Set<number>();
   const positions = ["GK", "DF", "DF", "DF", "DF", "MF", "MF", "MF", "FW", "FW", "FW"];
   const picked: number[] = [];
@@ -2346,15 +2382,19 @@ function computeBestSquadRating(playerIds: number[], boosts = new Map<number, nu
   for (const pos of positions) {
     const best = owned
       .filter((p) => p.pos === pos && !used.has(p.id))
-      .sort((a, b) => b.rating + (boosts.get(b.id) ?? 0) - (a.rating + (boosts.get(a.id) ?? 0)) || a.name.localeCompare(b.name))[0];
+      .sort((a, b) => getEffectiveRatingForSort(b, boosts, collectionBoosts) - getEffectiveRatingForSort(a, boosts, collectionBoosts) || a.name.localeCompare(b.name))[0];
     if (best) {
       used.add(best.id);
-      picked.push(best.rating + (boosts.get(best.id) ?? 0));
+      picked.push(getEffectiveRatingForSort(best, boosts, collectionBoosts));
     }
   }
 
   if (picked.length === 0) return 0;
   return Math.round((picked.reduce((s, r) => s + r, 0) / picked.length) * 10) / 10;
+}
+
+function getEffectiveRatingForSort(player: Player, boosts: Map<number, number>, collectionBoosts: Map<number, number>) {
+  return player.rating + (boosts.get(player.id) ?? 0) + (collectionBoosts.get(player.id) ?? 0);
 }
 
 export function getCommunitySquads() {
@@ -2438,13 +2478,15 @@ export function getCommunitySquads() {
     .map((user) => {
       const boosts = boostsByUser.get(user.id) ?? new Map<number, number>();
       const bonuses = bonusByUser.get(user.id) ?? new Map<number, { goalBoost: number; assistBoost: number; winCredits: number }>();
-      const best = pickBestCommunitySquad(ownedByUser.get(user.id) ?? [], boosts, bonuses, playerById);
+      const ownedPlayerIds = ownedByUser.get(user.id) ?? [];
+      const collectionBoosts = getCollectionBoostMapForPlayerIds(ownedPlayerIds);
+      const best = pickBestCommunitySquad(ownedPlayerIds, boosts, collectionBoosts, bonuses, playerById);
       const locked = lockedByUser.get(user.id);
       const lockedPlayers = locked
         ? communitySquadSlots
             .map((slot) => locked.players.find((player) => player.slot === slot))
             .filter((player): player is { slot: SquadSlot; playerId: number } => Boolean(player))
-            .map((player) => toCommunitySquadPlayer(player.slot, player.playerId, boosts, bonuses, playerById))
+            .map((player) => toCommunitySquadPlayer(player.slot, player.playerId, boosts, collectionBoosts, bonuses, playerById))
             .filter((player): player is NonNullable<ReturnType<typeof toCommunitySquadPlayer>> => Boolean(player))
         : [];
 
@@ -2463,7 +2505,7 @@ export function getCommunitySquads() {
     .sort((a, b) => b.best.rating - a.best.rating || a.username.localeCompare(b.username));
 }
 
-function pickBestCommunitySquad(playerIds: number[], boosts: Map<number, number>, bonuses: Map<number, { goalBoost: number; assistBoost: number; winCredits: number }>, playerById: Map<number, Player>) {
+function pickBestCommunitySquad(playerIds: number[], boosts: Map<number, number>, collectionBoosts: Map<number, number>, bonuses: Map<number, { goalBoost: number; assistBoost: number; winCredits: number }>, playerById: Map<number, Player>) {
   const owned = playerIds
     .map((id) => playerById.get(id))
     .filter((player): player is Player => Boolean(player));
@@ -2474,10 +2516,10 @@ function pickBestCommunitySquad(playerIds: number[], boosts: Map<number, number>
     const position = slot.startsWith("DF") ? "DF" : slot.startsWith("MF") ? "MF" : slot.startsWith("FW") ? "FW" : "GK";
     const player = owned
       .filter((candidate) => candidate.pos === position && !used.has(candidate.id))
-      .sort((a, b) => b.rating + (boosts.get(b.id) ?? 0) - (a.rating + (boosts.get(a.id) ?? 0)) || a.name.localeCompare(b.name))[0];
+      .sort((a, b) => getEffectiveRatingForSort(b, boosts, collectionBoosts) - getEffectiveRatingForSort(a, boosts, collectionBoosts) || a.name.localeCompare(b.name))[0];
     if (player) {
       used.add(player.id);
-      const squadPlayer = toCommunitySquadPlayer(slot, player.id, boosts, bonuses, playerById);
+      const squadPlayer = toCommunitySquadPlayer(slot, player.id, boosts, collectionBoosts, bonuses, playerById);
       if (squadPlayer) players.push(squadPlayer);
     }
   }
@@ -2488,10 +2530,11 @@ function pickBestCommunitySquad(playerIds: number[], boosts: Map<number, number>
   };
 }
 
-function toCommunitySquadPlayer(slot: SquadSlot, playerId: number, boosts: Map<number, number>, bonuses: Map<number, { goalBoost: number; assistBoost: number; winCredits: number }>, playerById: Map<number, Player>) {
+function toCommunitySquadPlayer(slot: SquadSlot, playerId: number, boosts: Map<number, number>, collectionBoosts: Map<number, number>, bonuses: Map<number, { goalBoost: number; assistBoost: number; winCredits: number }>, playerById: Map<number, Player>) {
   const player = playerById.get(playerId);
   if (!player) return null;
   const boost = boosts.get(player.id) ?? 0;
+  const collectionBoost = collectionBoosts.get(player.id) ?? 0;
   const bonus = bonuses.get(player.id) ?? { goalBoost: 0, assistBoost: 0, winCredits: 0 };
   return {
     slot,
@@ -2503,10 +2546,11 @@ function toCommunitySquadPlayer(slot: SquadSlot, playerId: number, boosts: Map<n
     rarity: player.rarity,
     rating: player.rating,
     boost,
+    collectionBoost,
     goalBoost: bonus.goalBoost,
     assistBoost: bonus.assistBoost,
     winCredits: bonus.winCredits,
-    effectiveRating: player.rating + boost
+    effectiveRating: player.rating + boost + collectionBoost
   };
 }
 
