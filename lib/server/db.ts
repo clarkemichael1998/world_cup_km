@@ -3227,7 +3227,9 @@ export function getRandomSwapLog(limit = 30) {
 }
 
 export function getAllOtherUsers(userId: number): Array<{ id: number; username: string }> {
-  return getDb().prepare("SELECT id, username FROM users WHERE id != ? ORDER BY username").all(userId) as Array<{ id: number; username: string }>;
+  const adminNames = getAdminUsernames();
+  const rows = getDb().prepare("SELECT id, username FROM users WHERE id != ? ORDER BY username").all(userId) as Array<{ id: number; username: string }>;
+  return rows.filter((r) => !adminNames.has(r.username.trim().toLowerCase()));
 }
 
 function seedFixtureResults(database: DatabaseSync) {

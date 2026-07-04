@@ -1049,41 +1049,67 @@ function DangerSwapView({
   const outgoing = challenges.filter((c) => c.isMine);
 
   return (
-    <section>
-      {/* Header */}
-      <div className="mb-5 overflow-hidden rounded-2xl border border-red-500/30 bg-gradient-to-br from-red-950/60 via-red-900/30 to-red-950/50 p-5">
-        <div className="flex items-center gap-2">
-          <span className="text-2xl">🎲</span>
-          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-red-400/70">Danger Zone</p>
+    <section className="space-y-4">
+      {/* Hero */}
+      <div className="relative overflow-hidden rounded-2xl border border-red-500/25 bg-gradient-to-br from-red-950/70 via-red-900/20 to-black/40 p-5">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(239,68,68,0.12),transparent_60%)]" />
+        <div className="relative">
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-red-400/60">Danger Zone</p>
+          <h2 className="mt-1 text-xl font-black text-white">Random Swap</h2>
+          <p className="mt-1.5 text-sm font-semibold text-white/45">
+            No picks. No previews. One random card each — gone before you know what it was.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1">
+            {["Locked XI protected", "Completed nations protected", "Everything else is fair game"].map((r) => (
+              <span key={r} className="flex items-center gap-1.5 text-xs font-semibold text-red-300/50">
+                <span className="h-1 w-1 rounded-full bg-red-500/50" />{r}
+              </span>
+            ))}
+          </div>
         </div>
-        <h2 className="mt-2 text-xl font-black text-white">Random Swap</h2>
-        <p className="mt-1 text-sm font-semibold text-red-200/60">
-          Challenge someone to swap a completely random card from each collection. No picks, no previews — you won't know what you lose or gain until it's done.
-        </p>
-        <ul className="mt-3 space-y-1">
-          {[
-            "Players in your locked XI are protected",
-            "Players from completed nations are protected",
-            "Everything else is fair game"
-          ].map((rule) => (
-            <li key={rule} className="flex items-center gap-2 text-xs font-semibold text-red-200/50">
-              <span className="h-1 w-1 shrink-0 rounded-full bg-red-500/60" />
-              {rule}
-            </li>
-          ))}
-        </ul>
       </div>
 
+      {/* Incoming challenges — surfaced prominently */}
+      {incoming.map((c) => (
+        <div key={c.id} className="overflow-hidden rounded-2xl border border-red-500/35 bg-red-950/30">
+          <div className="flex items-center justify-between gap-3 px-4 pt-4 pb-3">
+            <div>
+              <p className="text-xs font-black uppercase tracking-widest text-red-400/70">Challenge incoming</p>
+              <p className="mt-0.5 text-sm font-black text-white">
+                <span className="text-red-300">{c.challengerUsername}</span> wants a Danger Swap
+              </p>
+            </div>
+            <span className="text-xl">🎲</span>
+          </div>
+          <div className="flex gap-2 border-t border-red-500/15 px-4 py-3">
+            <button
+              className="flex-1 rounded-xl bg-red-500 py-2.5 text-sm font-black text-white transition hover:bg-red-400 disabled:opacity-40"
+              disabled={tradeBusy}
+              onClick={() => dangerAction({ action: "accept", swapId: c.id }, "Swap done — cards lost, cards gained.")}
+            >
+              Accept
+            </button>
+            <button
+              className="rounded-xl bg-white/6 px-5 py-2.5 text-sm font-semibold text-white/35 transition hover:bg-white/10 disabled:opacity-40"
+              disabled={tradeBusy}
+              onClick={() => dangerAction({ action: "decline", swapId: c.id }, "Challenge declined.")}
+            >
+              Decline
+            </button>
+          </div>
+        </div>
+      ))}
+
       {/* Issue challenge */}
-      <div className="mb-5 rounded-2xl border border-red-500/25 bg-red-950/20 p-4">
-        <p className="mb-3 text-xs font-black uppercase tracking-widest text-red-400/70">Issue a Challenge</p>
+      <div className="rounded-2xl border border-white/8 bg-white/4 p-4">
+        <p className="mb-3 text-xs font-black uppercase tracking-widest text-white/30">Issue a Challenge</p>
         <div className="flex gap-2">
           <select
-            className="min-w-0 flex-1 rounded-xl border border-red-500/25 bg-red-950/40 px-3 py-2.5 text-sm font-bold text-white focus:border-red-400/50 focus:outline-none"
+            className="min-w-0 flex-1 rounded-xl border border-white/10 bg-green-950 px-3 py-2.5 text-sm font-bold text-white focus:border-red-400/50 focus:outline-none"
             value={dangerTargetId || ""}
             onChange={(e) => setDangerTargetId(Number(e.target.value))}
           >
-            <option value="" className="bg-green-950">Select opponent…</option>
+            <option value="" className="bg-green-950">Pick an opponent…</option>
             {otherUsers.map((u) => (
               <option key={u.id} value={u.id} className="bg-green-950">{u.username}</option>
             ))}
@@ -1091,107 +1117,58 @@ function DangerSwapView({
           <button
             className="shrink-0 rounded-xl bg-red-500 px-5 py-2.5 text-sm font-black text-white transition hover:bg-red-400 disabled:opacity-40"
             disabled={tradeBusy || !dangerTargetId}
-            onClick={() => dangerTargetId && dangerAction({ action: "challenge", targetId: dangerTargetId }, "Challenge sent — now they decide.")}
+            onClick={() => dangerTargetId && dangerAction({ action: "challenge", targetId: dangerTargetId }, "Challenge sent.")}
           >
             Challenge
           </button>
         </div>
       </div>
 
-      {/* Incoming challenges */}
-      {incoming.length > 0 ? (
-        <div className="mb-5">
-          <p className="mb-3 text-xs font-black uppercase tracking-widest text-red-400/70">Incoming Challenges</p>
-          <div className="space-y-3">
-            {incoming.map((c) => (
-              <div key={c.id} className="overflow-hidden rounded-2xl border border-red-500/30 bg-red-950/25">
-                <div className="flex items-center justify-between gap-3 p-4">
-                  <div>
-                    <p className="text-sm font-black text-white">
-                      <span className="text-red-300">{c.challengerUsername}</span> is challenging you to a Danger Swap
-                    </p>
-                    <p className="mt-0.5 text-xs font-semibold text-red-200/40">
-                      Issued {new Date(c.createdAt).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
-                    </p>
-                  </div>
-                  <span className="rounded-full bg-red-500/20 px-2.5 py-1 text-[10px] font-black text-red-300">🎲 DANGER</span>
-                </div>
-                <div className="flex gap-2 border-t border-red-500/15 px-4 py-3">
-                  <button
-                    className="flex-1 rounded-xl bg-red-500 py-2.5 text-sm font-black text-white transition hover:bg-red-400 disabled:opacity-40"
-                    disabled={tradeBusy}
-                    onClick={() => dangerAction({ action: "accept", swapId: c.id }, "Swap executed — check the chat for the result!")}
-                  >
-                    Accept (no going back)
-                  </button>
-                  <button
-                    className="rounded-xl bg-white/8 px-5 py-2.5 text-sm font-black text-white/40 transition hover:bg-white/12 disabled:opacity-40"
-                    disabled={tradeBusy}
-                    onClick={() => dangerAction({ action: "decline", swapId: c.id }, "Challenge declined.")}
-                  >
-                    Decline
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      ) : null}
-
       {/* Sent challenges */}
       {outgoing.length > 0 ? (
-        <div className="mb-5">
-          <p className="mb-3 text-xs font-black uppercase tracking-widest text-white/35">Sent Challenges</p>
-          <div className="space-y-2">
-            {outgoing.map((c) => (
-              <div key={c.id} className="flex items-center justify-between gap-3 rounded-xl border border-white/8 bg-white/4 px-4 py-3">
-                <div>
-                  <p className="text-sm font-semibold text-white/70">
-                    Waiting on <span className="font-black text-white">{c.targetUsername}</span>
-                  </p>
-                  <p className="text-xs font-semibold text-white/30">
-                    Sent {new Date(c.createdAt).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
-                  </p>
-                </div>
-                <button
-                  className="rounded-lg bg-white/8 px-4 py-2 text-xs font-black text-white/40 hover:bg-white/12 disabled:opacity-40"
-                  disabled={tradeBusy}
-                  onClick={() => dangerAction({ action: "withdraw", swapId: c.id }, "Challenge withdrawn.")}
-                >
-                  Withdraw
-                </button>
-              </div>
-            ))}
-          </div>
+        <div className="space-y-2">
+          <p className="text-xs font-black uppercase tracking-widest text-white/25">Awaiting response</p>
+          {outgoing.map((c) => (
+            <div key={c.id} className="flex items-center justify-between gap-3 rounded-xl border border-white/8 bg-white/4 px-4 py-3">
+              <p className="text-sm font-semibold text-white/55">
+                Waiting on <span className="font-black text-white/80">{c.targetUsername}</span>
+              </p>
+              <button
+                className="rounded-lg bg-white/6 px-3 py-1.5 text-xs font-black text-white/35 hover:bg-white/10 disabled:opacity-40"
+                disabled={tradeBusy}
+                onClick={() => dangerAction({ action: "withdraw", swapId: c.id }, "Challenge withdrawn.")}
+              >
+                Withdraw
+              </button>
+            </div>
+          ))}
         </div>
       ) : null}
 
       {/* Public log */}
       <div>
-        <p className="mb-3 text-xs font-black uppercase tracking-widest text-white/35">Danger Swap Log</p>
+        <p className="mb-3 text-xs font-black uppercase tracking-widest text-white/25">Swap Log</p>
         {log.length === 0 ? (
-          <div className="rounded-xl border border-white/8 bg-white/4 p-6 text-center text-sm font-semibold text-white/25">
-            No danger swaps have happened yet. Be the first to take the plunge.
+          <div className="rounded-xl border border-white/6 bg-white/3 p-6 text-center text-sm font-semibold text-white/20">
+            No danger swaps yet.
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="divide-y divide-white/5 overflow-hidden rounded-xl border border-white/8 bg-white/4">
             {log.map((entry) => {
               const cPlayer = playerById.get(entry.challengerPlayerId);
               const tPlayer = playerById.get(entry.targetPlayerId);
               return (
-                <div key={entry.id} className="overflow-hidden rounded-xl border border-white/8 bg-white/4 px-4 py-3">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-xs font-black text-white/70">{entry.challengerUsername}</span>
-                    <span className="text-[10px] text-white/20">lost</span>
-                    <MiniChip player={cPlayer} />
-                    <span className="text-[10px] font-black text-red-400/60">⇄</span>
-                    <span className="text-xs font-black text-white/70">{entry.targetUsername}</span>
-                    <span className="text-[10px] text-white/20">lost</span>
-                    <MiniChip player={tPlayer} />
-                  </div>
-                  <p className="mt-1.5 text-[10px] font-semibold text-white/25">
-                    {new Date(entry.completedAt).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
-                  </p>
+                <div key={entry.id} className="flex flex-wrap items-center gap-x-2 gap-y-1 px-4 py-3">
+                  <span className="text-xs font-black text-white/60">{entry.challengerUsername}</span>
+                  <span className="text-[10px] text-white/20">↓</span>
+                  <MiniChip player={cPlayer} />
+                  <span className="text-[10px] font-black text-red-500/50 mx-0.5">🎲</span>
+                  <span className="text-xs font-black text-white/60">{entry.targetUsername}</span>
+                  <span className="text-[10px] text-white/20">↓</span>
+                  <MiniChip player={tPlayer} />
+                  <span className="ml-auto text-[10px] font-semibold text-white/20 tabular-nums">
+                    {new Date(entry.completedAt).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                  </span>
                 </div>
               );
             })}
