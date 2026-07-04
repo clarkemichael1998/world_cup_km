@@ -2173,6 +2173,14 @@ export function createDirectTradeProposal(proposerId: number, targetUserId: numb
   const proposerDupe = db.prepare("SELECT duplicate_count FROM user_players WHERE user_id = ? AND player_id = ?").get(proposerId, offeredPlayerId) as { duplicate_count: number } | undefined;
   if (!proposerDupe || proposerDupe.duplicate_count < 1) return "You can only offer a card you hold a duplicate of.";
 
+  const playerMap = new Map(getAllPlayers().map((player) => [player.id, player]));
+  const wantedPlayer = playerMap.get(wantedPlayerId);
+  const offeredPlayer = playerMap.get(offeredPlayerId);
+  if (!wantedPlayer || !offeredPlayer) return "One of those players could not be found.";
+  if (wantedPlayer.rarity !== offeredPlayer.rarity) {
+    return `Trades must match card status: offer another ${wantedPlayer.rarity} card for ${wantedPlayer.name}.`;
+  }
+
   const existing = db
     .prepare(
       `SELECT p.id, t.id AS offer_id

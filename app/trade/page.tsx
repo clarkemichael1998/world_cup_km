@@ -451,7 +451,8 @@ function MarketCard({
   const progress = player ? progressByNation.get(player.nation) : undefined;
   const key = `${entry.userId}:${entry.playerId}`;
   const selectedPlayerId = offerSelections[key];
-  const availableDuplicates = myDuplicates.filter((duplicate) => duplicate.id !== entry.playerId);
+  const matchingDuplicates = myDuplicates.filter((duplicate) => duplicate.id !== entry.playerId && duplicate.rarity === player?.rarity);
+  const blockedByStatus = Boolean(player) && matchingDuplicates.length === 0;
 
   return (
     <div className="rounded-xl border border-green-900/10 bg-green-950/[0.03] p-3">
@@ -460,9 +461,15 @@ function MarketCard({
         <div className="flex flex-wrap justify-end gap-1.5">
           <Badge tone={ownedIds.has(entry.playerId) ? "muted" : "good"}>{ownedIds.has(entry.playerId) ? "Already owned" : "You need this"}</Badge>
           {progress?.missing.length === 1 ? <Badge tone="gold">Completes {player?.nation}</Badge> : null}
+          {player ? <Badge tone="muted">{player.rarity} only</Badge> : null}
           <Badge tone="muted">Spare x{entry.duplicateCount}</Badge>
         </div>
       </div>
+      {blockedByStatus ? (
+        <p className="mt-3 rounded-md bg-amber-100 px-2 py-1.5 text-xs font-bold text-amber-900">
+          You need a spare {player?.rarity} card to propose for this one.
+        </p>
+      ) : null}
       <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-green-900/10 pt-3">
         <span className="text-xs font-black uppercase tracking-wide text-green-900/50">Offer</span>
         <select
@@ -470,8 +477,8 @@ function MarketCard({
           value={selectedPlayerId ?? ""}
           onChange={(event) => setOfferSelections((prev) => ({ ...prev, [key]: Number(event.target.value) }))}
         >
-          <option value="">{availableDuplicates.length > 0 ? "Choose your duplicate..." : "No duplicate to offer"}</option>
-          {availableDuplicates.map((duplicate) => (
+          <option value="">{matchingDuplicates.length > 0 ? `Choose your ${player?.rarity} duplicate...` : `No spare ${player?.rarity ?? "matching"} card`}</option>
+          {matchingDuplicates.map((duplicate) => (
             <option key={duplicate.id} value={duplicate.id}>
               {duplicate.name} - spare x{duplicateCounts[duplicate.id] ?? 0} - {duplicate.nation}
             </option>
@@ -488,7 +495,7 @@ function MarketCard({
               "Trade proposed. It expires in 24 hours."
             )
           }
-          disabled={tradeBusy || !selectedPlayerId}
+          disabled={tradeBusy || !selectedPlayerId || blockedByStatus}
         >
           Propose
         </Button>
