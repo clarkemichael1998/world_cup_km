@@ -68,6 +68,7 @@ export default function TradePage() {
   const [activeView, setActiveView] = useState<TradeView>("home");
   const [bestSwapMode, setBestSwapMode] = useState<BestSwapMode>("collections");
   const [search, setSearch] = useState("");
+  const [proposalTab, setProposalTab] = useState<"incoming" | "sent">("incoming");
 
   useEffect(() => {
     loadUserStateAsync().then(setState);
@@ -319,24 +320,43 @@ export default function TradePage() {
       {/* ── PROPOSALS ───────────────────────────────────────── */}
       {activeView === "proposals" ? (
         <section>
-          <div className="mb-4">
-            <p className="text-xs font-black uppercase tracking-widest text-white/45">Proposed Trades</p>
-            <p className="mt-1 text-sm font-semibold text-white/55">
-              Incoming proposals can be accepted or rejected. Your sent proposals can be withdrawn.
-            </p>
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-xs font-black uppercase tracking-widest text-white/45">Proposed Trades</p>
+              <p className="mt-1 text-sm font-semibold text-white/55">Accept or reject incoming swaps. Withdraw your own sent proposals.</p>
+            </div>
+            <div className="inline-flex gap-1 rounded-xl bg-white/6 p-1 ring-1 ring-white/10">
+              <ModeButton active={proposalTab === "incoming"} onClick={() => setProposalTab("incoming")}>
+                Incoming
+                {incoming.length > 0 ? <span className="ml-1.5 rounded-full bg-amber-400/30 px-1.5 py-0.5 text-[9px] font-black text-amber-200">{incoming.length}</span> : null}
+              </ModeButton>
+              <ModeButton active={proposalTab === "sent"} onClick={() => setProposalTab("sent")}>
+                Sent
+                {outgoing.length > 0 ? <span className="ml-1.5 rounded-full bg-white/20 px-1.5 py-0.5 text-[9px] font-black">{outgoing.length}</span> : null}
+              </ModeButton>
+            </div>
           </div>
-          <div className="grid gap-5 lg:grid-cols-2">
-            <ProposalColumn title="Incoming" count={incoming.length} emptyText="No one has proposed a swap to you yet.">
-              {incoming.map((p) => (
-                <ProposalCard key={p.id} proposal={p} playerById={playerById} tradeBusy={tradeBusy} tradeAction={tradeAction} />
-              ))}
-            </ProposalColumn>
-            <ProposalColumn title="Sent" count={outgoing.length} emptyText="You haven't sent any active proposals.">
-              {outgoing.map((p) => (
-                <ProposalCard key={p.id} proposal={p} playerById={playerById} tradeBusy={tradeBusy} tradeAction={tradeAction} />
-              ))}
-            </ProposalColumn>
-          </div>
+          {proposalTab === "incoming" ? (
+            incoming.length === 0 ? (
+              <div className="rounded-xl border border-white/8 bg-white/4 p-8 text-center text-sm font-semibold text-white/30">No incoming proposals right now.</div>
+            ) : (
+              <div className="space-y-3">
+                {incoming.map((p) => (
+                  <ProposalCard key={p.id} proposal={p} playerById={playerById} tradeBusy={tradeBusy} tradeAction={tradeAction} />
+                ))}
+              </div>
+            )
+          ) : (
+            outgoing.length === 0 ? (
+              <div className="rounded-xl border border-white/8 bg-white/4 p-8 text-center text-sm font-semibold text-white/30">You haven't sent any active proposals.</div>
+            ) : (
+              <div className="space-y-3">
+                {outgoing.map((p) => (
+                  <ProposalCard key={p.id} proposal={p} playerById={playerById} tradeBusy={tradeBusy} tradeAction={tradeAction} />
+                ))}
+              </div>
+            )
+          )}
         </section>
       ) : null}
 
@@ -620,25 +640,6 @@ function Showcase({
 
 // ── Proposals ─────────────────────────────────────────────────
 
-function ProposalColumn({ title, count, emptyText, children }: { title: string; count: number; emptyText: string; children: ReactNode }) {
-  const hasChildren = Array.isArray(children) ? children.length > 0 : Boolean(children);
-  return (
-    <div>
-      <div className="mb-3 flex items-center gap-2">
-        <p className="text-xs font-black uppercase tracking-widest text-white/45">{title}</p>
-        {count > 0 ? (
-          <span className="rounded-full bg-amber-400/20 px-2 py-0.5 text-[10px] font-black text-amber-300">{count}</span>
-        ) : null}
-      </div>
-      <div className="space-y-3">
-        {hasChildren ? children : (
-          <div className="rounded-xl border border-white/8 bg-white/4 p-5 text-sm font-semibold text-white/30">{emptyText}</div>
-        )}
-      </div>
-    </div>
-  );
-}
-
 function ProposalCard({
   proposal, playerById, tradeBusy, tradeAction
 }: {
@@ -651,46 +652,52 @@ function ProposalCard({
   const wanted = playerById.get(proposal.wantedPlayerId);
   return (
     <div className={`overflow-hidden rounded-2xl border ${proposal.isIncoming ? "border-amber-400/25 bg-amber-950/15" : "border-white/10 bg-white/5"}`}>
-      <div className="flex items-center justify-between gap-2 px-4 pt-4">
-        <p className="text-xs font-semibold text-white/45">
-          <span className="font-black text-white/75">{proposal.proposerUsername}</span>
-          <span className="mx-1 text-white/25">→</span>
-          <span className="font-black text-white/75">{proposal.targetUsername}</span>
-        </p>
-        <span className="rounded-full bg-white/8 px-2 py-0.5 text-[9px] font-black text-white/35">
-          Expires {formatExpiry(proposal.expiresAt)}
-        </span>
-      </div>
-
-      <div className="mt-3 flex items-stretch gap-2 px-4">
-        <ProposalPlayerChip player={offered} label="Offered" />
-        <div className="flex items-center px-1">
-          <span className="text-sm font-black text-white/20">⇄</span>
+      {/* Meta row */}
+      <div className="flex items-center justify-between gap-2 px-4 pt-3">
+        <div className="flex items-center gap-2">
+          {proposal.isIncoming ? (
+            <span className="rounded-full bg-amber-400/20 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-amber-300">Incoming</span>
+          ) : (
+            <span className="rounded-full bg-white/8 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-white/40">Sent</span>
+          )}
+          <span className="text-xs font-semibold text-white/40">
+            {proposal.isIncoming ? `from ${proposal.proposerUsername}` : `to ${proposal.targetUsername}`}
+          </span>
         </div>
-        <ProposalPlayerChip player={wanted} label="Wanted" />
+        <span className="text-[10px] font-semibold text-white/30">Expires {formatExpiry(proposal.expiresAt)}</span>
       </div>
 
-      <div className={`mt-4 flex gap-2 px-4 pb-4 ${proposal.isIncoming ? "flex-col sm:flex-row" : ""}`}>
+      {/* Swap display */}
+      <div className="mt-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2 px-4">
+        <ProposalPlayerChip player={offered} label={proposal.isIncoming ? `${proposal.proposerUsername} gives` : "You give"} />
+        <div className="flex flex-col items-center gap-0.5">
+          <span className="text-lg font-black text-white/15">⇄</span>
+        </div>
+        <ProposalPlayerChip player={wanted} label={proposal.isIncoming ? "You receive" : `${proposal.targetUsername} gives`} />
+      </div>
+
+      {/* Actions */}
+      <div className="mt-4 flex gap-2 border-t border-white/8 px-4 py-3">
         {proposal.isIncoming ? (
           <>
             <button
-              className="flex-1 rounded-xl bg-amber-400 py-2.5 text-xs font-black text-amber-950 transition hover:bg-amber-300 disabled:opacity-40"
+              className="flex-1 rounded-xl bg-amber-400 py-2.5 text-sm font-black text-amber-950 transition hover:bg-amber-300 disabled:opacity-40"
               onClick={() => tradeAction({ action: "confirm", proposalId: proposal.id }, "Trade complete.")}
               disabled={tradeBusy}
             >
-              Accept
+              Accept swap
             </button>
             <button
-              className="flex-1 rounded-xl bg-white/8 py-2.5 text-xs font-black text-white/50 transition hover:bg-white/12 disabled:opacity-40"
+              className="rounded-xl bg-white/8 px-5 py-2.5 text-sm font-black text-white/45 transition hover:bg-white/12 disabled:opacity-40"
               onClick={() => tradeAction({ action: "decline", proposalId: proposal.id }, "Proposal rejected.")}
               disabled={tradeBusy}
             >
-              Reject
+              Decline
             </button>
           </>
         ) : (
           <button
-            className="rounded-xl bg-white/8 px-5 py-2.5 text-xs font-black text-white/50 transition hover:bg-white/12 disabled:opacity-40"
+            className="rounded-xl bg-white/8 px-5 py-2.5 text-sm font-black text-white/45 transition hover:bg-white/12 disabled:opacity-40"
             onClick={() => tradeAction({ action: "withdraw", proposalId: proposal.id }, "Proposal withdrawn.")}
             disabled={tradeBusy}
           >
@@ -706,18 +713,19 @@ function ProposalPlayerChip({ player, label }: { player: Player | undefined; lab
   const flag = flagUrl(player?.nation ?? "");
   const rarity = player?.rarity ?? "common";
   return (
-    <div className="flex min-w-0 flex-1 items-center gap-2.5 rounded-xl bg-white/6 px-3 py-2.5 ring-1 ring-white/8">
-      <div className={`flex h-10 w-10 shrink-0 flex-col items-center justify-center rounded-lg ring-2 ${RARITY_RING[rarity] ?? RARITY_RING.common}`}>
-        <span className={`text-base font-black leading-none ${RARITY_COLOUR[rarity] ?? "text-white/80"}`}>{player?.rating ?? "?"}</span>
+    <div className="flex min-w-0 items-center gap-3 rounded-xl bg-white/6 p-3 ring-1 ring-white/8">
+      <div className={`flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-xl ring-2 ${RARITY_RING[rarity] ?? RARITY_RING.common}`}>
+        <span className={`text-lg font-black leading-none ${RARITY_COLOUR[rarity] ?? "text-white/80"}`}>{player?.rating ?? "?"}</span>
+        <span className="text-[8px] font-black uppercase leading-none text-white/35">{player?.pos ?? ""}</span>
       </div>
-      <div className="min-w-0">
-        <p className="text-[9px] font-black uppercase tracking-wide text-white/30">{label}</p>
-        <div className="flex items-center gap-1">
-          {flag ? <img src={flag} alt="" className="h-3 w-4 shrink-0 rounded-sm object-cover" /> : null}
-          <p className="truncate text-xs font-black text-white/85">{player?.name ?? "Unknown"}</p>
+      <div className="min-w-0 flex-1">
+        <p className="text-[10px] font-black uppercase tracking-wide text-white/30">{label}</p>
+        <div className="mt-0.5 flex items-center gap-1.5">
+          {flag ? <img src={flag} alt="" className="h-3.5 w-5 shrink-0 rounded-sm object-cover" /> : null}
+          <p className="truncate text-sm font-black text-white/90">{player?.name ?? "Unknown"}</p>
         </div>
         {player ? (
-          <p className={`text-[9px] font-bold uppercase ${RARITY_COLOUR[rarity] ?? "text-white/40"}`}>{rarity}</p>
+          <p className={`mt-0.5 text-[10px] font-bold uppercase ${RARITY_COLOUR[rarity] ?? "text-white/40"}`}>{player.nation} · {rarity}</p>
         ) : null}
       </div>
     </div>
@@ -767,7 +775,7 @@ function NationTargetCard({
         />
       </div>
 
-      <div className="mt-3 space-y-px">
+      <div className="mt-3 divide-y divide-white/6">
         {progress.missing.slice(0, 5).map((missingPlayer) => {
           const matchingEntries = market.filter((e) => e.playerId === missingPlayer.id);
           const hasAvailable = matchingEntries.length > 0;
@@ -778,54 +786,64 @@ function NationTargetCard({
           const pFlag = flagUrl(missingPlayer.nation);
 
           return (
-            <div key={missingPlayer.id} className="border-t border-white/6 px-4 py-3">
-              <div className="flex items-center gap-2">
-                <div className={`flex h-9 w-9 shrink-0 flex-col items-center justify-center rounded-lg ring-2 ${RARITY_RING[rarity] ?? RARITY_RING.common}`}>
+            <div key={missingPlayer.id} className="px-4 py-3">
+              {/* Player info row */}
+              <div className="flex items-center gap-3">
+                <div className={`flex h-10 w-10 shrink-0 flex-col items-center justify-center rounded-lg ring-2 ${RARITY_RING[rarity] ?? RARITY_RING.common}`}>
                   <span className={`text-sm font-black leading-none ${RARITY_COLOUR[rarity] ?? "text-white/80"}`}>{missingPlayer.rating}</span>
                   <span className="text-[7px] font-black uppercase leading-none text-white/35">{missingPlayer.pos}</span>
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1.5">
                     {pFlag ? <img src={pFlag} alt="" className="h-3 w-4 shrink-0 rounded-sm object-cover" /> : null}
-                    <p className="truncate text-xs font-black text-white/80">{missingPlayer.name}</p>
+                    <p className="truncate text-sm font-black text-white/85">{missingPlayer.name}</p>
                   </div>
-                  <p className={`text-[9px] font-bold uppercase ${RARITY_COLOUR[rarity] ?? "text-white/40"}`}>{rarity}</p>
+                  <p className={`mt-0.5 text-[10px] font-bold uppercase ${RARITY_COLOUR[rarity] ?? "text-white/40"}`}>{rarity}</p>
                 </div>
-                <span className={`rounded-full px-2 py-0.5 text-[9px] font-black ${hasAvailable ? "bg-green-500/15 text-green-300" : "bg-white/6 text-white/25"}`}>
-                  {hasAvailable ? `${matchingEntries.length} avail` : "None"}
-                </span>
+                {hasAvailable ? (
+                  <span className="shrink-0 rounded-full bg-green-500/15 px-2.5 py-1 text-[10px] font-black text-green-300">
+                    {matchingEntries.length} available
+                  </span>
+                ) : (
+                  <span className="shrink-0 rounded-full bg-white/6 px-2.5 py-1 text-[10px] font-semibold text-white/25">Not listed</span>
+                )}
               </div>
 
+              {/* Offer row — only when someone has this card */}
               {hasAvailable ? (
-                <div className="mt-2.5 flex items-center gap-2">
-                  <select
-                    className="min-w-0 flex-1 rounded-lg border border-white/12 bg-white/8 px-2 py-1.5 text-xs font-bold text-white focus:border-amber-400/50 focus:outline-none"
-                    value={selectedPlayerId ?? ""}
-                    onChange={(e) => setOfferSelections((prev) => ({ ...prev, [key]: Number(e.target.value) }))}
-                  >
-                    <option value="" className="bg-green-950">
-                      {matchingDuplicates.length > 0 ? `Your spare ${rarity}…` : `No spare ${rarity}`}
-                    </option>
-                    {matchingDuplicates.map((d) => (
-                      <option key={d.id} value={d.id} className="bg-green-950">
-                        {d.name} ×{duplicateCounts[d.id] ?? 0} · {d.nation}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    className="shrink-0 rounded-lg bg-amber-400 px-3 py-1.5 text-xs font-black text-amber-950 transition hover:bg-amber-300 disabled:opacity-40"
-                    disabled={tradeBusy || !selectedPlayerId || matchingDuplicates.length === 0}
-                    onClick={() =>
-                      selectedPlayerId &&
-                      matchingEntries[0] &&
-                      tradeAction(
-                        { action: "propose", targetUserId: matchingEntries[0].userId, wantedPlayerId: missingPlayer.id, offeredPlayerId: selectedPlayerId },
-                        "Trade proposed — it expires in 24 hours."
-                      )
-                    }
-                  >
-                    Propose
-                  </button>
+                <div className="mt-2.5 flex items-center gap-2 rounded-xl bg-white/5 p-2 ring-1 ring-white/8">
+                  {matchingDuplicates.length === 0 ? (
+                    <p className="flex-1 px-1 text-xs font-semibold text-white/30">No spare {rarity} to offer in return</p>
+                  ) : (
+                    <>
+                      <select
+                        className="min-w-0 flex-1 rounded-lg border border-white/12 bg-white/8 px-2 py-2 text-xs font-bold text-white focus:border-amber-400/50 focus:outline-none"
+                        value={selectedPlayerId ?? ""}
+                        onChange={(e) => setOfferSelections((prev) => ({ ...prev, [key]: Number(e.target.value) }))}
+                      >
+                        <option value="" className="bg-green-950">Your spare {rarity}…</option>
+                        {matchingDuplicates.map((d) => (
+                          <option key={d.id} value={d.id} className="bg-green-950">
+                            {d.name} ×{duplicateCounts[d.id] ?? 0} · {d.nation}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        className="shrink-0 rounded-lg bg-amber-400 px-4 py-2 text-xs font-black text-amber-950 transition hover:bg-amber-300 disabled:opacity-40"
+                        disabled={tradeBusy || !selectedPlayerId}
+                        onClick={() =>
+                          selectedPlayerId &&
+                          matchingEntries[0] &&
+                          tradeAction(
+                            { action: "propose", targetUserId: matchingEntries[0].userId, wantedPlayerId: missingPlayer.id, offeredPlayerId: selectedPlayerId },
+                            "Trade proposed — it expires in 24 hours."
+                          )
+                        }
+                      >
+                        Propose
+                      </button>
+                    </>
+                  )}
                 </div>
               ) : null}
             </div>
