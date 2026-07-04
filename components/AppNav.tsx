@@ -47,7 +47,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <NavLink href="/add-km" label="Log" />
             <NavLink href="/collection" label="Stickers" />
             <NavLink href="/squad" label="Squad" badge={badges.squadNeedsLock ? "Lock" : undefined} />
-            <NavLink href="/trade" label="Trade" />
             <NavLink href="/results" label="Results" />
             <NavLink href="/cups" label="Cups" />
             <NavLink href="/leaderboard" label="Leaderboard" />
@@ -55,7 +54,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <span className="mx-1 h-5 w-px bg-white/10" />
             <NavLink href="/matchday-guide" label="Guide" />
             <NavLink href="/rules" label="Rules" />
-            <NavLink href="/suggestions" label="Ideas" />
+            <Link className="rounded-md bg-amber-400 px-3 py-2 font-black text-amber-950 transition hover:bg-amber-300" href="/trade">Trade</Link>
             {isAdmin ? <Link className="rounded-md bg-amber-400 px-3 py-2 font-black text-amber-950 hover:bg-amber-300" href="/admin">Admin</Link> : null}
             {badges.credits > 0 ? <span className="rounded-full bg-amber-300 px-2 py-1 text-xs font-black text-amber-950 shadow-sm">{badges.credits} packs</span> : null}
             <NavActions />
@@ -69,14 +68,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       >
         <Link href="/" className="shrink-0" aria-label="KMXI home"><BrandLogo variant="nav" /></Link>
         <div className="flex min-w-0 items-center gap-2">
-          <Link href="/suggestions" className="whitespace-nowrap rounded-md bg-white/12 px-2 py-1 text-xs font-bold uppercase tracking-wide text-white hover:bg-white/18">
-            Ideas
-          </Link>
           <Link href="/rules" className="whitespace-nowrap rounded-md bg-white/12 px-2 py-1 text-xs font-bold uppercase tracking-wide text-white hover:bg-white/18">
             Rules
           </Link>
           <Link href="/cups" className="whitespace-nowrap rounded-md bg-amber-300 px-2 py-1 text-xs font-bold uppercase tracking-wide text-amber-950 hover:bg-amber-200">
             Cups
+          </Link>
+          <Link href="/trade" className="whitespace-nowrap rounded-md bg-amber-400 px-2 py-1 text-xs font-bold uppercase tracking-wide text-amber-950 hover:bg-amber-300">
+            Trade
           </Link>
           {isAdmin ? (
             <Link href="/admin" className="whitespace-nowrap rounded-md bg-amber-300 px-2 py-1 text-xs font-bold uppercase tracking-wide text-amber-950 hover:bg-amber-200">

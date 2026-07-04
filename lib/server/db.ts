@@ -2365,6 +2365,18 @@ export function confirmTradeProposal(offererId: number, proposalId: number): str
     db.prepare("UPDATE trade_proposals SET status = 'rejected' WHERE offer_id = ? AND status = 'pending'").run(proposal.offer_id);
     db.exec("COMMIT");
 
+    // Post to chat only for premium-rarity swaps (icon, legend, epic)
+    const premiumRarities = new Set(["icon", "legend", "epic"]);
+    const playerMap = new Map(getAllPlayers().map((p) => [p.id, p]));
+    const givenPlayer = playerMap.get(proposal.offer_player_id);
+    const receivedPlayer = playerMap.get(proposal.player_id);
+    if (givenPlayer && receivedPlayer && (premiumRarities.has(givenPlayer.rarity) || premiumRarities.has(receivedPlayer.rarity))) {
+      const offererName = (db.prepare("SELECT username FROM users WHERE id = ?").get(offererId) as { username: string } | undefined)?.username ?? "Someone";
+      const proposerName = (db.prepare("SELECT username FROM users WHERE id = ?").get(proposal.user_id) as { username: string } | undefined)?.username ?? "Someone";
+      const emoji = givenPlayer.rarity === "icon" || receivedPlayer.rarity === "icon" ? "🌟" : givenPlayer.rarity === "legend" || receivedPlayer.rarity === "legend" ? "🏆" : "💎";
+      createAdminChatMessage(`${emoji} ${offererName} and ${proposerName} just pulled off a big one — ${givenPlayer.name} (${givenPlayer.rarity}) for ${receivedPlayer.name} (${receivedPlayer.rarity}).`);
+    }
+
     return null;
   } catch (error) {
     db.exec("ROLLBACK");
