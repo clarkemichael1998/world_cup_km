@@ -776,7 +776,19 @@ function NationTargetCard({
       </div>
 
       <div className="mt-3 divide-y divide-white/6">
-        {progress.missing.slice(0, 5).map((missingPlayer) => {
+        {(() => {
+          const available = progress.missing.filter((p) => market.some((e) => e.playerId === p.id)).slice(0, 5);
+          const unavailableCount = progress.missing.length - available.length;
+          if (available.length === 0) {
+            return (
+              <div className="px-4 py-4 text-sm font-semibold text-white/30">
+                None of the {progress.missing.length} missing player{progress.missing.length === 1 ? "" : "s"} are currently listed for trade.
+              </div>
+            );
+          }
+          return (
+            <>
+              {available.map((missingPlayer) => {
           const matchingEntries = market.filter((e) => e.playerId === missingPlayer.id);
           const hasAvailable = matchingEntries.length > 0;
           const key = `${matchingEntries[0]?.userId}:${missingPlayer.id}`;
@@ -849,6 +861,14 @@ function NationTargetCard({
             </div>
           );
         })}
+              {unavailableCount > 0 ? (
+                <div className="border-t border-white/6 px-4 py-2.5 text-[11px] font-semibold text-white/30">
+                  +{unavailableCount} more missing but not currently listed for trade
+                </div>
+              ) : null}
+            </>
+          );
+        })()}
       </div>
     </div>
   );
