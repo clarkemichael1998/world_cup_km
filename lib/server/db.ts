@@ -16,13 +16,32 @@ const dbPath = process.env.SQLITE_DB_PATH ?? path.join(dbDir, "km-footy.sqlite")
 const sessionCookie = "km_footy_session";
 const basePlayers = players as Player[];
 export const MAX_PLAYER_RATING = 199;
+
+// Hidden milestone cards — awarded silently after danger swap milestones.
+// Not in players.json, not in the random pack pool, excluded from nation completion.
+const DANGER_MILESTONE_PLAYERS: Player[] = [
+  { id: 99001, slug: "el-hadji-diouf-danger", name: "El Hadji Diouf", sortName: "Diouf, El Hadji", club: "—", nation: "Senegal", pos: "FW", rating: 33, rarity: "dangerous", wiki: null, dob: "1981-01-15", caps: null, goals: null, clubWiki: null, clubCountry: "Senegal", teamId: "senegal" },
+  { id: 99002, slug: "nigel-de-jong-danger", name: "Nigel de Jong", sortName: "De Jong, Nigel", club: "—", nation: "Netherlands", pos: "MF", rating: 78, rarity: "dangerous", wiki: null, dob: "1984-11-30", caps: null, goals: null, clubWiki: null, clubCountry: "Netherlands", teamId: "netherlands" },
+  { id: 99003, slug: "rene-higuita-danger", name: "René Higuita", sortName: "Higuita, René", club: "—", nation: "Colombia", pos: "GK", rating: 85, rarity: "dangerous", wiki: null, dob: "1966-08-27", caps: null, goals: null, clubWiki: null, clubCountry: "Colombia", teamId: "colombia" },
+  { id: 99004, slug: "luis-suarez-danger", name: "Luis Suárez", sortName: "Suárez, Luis", club: "—", nation: "Uruguay", pos: "FW", rating: 95, rarity: "dangerous", wiki: null, dob: "1987-01-24", caps: null, goals: null, clubWiki: null, clubCountry: "Uruguay", teamId: "uruguay" },
+  { id: 99005, slug: "zinedine-zidane-danger", name: "Zinedine Zidane", sortName: "Zidane, Zinedine", club: "—", nation: "France", pos: "MF", rating: 120, rarity: "dangerous", wiki: null, dob: "1972-06-23", caps: null, goals: null, clubWiki: null, clubCountry: "France", teamId: "france" },
+];
+
+const DANGER_MILESTONES: Array<{ count: number; playerId: number }> = [
+  { count: 3, playerId: 99001 },
+  { count: 7, playerId: 99002 },
+  { count: 15, playerId: 99003 },
+  { count: 30, playerId: 99004 },
+  { count: 60, playerId: 99005 },
+];
 const goalBoostByRarity: Record<Rarity, number> = {
   icon: 2,
   legend: 2,
   epic: 3,
   rare: 5,
   common: 10,
-  clowns: -5
+  clowns: -5,
+  dangerous: 0
 };
 
 type UserRow = {
@@ -354,6 +373,20 @@ export function getDb() {
       rank INTEGER NOT NULL,
       PRIMARY KEY (snapshot_date, user_id)
     );
+    CREATE TABLE IF NOT EXISTS danger_swap_milestones (
+      user_id INTEGER NOT NULL,
+      player_id INTEGER NOT NULL,
+      awarded_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (user_id, player_id),
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
+    CREATE TABLE IF NOT EXISTS danger_reveal_queue (
+      user_id INTEGER NOT NULL,
+      player_id INTEGER NOT NULL,
+      awarded_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (user_id, player_id),
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
     CREATE TABLE IF NOT EXISTS random_swaps (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       challenger_id INTEGER NOT NULL,
@@ -481,7 +514,11 @@ export type PlayerRatingAdjustment = {
 };
 
 export function getAllPlayers(): Player[] {
-  return applyGlobalRatingAdjustments([...basePlayers, ...getLateCallupPlayers(), ...cupLegendPlayers]);
+  return applyGlobalRatingAdjustments([...basePlayers, ...getLateCallupPlayers(), ...cupLegendPlayers, ...DANGER_MILESTONE_PLAYERS]);
+}
+
+export function getDangerMilestonePlayers(): Player[] {
+  return DANGER_MILESTONE_PLAYERS;
 }
 
 export function getLateCallupPlayers(): Player[] {
@@ -901,7 +938,7 @@ export function getCompletedCollectionNationsForPlayerIds(playerIds: number[]): 
   const owned = new Set(playerIds);
   const byNation = new Map<string, number[]>();
   for (const player of getAllPlayers()) {
-    if (player.cupId) continue;
+    if (player.cupId || player.rarity === "dangerous") continue;
     const list = byNation.get(player.nation) ?? [];
     list.push(player.id);
     byNation.set(player.nation, list);
@@ -918,7 +955,7 @@ export function getCollectionBoostMapForPlayerIds(playerIds: number[]): Map<numb
   if (completedNations.size === 0) return new Map();
   const boosts = new Map<number, number>();
   for (const player of getAllPlayers()) {
-    if (player.cupId || !owned.has(player.id) || !completedNations.has(player.nation)) continue;
+    if (player.cupId || player.rarity === "dangerous" || !owned.has(player.id) || !completedNations.has(player.nation)) continue;
     boosts.set(player.id, COLLECTION_COMPLETION_BOOST);
   }
   return boosts;
@@ -933,7 +970,7 @@ export function awardNationCompletionRewards(userId: number): string[] {
 
   const byNation = new Map<string, number[]>();
   for (const player of getAllPlayers()) {
-    if (player.cupId) continue;
+    if (player.cupId || player.rarity === "dangerous") continue;
     const list = byNation.get(player.nation) ?? [];
     list.push(player.id);
     byNation.set(player.nation, list);
@@ -3183,6 +3220,8 @@ export function respondToRandomSwap(swapId: number, userId: number, action: "acc
         `🎲 DANGER SWAP — ${challengerName} lost ${cPlayer.name} (${cPlayer.rarity}) · ${targetName} lost ${tPlayer.name} (${tPlayer.rarity}).`
       );
     }
+    checkAndAwardDangerMilestones(swap.challenger_id);
+    checkAndAwardDangerMilestones(userId);
     return { ok: true };
   } catch (err) {
     db.exec("ROLLBACK");
@@ -3224,6 +3263,55 @@ export function getRandomSwapLog(limit = 30) {
       challenger_player_id: number; target_player_id: number;
       completed_at: string; challenger_username: string; target_username: string;
     }>;
+}
+
+// ── Danger Milestone Awards ───────────────────────────────────
+
+export function checkAndAwardDangerMilestones(userId: number): void {
+  const db = getDb();
+  const { count } = db.prepare(
+    "SELECT COUNT(*) AS count FROM random_swaps WHERE status = 'completed' AND (challenger_id = ? OR target_id = ?)"
+  ).get(userId, userId) as { count: number };
+
+  for (const milestone of DANGER_MILESTONES) {
+    if (count < milestone.count) continue;
+    const already = db.prepare("SELECT 1 FROM danger_swap_milestones WHERE user_id = ? AND player_id = ?").get(userId, milestone.playerId);
+    if (already) continue;
+
+    db.exec("BEGIN IMMEDIATE");
+    try {
+      db.prepare("INSERT OR IGNORE INTO danger_swap_milestones (user_id, player_id) VALUES (?, ?)").run(userId, milestone.playerId);
+      const owned = db.prepare("SELECT duplicate_count FROM user_players WHERE user_id = ? AND player_id = ?").get(userId, milestone.playerId) as { duplicate_count: number } | undefined;
+      if (owned) {
+        db.prepare("UPDATE user_players SET duplicate_count = duplicate_count + 1 WHERE user_id = ? AND player_id = ?").run(userId, milestone.playerId);
+      } else {
+        db.prepare("INSERT INTO user_players (user_id, player_id, duplicate_count) VALUES (?, ?, 0)").run(userId, milestone.playerId);
+      }
+      db.prepare("INSERT INTO card_awards (user_id, player_id, rarity, source, source_id, position) VALUES (?, ?, 'dangerous', 'danger_milestone', NULL, 0)").run(userId, milestone.playerId);
+      db.prepare("INSERT OR IGNORE INTO danger_reveal_queue (user_id, player_id) VALUES (?, ?)").run(userId, milestone.playerId);
+      db.exec("COMMIT");
+    } catch {
+      db.exec("ROLLBACK");
+    }
+  }
+}
+
+export function getPendingDangerReveals(userId: number): number {
+  const { count } = getDb().prepare("SELECT COUNT(*) AS count FROM danger_reveal_queue WHERE user_id = ?").get(userId) as { count: number };
+  return count;
+}
+
+export function claimDangerReveals(userId: number): number[] {
+  const db = getDb();
+  const rows = db.prepare("SELECT player_id FROM danger_reveal_queue WHERE user_id = ? ORDER BY awarded_at").all(userId) as { player_id: number }[];
+  if (rows.length === 0) return [];
+  const playerIds = rows.map((r) => r.player_id);
+  const { maxPos } = db.prepare("SELECT MAX(position) AS maxPos FROM reveal_players WHERE user_id = ?").get(userId) as { maxPos: number | null };
+  const startPos = (maxPos ?? -1) + 1;
+  const insert = db.prepare("INSERT OR REPLACE INTO reveal_players (user_id, position, player_id) VALUES (?, ?, ?)");
+  playerIds.forEach((id, i) => insert.run(userId, startPos + i, id));
+  db.prepare("DELETE FROM danger_reveal_queue WHERE user_id = ?").run(userId);
+  return playerIds;
 }
 
 export function getAllOtherUsers(userId: number): Array<{ id: number; username: string }> {

@@ -64,6 +64,8 @@ export default function Home() {
   const [matchdayScore, setMatchdayScore] = useState<MatchdayScore | null>(null);
   const [cupStatuses, setCupStatuses] = useState<CupStatus[] | null>(null);
   const [incomingProposals, setIncomingProposals] = useState<number>(0);
+  const [dangerPending, setDangerPending] = useState(0);
+  const [claimingDanger, setClaimingDanger] = useState(false);
   const router = useRouter();
   const countdown = useCountdown();
 
@@ -92,6 +94,10 @@ export default function Home() {
       .then((r) => (r.ok ? r.json() : null))
       .then((p) => setIncomingProposals((p?.proposals ?? []).filter((pr: { isIncoming: boolean }) => pr.isIncoming).length))
       .catch(() => {});
+    fetch("/api/danger-rewards", { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((p) => setDangerPending(p?.pending ?? 0))
+      .catch(() => {});
   }, []);
 
   async function submitNews() {
@@ -109,6 +115,17 @@ export default function Home() {
       setNewsNotice(response.ok ? "Headline live — it's on the reel now." : payload.error ?? "Could not set the news.");
     } finally {
       setNewsBusy(false);
+    }
+  }
+
+  async function claimDangerReward() {
+    if (claimingDanger) return;
+    setClaimingDanger(true);
+    try {
+      const res = await fetch("/api/danger-rewards", { method: "POST", credentials: "include" });
+      if (res.ok) router.push("/reveal");
+    } finally {
+      setClaimingDanger(false);
     }
   }
 
@@ -188,6 +205,26 @@ export default function Home() {
             <Button variant="accent" onClick={openPack} disabled={redeeming}>
               {redeeming ? "Opening…" : `Open ${redeemAmount}`}
             </Button>
+          </div>
+        </section>
+      ) : null}
+
+      {dangerPending > 0 ? (
+        <section className="relative overflow-hidden rounded-2xl border border-red-500/40 bg-gradient-to-br from-red-950/80 via-black/60 to-red-950/40 p-5 shadow-lg shadow-red-950/30">
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(239,68,68,0.10),transparent_70%)]" />
+          <div className="relative flex items-center justify-between gap-4">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.25em] text-red-400/70">Reward</p>
+              <p className="mt-1 text-lg font-black text-white">Something&apos;s waiting for you.</p>
+              <p className="mt-0.5 text-sm font-semibold text-red-200/40">A card has been set aside. Claim it before it disappears.</p>
+            </div>
+            <button
+              onClick={claimDangerReward}
+              disabled={claimingDanger}
+              className="shrink-0 rounded-xl bg-red-500 px-5 py-3 text-sm font-black text-white shadow-md transition hover:bg-red-400 disabled:opacity-50"
+            >
+              {claimingDanger ? "Loading…" : "Reveal"}
+            </button>
           </div>
         </section>
       ) : null}

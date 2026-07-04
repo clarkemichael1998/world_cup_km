@@ -36,7 +36,8 @@ const rarityClasses: Record<Player["rarity"], string> = {
   rare: "border-sky-300 bg-sky-50 text-sky-950",
   epic: "border-fuchsia-300 bg-fuchsia-50 text-fuchsia-950",
   legend: "border-amber-300 bg-amber-50 text-amber-950",
-  icon: "border-amber-300 bg-zinc-950 text-amber-50"
+  icon: "border-amber-300 bg-zinc-950 text-amber-50",
+  dangerous: "border-red-500 bg-red-950 text-red-50"
 };
 
 export default function ProfilePage() {

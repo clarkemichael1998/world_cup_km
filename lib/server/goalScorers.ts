@@ -7,7 +7,8 @@ export const GOAL_BOOST_BY_RARITY: Record<Rarity, number> = {
   epic: 3,
   rare: 5,
   common: 10,
-  clowns: -5
+  clowns: -5,
+  dangerous: 0
 };
 
 export const ASSIST_BOOST_BY_RARITY: Record<Rarity, number> = {
@@ -16,7 +17,8 @@ export const ASSIST_BOOST_BY_RARITY: Record<Rarity, number> = {
   epic: 2,
   rare: 3,
   common: 5,
-  clowns: -3
+  clowns: -3,
+  dangerous: 0
 };
 
 export function getPlayerById(id: number): Player | undefined {

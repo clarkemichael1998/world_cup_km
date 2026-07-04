@@ -10,30 +10,33 @@ import type { Player, UserState } from "@/lib/types";
 type Stage = 0 | 1 | 2 | 3;
 
 const rarityGlow: Record<Player["rarity"], string> = {
-  clowns:  "rgba(248,113,113,0.6)",
-  common:  "rgba(148,163,184,0.5)",
-  rare:    "rgba(56,189,248,0.55)",
-  epic:    "rgba(192,132,252,0.6)",
-  legend:  "rgba(251,191,36,0.65)",
-  icon:    "rgba(255,255,255,0.7)"
+  clowns:    "rgba(248,113,113,0.6)",
+  common:    "rgba(148,163,184,0.5)",
+  rare:      "rgba(56,189,248,0.55)",
+  epic:      "rgba(192,132,252,0.6)",
+  legend:    "rgba(251,191,36,0.65)",
+  icon:      "rgba(255,255,255,0.7)",
+  dangerous: "rgba(239,68,68,0.9)"
 };
 
 const rarityGrad: Record<Player["rarity"], string> = {
-  clowns:  "from-red-700 via-red-900 to-slate-900",
-  common:  "from-slate-700 via-slate-800 to-slate-900",
-  rare:    "from-sky-700 via-sky-900 to-slate-900",
-  epic:    "from-fuchsia-700 via-purple-900 to-slate-900",
-  legend:  "from-amber-500 via-amber-800 to-slate-900",
-  icon:    "from-zinc-400 via-zinc-700 to-zinc-950"
+  clowns:    "from-red-700 via-red-900 to-slate-900",
+  common:    "from-slate-700 via-slate-800 to-slate-900",
+  rare:      "from-sky-700 via-sky-900 to-slate-900",
+  epic:      "from-fuchsia-700 via-purple-900 to-slate-900",
+  legend:    "from-amber-500 via-amber-800 to-slate-900",
+  icon:      "from-zinc-400 via-zinc-700 to-zinc-950",
+  dangerous: "from-red-600 via-red-950 to-black"
 };
 
 const rarityLabel: Record<Player["rarity"], string> = {
-  clowns: "Clowns",
-  common: "Common",
-  rare:   "Rare",
-  epic:   "Epic",
-  legend: "Legend",
-  icon:   "Icon"
+  clowns:    "Clowns",
+  common:    "Common",
+  rare:      "Rare",
+  epic:      "Epic",
+  legend:    "Legend",
+  icon:      "Icon",
+  dangerous: "Dangerous"
 };
 
 export default function RevealPage() {
