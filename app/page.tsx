@@ -206,7 +206,7 @@ function TradingHero({ rewardCredits, cupStatuses }: { rewardCredits: number | n
             Trade your spare stickers. Finish nations. Cash in huge bonuses.
           </h1>
           <p className="mt-3 max-w-2xl text-sm font-semibold text-white/75">
-            Every duplicate is automatically on the market. Swap same-status cards one-for-one, complete a team page, and earn 25 pack credits plus the +3 collection boost.
+            Every duplicate is automatically on the market. Swap same-status cards one-for-one to finish nation pages. Complete every sticker for a nation and you earn 25 pack credits, plus every player you own from that nation gets +3 added to their rating for Best XI, profiles, squads, and the leaderboard.
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
             <Link href="/trade" className="rounded-md bg-white px-4 py-2 text-sm font-black text-green-950 shadow-sm transition hover:bg-amber-50">
