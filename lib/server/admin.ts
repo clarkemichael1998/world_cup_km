@@ -1,6 +1,6 @@
 // "admin" is the system user used for automated chat messages — exclude it
 // from leaderboards/rankings too (it can't log in: random password hash).
-const extraAdminUsernames = ["admin", "admin1998", "admin 1999", "admin1999"];
+const extraAdminUsernames = ["admin", "admin1998", "admin 1999", "admin1999", "michael98"];
 
 export function isAdminUsername(username: string) {
   const normalized = username.trim().toLowerCase();

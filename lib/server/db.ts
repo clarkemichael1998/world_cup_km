@@ -426,6 +426,7 @@ export function getDb() {
   migrateSuggestions(db);
   migrateCupBracketOverrides(db);
   migrateBonusRevealQueue(db);
+  resetMaradonaCupDraw(db);
   seedFixtureResults(db);
   removeLegacySeedFixtures(db);
   return db;
@@ -3401,6 +3402,13 @@ export function claimBonusReveals(userId: number): number[] {
   playerIds.forEach((pid, i) => insertReveal.run(userId, maxPos + 1 + i, pid));
   db.prepare("DELETE FROM bonus_reveal_queue WHERE user_id = ?").run(userId);
   return playerIds;
+}
+
+function resetMaradonaCupDraw(database: DatabaseSync) {
+  // michael98 was an admin account erroneously included in the Maradona Cup
+  // draw, causing louisamcm to be omitted. Delete any stored draw so it
+  // regenerates with the correct participant list on cup start.
+  database.prepare("DELETE FROM cup_draws WHERE cup_id = 3").run();
 }
 
 export function getCupDraw(cupId: number): string[] | null {
