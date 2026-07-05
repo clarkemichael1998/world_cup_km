@@ -399,6 +399,12 @@ export function getDb() {
       FOREIGN KEY (challenger_id) REFERENCES users(id),
       FOREIGN KEY (target_id) REFERENCES users(id)
     );
+    CREATE TABLE IF NOT EXISTS bonus_reveal_queue (
+      user_id INTEGER NOT NULL,
+      player_id INTEGER NOT NULL,
+      PRIMARY KEY (user_id, player_id),
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
     CREATE TABLE IF NOT EXISTS cup_draws (
       cup_id INTEGER PRIMARY KEY,
       participant_usernames TEXT NOT NULL
@@ -419,6 +425,7 @@ export function getDb() {
   migrateGoalScorers(db);
   migrateSuggestions(db);
   migrateCupBracketOverrides(db);
+  migrateBonusRevealQueue(db);
   seedFixtureResults(db);
   removeLegacySeedFixtures(db);
   return db;
@@ -3343,14 +3350,57 @@ function removeLegacySeedFixtures(database: DatabaseSync) {
 }
 
 function migrateCupBracketOverrides(database: DatabaseSync) {
-  const insert = database.prepare(
-    "INSERT OR IGNORE INTO cup_match_overrides (cup_id, match_id, home_username, away_username, force_winner) VALUES (?, ?, ?, ?, ?)"
+  const upsert = database.prepare(
+    "INSERT OR REPLACE INTO cup_match_overrides (cup_id, match_id, home_username, away_username, force_winner) VALUES (?, ?, ?, ?, ?)"
   );
   // Dalglish Cup (cup 2) semi-finals — correct matchups after reseeding incident
-  insert.run(2, "sf-1", "liamshieldss", "liamw", null);
-  insert.run(2, "sf-2", "clairemcmahon", "annieclarke11", null);
-  // Larsson Cup (cup 1) final — liamshieldss was the correct winner
-  insert.run(1, "final", "liamshieldss", null, "liamshieldss");
+  upsert.run(2, "sf-1", "liamshieldss", "liamw", null);
+  upsert.run(2, "sf-2", "clairemcmahon", "annieclarke11", null);
+  // Larsson Cup (cup 1) final — liamshieldss beat lucy
+  upsert.run(1, "final", "liamshieldss", "lucy", "liamshieldss");
+}
+
+function migrateBonusRevealQueue(database: DatabaseSync) {
+  // One-time compensation award: Nicolas Raskin (652) + Lawrence Shankland (311)
+  const BONUS_KEY = "bonus-compensation-2026-07-05";
+  const BONUS_PLAYER_IDS = [652, 311];
+
+  const alreadyRan = database
+    .prepare("SELECT COUNT(*) AS c FROM card_awards WHERE source = ?")
+    .get(BONUS_KEY) as { c: number };
+  if (alreadyRan.c > 0) return;
+
+  const adminNames = getAdminUsernames();
+  const users = database.prepare("SELECT id, username FROM users").all() as Array<{ id: number; username: string }>;
+
+  for (const user of users) {
+    if (adminNames.has(user.username.toLowerCase())) continue;
+    for (const playerId of BONUS_PLAYER_IDS) {
+      database
+        .prepare("INSERT OR IGNORE INTO bonus_reveal_queue (user_id, player_id) VALUES (?, ?)")
+        .run(user.id, playerId);
+      const player = getAllPlayers().find((p) => p.id === playerId);
+      database
+        .prepare("INSERT INTO card_awards (user_id, player_id, rarity, source, source_id, position) VALUES (?, ?, ?, ?, ?, ?)")
+        .run(user.id, playerId, player?.rarity ?? "clowns", BONUS_KEY, null, 0);
+    }
+  }
+}
+
+export function getPendingBonusReveals(userId: number): number {
+  return ((getDb().prepare("SELECT COUNT(*) AS c FROM bonus_reveal_queue WHERE user_id = ?").get(userId) as { c: number }).c);
+}
+
+export function claimBonusReveals(userId: number): number[] {
+  const db = getDb();
+  const rows = db.prepare("SELECT player_id FROM bonus_reveal_queue WHERE user_id = ?").all(userId) as Array<{ player_id: number }>;
+  if (rows.length === 0) return [];
+  const playerIds = rows.map((r) => r.player_id);
+  const maxPos = (db.prepare("SELECT COALESCE(MAX(position), -1) AS m FROM reveal_players WHERE user_id = ?").get(userId) as { m: number }).m;
+  const insertReveal = db.prepare("INSERT OR IGNORE INTO reveal_players (user_id, position, player_id) VALUES (?, ?, ?)");
+  playerIds.forEach((pid, i) => insertReveal.run(userId, maxPos + 1 + i, pid));
+  db.prepare("DELETE FROM bonus_reveal_queue WHERE user_id = ?").run(userId);
+  return playerIds;
 }
 
 export function getCupDraw(cupId: number): string[] | null {

@@ -66,6 +66,8 @@ export default function Home() {
   const [incomingProposals, setIncomingProposals] = useState<number>(0);
   const [dangerPending, setDangerPending] = useState(0);
   const [claimingDanger, setClaimingDanger] = useState(false);
+  const [bonusPending, setBonusPending] = useState(0);
+  const [claimingBonus, setClaimingBonus] = useState(false);
   const router = useRouter();
   const countdown = useCountdown();
 
@@ -98,6 +100,10 @@ export default function Home() {
       .then((r) => (r.ok ? r.json() : null))
       .then((p) => setDangerPending(p?.pending ?? 0))
       .catch(() => {});
+    fetch("/api/bonus-reveal", { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((p) => setBonusPending(p?.pending ?? 0))
+      .catch(() => {});
   }, []);
 
   async function submitNews() {
@@ -126,6 +132,17 @@ export default function Home() {
       if (res.ok) router.push("/reveal");
     } finally {
       setClaimingDanger(false);
+    }
+  }
+
+  async function claimBonusReward() {
+    if (claimingBonus) return;
+    setClaimingBonus(true);
+    try {
+      const res = await fetch("/api/bonus-reveal", { method: "POST", credentials: "include" });
+      if (res.ok) router.push("/reveal");
+    } finally {
+      setClaimingBonus(false);
     }
   }
 
@@ -205,6 +222,25 @@ export default function Home() {
             <Button variant="accent" onClick={openPack} disabled={redeeming}>
               {redeeming ? "Opening…" : `Open ${redeemAmount}`}
             </Button>
+          </div>
+        </section>
+      ) : null}
+
+      {bonusPending > 0 ? (
+        <section className="rounded-2xl border border-green-500/30 bg-gradient-to-br from-green-950/60 via-black/60 to-emerald-950/40 p-5 shadow-lg">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.25em] text-green-400/70">Bonus Stickers</p>
+              <p className="mt-1 text-lg font-black text-white">You have {bonusPending} bonus sticker{bonusPending !== 1 ? "s" : ""} waiting.</p>
+              <p className="mt-0.5 text-xs font-semibold text-green-200/50">A small thank-you from us — tap to reveal.</p>
+            </div>
+            <button
+              onClick={claimBonusReward}
+              disabled={claimingBonus}
+              className="shrink-0 rounded-xl bg-green-600 px-5 py-3 text-sm font-black text-white shadow-md transition hover:bg-green-500 disabled:opacity-50"
+            >
+              {claimingBonus ? "Loading…" : "Reveal"}
+            </button>
           </div>
         </section>
       ) : null}
