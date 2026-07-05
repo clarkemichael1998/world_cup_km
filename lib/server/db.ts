@@ -399,6 +399,18 @@ export function getDb() {
       FOREIGN KEY (challenger_id) REFERENCES users(id),
       FOREIGN KEY (target_id) REFERENCES users(id)
     );
+    CREATE TABLE IF NOT EXISTS cup_draws (
+      cup_id INTEGER PRIMARY KEY,
+      participant_usernames TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS cup_match_overrides (
+      cup_id INTEGER NOT NULL,
+      match_id TEXT NOT NULL,
+      home_username TEXT,
+      away_username TEXT,
+      force_winner TEXT,
+      PRIMARY KEY (cup_id, match_id)
+    );
   `);
   migrateKmLogActivity(db);
   migrateChatMessages(db);
@@ -406,6 +418,7 @@ export function getDb() {
   migrateUserState(db);
   migrateGoalScorers(db);
   migrateSuggestions(db);
+  migrateCupBracketOverrides(db);
   seedFixtureResults(db);
   removeLegacySeedFixtures(db);
   return db;
@@ -3327,4 +3340,34 @@ function seedFixtureResults(database: DatabaseSync) {
 
 function removeLegacySeedFixtures(database: DatabaseSync) {
   database.prepare("DELETE FROM fixture_results WHERE match_id LIKE 'seed-%' OR source = 'seed'").run();
+}
+
+function migrateCupBracketOverrides(database: DatabaseSync) {
+  const insert = database.prepare(
+    "INSERT OR IGNORE INTO cup_match_overrides (cup_id, match_id, home_username, away_username, force_winner) VALUES (?, ?, ?, ?, ?)"
+  );
+  // Dalglish Cup (cup 2) semi-finals — correct matchups after reseeding incident
+  insert.run(2, "sf-1", "liamshieldss", "liamw", null);
+  insert.run(2, "sf-2", "clairemcmahon", "annieclarke11", null);
+  // Larsson Cup (cup 1) final — liamshieldss was the correct winner
+  insert.run(1, "final", "liamshieldss", null, "liamshieldss");
+}
+
+export function getCupDraw(cupId: number): string[] | null {
+  const row = getDb()
+    .prepare("SELECT participant_usernames FROM cup_draws WHERE cup_id = ?")
+    .get(cupId) as { participant_usernames: string } | null;
+  return row ? (JSON.parse(row.participant_usernames) as string[]) : null;
+}
+
+export function setCupDraw(cupId: number, usernames: string[]) {
+  getDb()
+    .prepare("INSERT OR REPLACE INTO cup_draws (cup_id, participant_usernames) VALUES (?, ?)")
+    .run(cupId, JSON.stringify(usernames));
+}
+
+export function getCupMatchOverrides(cupId: number): Array<{ match_id: string; home_username: string | null; away_username: string | null; force_winner: string | null }> {
+  return getDb()
+    .prepare("SELECT match_id, home_username, away_username, force_winner FROM cup_match_overrides WHERE cup_id = ?")
+    .all(cupId) as Array<{ match_id: string; home_username: string | null; away_username: string | null; force_winner: string | null }>;
 }

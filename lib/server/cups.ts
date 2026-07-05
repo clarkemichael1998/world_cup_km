@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 import { getAdminUsernames } from "@/lib/server/admin";
-import { awardPlayersInTransaction, createAdminChatMessage, getAllPlayers, getDb } from "@/lib/server/db";
+import { awardPlayersInTransaction, createAdminChatMessage, getAllPlayers, getCupDraw, getCupMatchOverrides, getDb, setCupDraw } from "@/lib/server/db";
 import { compareDailyScores, getDailyScore, isMatchdayOpen, isMatchdaySettled } from "@/lib/server/dailyScoring";
 import { cupThemes, getCupLegendPlayer } from "@/lib/cupLegends";
 
@@ -320,7 +320,28 @@ function slotFor(participant: Participant | undefined): SlotSource {
 }
 
 function buildCup(db: DatabaseSync, id: number, dates: string[], participants: Participant[]): Omit<CupDefinition, "locked" | "unlocksOn"> {
-  const shuffled = deterministicShuffle(participants, id * 2026);
+  const today = getLondonToday();
+  const startDate = dates[0];
+
+  // Freeze the bracket draw once a cup has started so new/removed users
+  // never cause rerandomisation on redeploy.
+  let shuffled: Participant[];
+  const storedDraw = getCupDraw(id);
+  if (storedDraw) {
+    const byUsername = new Map(participants.map((p) => [p.username, p]));
+    shuffled = storedDraw.map((u) => byUsername.get(u)).filter((p): p is Participant => p !== undefined);
+    // Any participant not in the frozen draw (joined after cup started) appended at end
+    const storedSet = new Set(storedDraw);
+    for (const p of participants) {
+      if (!storedSet.has(p.username)) shuffled.push(p);
+    }
+  } else if (today >= startDate) {
+    shuffled = deterministicShuffle(participants, id * 2026);
+    setCupDraw(id, shuffled.map((p) => p.username));
+  } else {
+    shuffled = deterministicShuffle(participants, id * 2026);
+  }
+
   const rounds = roundLabels.map((label, index) => ({ day: index + 1, date: dates[index], label }));
   const matches: BuildMatch[] = [];
 
@@ -367,7 +388,7 @@ function buildCup(db: DatabaseSync, id: number, dates: string[], participants: P
     legend: theme.legend,
     country: theme.country,
     rounds,
-    matches: resolveBracket(db, matches)
+    matches: resolveBracket(db, matches, participants, id)
   };
 }
 
@@ -398,13 +419,29 @@ function resolveSide(source: SlotSource, decided: Map<string, { username: string
 // sides are known real participants and that round's matchday has closed —
 // using the exact same daily-score formula as the leaderboard's head-to-head.
 // Byes auto-advance immediately without waiting for the date.
-function resolveBracket(db: DatabaseSync, matches: BuildMatch[]): CupMatch[] {
+function resolveBracket(db: DatabaseSync, matches: BuildMatch[], participants: Participant[], cupId: number): CupMatch[] {
   const decided = new Map<string, { username: string; userId: number }>();
   const results = new Map<string, CupMatch>();
+  const overrideRows = getCupMatchOverrides(cupId);
+  const overrideMap = new Map(overrideRows.map((r) => [r.match_id, r]));
+  const byUsername = new Map(participants.map((p) => [p.username, p]));
 
   for (const match of matches) {
-    const home = resolveSide(match.homeSource, decided);
-    const away = resolveSide(match.awaySource, decided);
+    let home = resolveSide(match.homeSource, decided);
+    let away = resolveSide(match.awaySource, decided);
+
+    // Apply any admin-set participant overrides for this match
+    const ov = overrideMap.get(match.id);
+    if (ov) {
+      if (ov.home_username) {
+        const p = byUsername.get(ov.home_username);
+        home = p ? { display: p.username, userId: p.id, isBye: false } : { display: ov.home_username, userId: null, isBye: false };
+      }
+      if (ov.away_username) {
+        const p = byUsername.get(ov.away_username);
+        away = p ? { display: p.username, userId: p.id, isBye: false } : { display: ov.away_username, userId: null, isBye: false };
+      }
+    }
 
     let winner: { username: string; userId: number } | null = null;
     let status: CupMatch["status"] = "scheduled";
@@ -440,6 +477,21 @@ function resolveBracket(db: DatabaseSync, matches: BuildMatch[]): CupMatch[] {
     // Otherwise (both known but the window hasn't opened yet, e.g. a future
     // round) stays "scheduled" with no score — it isn't live just because
     // the draw already assigned real names to both slots.
+
+    // Apply force_winner override — ensures the correct winner is recorded
+    // even if bracket path was scrambled by a reseeding incident. If the
+    // forced winner isn't currently one of the resolved sides, substitute
+    // them into the home slot so the UI highlights them correctly.
+    if (ov?.force_winner) {
+      const fw = byUsername.get(ov.force_winner);
+      if (fw) {
+        if (home.display !== fw.username && away.display !== fw.username) {
+          home = { display: fw.username, userId: fw.id, isBye: false };
+        }
+        winner = { username: fw.username, userId: fw.id };
+        if (status === "scheduled") status = "decided";
+      }
+    }
 
     if (winner) decided.set(match.id, winner);
 
