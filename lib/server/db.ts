@@ -262,6 +262,8 @@ export function getDb() {
       icon_count INTEGER NOT NULL DEFAULT 0,
       legend_player_id INTEGER,
       card_award_count INTEGER NOT NULL DEFAULT 0,
+      reversed_at TEXT,
+      reversal_reason TEXT,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       UNIQUE(cup_id, user_id, reward_key),
       FOREIGN KEY (user_id) REFERENCES users(id)
@@ -424,6 +426,7 @@ export function getDb() {
   migrateUserState(db);
   migrateGoalScorers(db);
   migrateSuggestions(db);
+  migrateCupRewardEvents(db);
   migrateCupBracketOverrides(db);
   migrateBonusRevealQueue(db);
   resetMaradonaCupDraw(db);
@@ -3086,6 +3089,17 @@ function migrateSuggestions(database: DatabaseSync) {
   }
   if (colNames.size > 0 && !colNames.has("implemented_by")) {
     database.exec("ALTER TABLE suggestions ADD COLUMN implemented_by INTEGER");
+  }
+}
+
+function migrateCupRewardEvents(database: DatabaseSync) {
+  const cols = database.prepare("PRAGMA table_info(cup_reward_events)").all() as Array<{ name: string }>;
+  const colNames = new Set(cols.map((c) => c.name));
+  if (colNames.size > 0 && !colNames.has("reversed_at")) {
+    database.exec("ALTER TABLE cup_reward_events ADD COLUMN reversed_at TEXT");
+  }
+  if (colNames.size > 0 && !colNames.has("reversal_reason")) {
+    database.exec("ALTER TABLE cup_reward_events ADD COLUMN reversal_reason TEXT");
   }
 }
 

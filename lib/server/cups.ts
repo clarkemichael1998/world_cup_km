@@ -156,7 +156,7 @@ export function getMyCupStatuses(username: string): MyCupStatus[] {
   return results;
 }
 
-export function settleCupRewards(): { awarded: CupRewardSettlement[]; alreadyAwarded: CupRewardSettlement[] } {
+export function settleCupRewards(cupId?: number): { awarded: CupRewardSettlement[]; alreadyAwarded: CupRewardSettlement[] } {
   const db = getDb();
   const participants = getCupParticipants(db);
   const userByUsername = new Map(participants.map((participant) => [participant.username, participant]));
@@ -166,6 +166,7 @@ export function settleCupRewards(): { awarded: CupRewardSettlement[]; alreadyAwa
   db.exec("BEGIN IMMEDIATE");
   try {
     for (const [index, dates] of cupSchedules.entries()) {
+      if (cupId !== undefined && index + 1 !== cupId) continue;
       const cup = buildCup(db, index + 1, dates, participants);
       const final = cup.matches.find((match) => match.round === "final");
 
@@ -206,6 +207,97 @@ export function settleCupRewards(): { awarded: CupRewardSettlement[]; alreadyAwa
   }
 
   return { awarded, alreadyAwarded };
+}
+
+export function reverseCupRewardSettlement(cupId: number, createdDate: string, reason: string) {
+  const db = getDb();
+  const cleanReason = reason.trim().slice(0, 240) || "Cup reward settlement reversed by admin.";
+  const rows = db
+    .prepare(
+      `SELECT cre.id, cre.cup_name, cre.user_id, users.username, cre.reward_key, cre.reward_label, cre.pack_credit_count
+       FROM cup_reward_events cre
+       JOIN users ON users.id = cre.user_id
+       WHERE cre.cup_id = ?
+         AND date(cre.created_at) = ?
+         AND cre.reversed_at IS NULL
+       ORDER BY cre.id`
+    )
+    .all(cupId, createdDate) as Array<{
+      id: number;
+      cup_name: string;
+      user_id: number;
+      username: string;
+      reward_key: string;
+      reward_label: string;
+      pack_credit_count: number;
+    }>;
+
+  let creditsReversed = 0;
+  let cardsReversed = 0;
+  const users = new Set<string>();
+  const cupName = rows[0]?.cup_name ?? cupThemes[cupId - 1]?.cupName ?? `Cup ${cupId}`;
+
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    for (const row of rows) {
+      users.add(row.username);
+      if (row.pack_credit_count > 0) {
+        db.prepare("UPDATE users SET reward_credits = reward_credits - ? WHERE id = ?").run(row.pack_credit_count, row.user_id);
+        creditsReversed += row.pack_credit_count;
+      }
+
+      const awards = db
+        .prepare("SELECT id, player_id FROM card_awards WHERE source = 'cup_reward' AND source_id = ? ORDER BY position, id")
+        .all(row.id) as Array<{ id: number; player_id: number }>;
+      for (const award of awards) {
+        removeOneOwnedPlayer(db, row.user_id, award.player_id);
+        db.prepare("DELETE FROM card_awards WHERE id = ?").run(award.id);
+        cardsReversed += 1;
+      }
+
+      db.prepare("UPDATE cup_reward_events SET reversed_at = CURRENT_TIMESTAMP, reversal_reason = ? WHERE id = ?").run(cleanReason, row.id);
+    }
+
+    db
+      .prepare(
+        `UPDATE chat_messages
+         SET message = ?
+         WHERE date(created_at) = ?
+           AND message LIKE ?`
+      )
+      .run(`[Cup reward reversed] ${cupName} award message removed. Reason: ${cleanReason}`, createdDate, `%${cupName}:%awarded%`);
+
+    db.exec("COMMIT");
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
+
+  if (rows.length > 0) {
+    createAdminChatMessage(
+      `${cupName} reward correction: reversed ${rows.length} reward row${rows.length === 1 ? "" : "s"} from ${createdDate}, removing ${creditsReversed} pack credits and ${cardsReversed} card award${cardsReversed === 1 ? "" : "s"}.`
+    );
+  }
+
+  return {
+    cupId,
+    cupName,
+    createdDate,
+    reversedCount: rows.length,
+    creditsReversed,
+    cardsReversed,
+    users: Array.from(users).sort()
+  };
+}
+
+function removeOneOwnedPlayer(db: DatabaseSync, userId: number, playerId: number) {
+  const owned = db.prepare("SELECT duplicate_count FROM user_players WHERE user_id = ? AND player_id = ?").get(userId, playerId) as { duplicate_count: number } | undefined;
+  if (!owned) return;
+  if (owned.duplicate_count > 0) {
+    db.prepare("UPDATE user_players SET duplicate_count = duplicate_count - 1 WHERE user_id = ? AND player_id = ?").run(userId, playerId);
+  } else {
+    db.prepare("DELETE FROM user_players WHERE user_id = ? AND player_id = ?").run(userId, playerId);
+  }
 }
 
 function isSettledMatch(match: CupMatch) {

@@ -121,7 +121,13 @@ const WC_TEAMS = [
   "Venezuela", "Vietnam", "DR Congo",
 ].sort();
 
-const today = new Date().toISOString().slice(0, 10);
+const today = new Date().toLocaleDateString("en-CA");
+const CUP_OPTIONS = [
+  { id: 1, name: "Larsson Cup" },
+  { id: 2, name: "Dalglish Cup" },
+  { id: 3, name: "Maradona Cup" },
+  { id: 4, name: "Pele Cup" }
+];
 
 export default function AdminPage() {
   const [tab, setTab] = useState<"results" | "goalscorers" | "activity" | "boost" | "news" | "players" | "ratings" | "settle" | "monitor">("results");
@@ -335,6 +341,8 @@ function LiveSettleTab({ onForbidden }: { onForbidden: () => void }) {
   const [busy, setBusy] = useState(false);
   const [resyncBusy, setResyncBusy] = useState(false);
   const [cupBusy, setCupBusy] = useState(false);
+  const [cupId, setCupId] = useState(2);
+  const [reverseDate, setReverseDate] = useState(today);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [diagUser, setDiagUser] = useState("");
@@ -461,7 +469,12 @@ function LiveSettleTab({ onForbidden }: { onForbidden: () => void }) {
     setNotice("");
     setError("");
     try {
-      const res = await fetch("/api/admin/settle-cups", { method: "POST", credentials: "include" });
+      const res = await fetch("/api/admin/settle-cups", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ cupId })
+      });
       if (res.status === 403) { onForbidden(); return; }
       const data = (await res.json().catch(() => ({}))) as {
         awardedCount?: number;
@@ -473,9 +486,43 @@ function LiveSettleTab({ onForbidden }: { onForbidden: () => void }) {
         setError(data.error ?? "Could not settle cup rewards.");
         return;
       }
-      const larssonWinner = data.awarded?.find((row) => row.cupName === "Larsson Cup" && row.legendAwarded);
-      const larssonText = larssonWinner ? ` Larsson card awarded to ${larssonWinner.username}.` : "";
-      setNotice(`Cup rewards settled: ${data.awardedCount ?? 0} newly awarded, ${data.alreadyAwardedCount ?? 0} already present.${larssonText}`);
+      const legendWinner = data.awarded?.find((row) => row.legendAwarded);
+      const legendText = legendWinner ? ` Legend card awarded to ${legendWinner.username}.` : "";
+      const cupName = CUP_OPTIONS.find((cup) => cup.id === cupId)?.name ?? `Cup ${cupId}`;
+      setNotice(`${cupName} rewards settled: ${data.awardedCount ?? 0} newly awarded, ${data.alreadyAwardedCount ?? 0} already present.${legendText}`);
+    } finally {
+      setCupBusy(false);
+    }
+  }
+
+  async function reverseLarssonToday() {
+    if (cupBusy) return;
+    setCupBusy(true);
+    setNotice("");
+    setError("");
+    try {
+      const res = await fetch("/api/admin/settle-cups", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          action: "reverse",
+          cupId: 1,
+          createdDate: reverseDate,
+          reason: "Mistaken Larsson Cup settlement while intending to settle Dalglish Cup."
+        })
+      });
+      if (res.status === 403) { onForbidden(); return; }
+      const data = (await res.json().catch(() => ({}))) as {
+        reversed?: { reversedCount: number; creditsReversed: number; cardsReversed: number; users: string[] };
+        error?: string;
+      };
+      if (!res.ok) {
+        setError(data.error ?? "Could not reverse Larsson settlement.");
+        return;
+      }
+      const reversed = data.reversed;
+      setNotice(`Larsson reversal complete: ${reversed?.reversedCount ?? 0} reward rows, ${reversed?.creditsReversed ?? 0} pack credits, ${reversed?.cardsReversed ?? 0} card awards reversed.${reversed?.users?.length ? ` Users: ${reversed.users.join(", ")}.` : ""}`);
     } finally {
       setCupBusy(false);
     }
@@ -525,15 +572,48 @@ function LiveSettleTab({ onForbidden }: { onForbidden: () => void }) {
       <div className="mt-6 border-t border-green-900/10 pt-5">
         <p className="text-sm font-bold uppercase tracking-wide text-green-900/60">Cup Rewards</p>
         <p className="mt-2 text-sm font-semibold text-green-900/65">
-          Awards completed cup prizes once: pack credits for the sticker rewards, a guaranteed Icon for the runner-up, and the Cup Legend card for the winner. Safe to run more than once.
+          Awards completed cup prizes once for the selected cup only: pack credits for sticker rewards, a guaranteed Icon for the runner-up, and the Cup Legend card for the winner.
         </p>
-        <button
-          onClick={settleCups}
-          disabled={cupBusy}
-          className="mt-4 rounded-md bg-blue-700 px-5 py-3 font-black text-white hover:bg-blue-800 disabled:opacity-40"
-        >
-          {cupBusy ? "Settling cups..." : "Settle Cup Rewards"}
-        </button>
+        <div className="mt-4 flex flex-wrap items-end gap-2">
+          <label className="min-w-48 flex-1 text-xs font-black uppercase tracking-wide text-green-900/55">
+            Cup to settle
+            <select
+              value={cupId}
+              onChange={(event) => setCupId(Number(event.target.value))}
+              className="mt-1 w-full rounded-md border border-green-900/20 bg-white px-3 py-2 text-sm font-black normal-case tracking-normal text-green-950"
+            >
+              {CUP_OPTIONS.map((cup) => <option key={cup.id} value={cup.id}>{cup.name}</option>)}
+            </select>
+          </label>
+          <button
+            onClick={settleCups}
+            disabled={cupBusy}
+            className="rounded-md bg-blue-700 px-5 py-3 font-black text-white hover:bg-blue-800 disabled:opacity-40"
+          >
+            {cupBusy ? "Settling cup..." : `Settle ${CUP_OPTIONS.find((cup) => cup.id === cupId)?.name ?? "Cup"}`}
+          </button>
+        </div>
+        <div className="mt-5 rounded-lg border border-red-200 bg-red-50 p-4">
+          <p className="text-xs font-black uppercase tracking-wide text-red-800">Emergency reversal</p>
+          <p className="mt-1 text-sm font-semibold text-red-900">
+            Reverses Larsson Cup reward rows created on the selected date, subtracts those pack credits, removes cup reward card awards, and marks matching chat award messages as reversed.
+          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <input
+              value={reverseDate}
+              onChange={(event) => setReverseDate(event.target.value)}
+              className="w-40 rounded-md border border-red-200 bg-white px-3 py-2 text-sm font-black text-red-950"
+              placeholder="YYYY-MM-DD"
+            />
+            <button
+              onClick={reverseLarssonToday}
+              disabled={cupBusy || !/^\d{4}-\d{2}-\d{2}$/.test(reverseDate)}
+              className="rounded-md bg-red-700 px-5 py-2 font-black text-white hover:bg-red-800 disabled:opacity-40"
+            >
+              Reverse Larsson Awards For Date
+            </button>
+          </div>
+        </div>
       </div>
 
       {notice ? <p className="mt-4 rounded-md bg-green-50 p-3 text-sm font-bold text-green-800">{notice}</p> : null}
