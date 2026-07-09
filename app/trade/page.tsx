@@ -8,7 +8,7 @@ import { basePlayerPool, loadPlayerPool } from "@/lib/playerPool";
 import { loadUserStateAsync } from "@/lib/storage";
 import type { Player, UserState } from "@/lib/types";
 
-type MarketEntry = { userId: number; username: string; playerId: number; duplicateCount: number };
+type MarketEntry = { userId: number; username: string; playerId: number; duplicateCount: number; acceptableOfferPlayerIds: number[] };
 type RandomChallenge = {
   id: number;
   challengerId: number;
@@ -103,7 +103,7 @@ export default function TradePage() {
       const response = await fetch("/api/trades", { credentials: "include" });
       if (!response.ok) return;
       const payload = await response.json();
-      setMarket(payload.market ?? []);
+      setMarket((payload.market ?? []).map((entry: MarketEntry) => ({ ...entry, acceptableOfferPlayerIds: entry.acceptableOfferPlayerIds ?? [] })));
       setRecentTrades(payload.recent ?? []);
     } catch {}
   }
@@ -196,6 +196,7 @@ export default function TradePage() {
   const recommendedMarket = useMemo(() => {
     return market
       .filter((entry) => !ownedIds.has(entry.playerId))
+      .filter((entry) => entry.acceptableOfferPlayerIds.length > 0)
       .sort((a, b) => {
         const aP = playerById.get(a.playerId);
         const bP = playerById.get(b.playerId);
@@ -212,6 +213,7 @@ export default function TradePage() {
   const rankedMarket = useMemo(() => {
     return market
       .filter((entry) => !ownedIds.has(entry.playerId))
+      .filter((entry) => entry.acceptableOfferPlayerIds.length > 0)
       .sort((a, b) => {
         const aP = playerById.get(a.playerId);
         const bP = playerById.get(b.playerId);
@@ -245,7 +247,7 @@ export default function TradePage() {
 
   return (
     <div>
-      <PageTitle title="Trading Hub" subtitle="Every duplicate is automatically available. Swap instantly for another user's duplicate of the same grade." />
+      <PageTitle title="Trading Hub" subtitle="Every duplicate is automatically available. Swap instantly only when both users need the card they receive." />
 
       {tradeNotice ? (
         <p className="mb-4 rounded-xl bg-amber-400/15 px-4 py-3 text-sm font-black text-amber-200 ring-1 ring-amber-400/25">{tradeNotice}</p>
@@ -284,7 +286,7 @@ export default function TradePage() {
             <h2 className="mt-1 text-2xl font-black sm:text-3xl">
               Pick a card you want.<br />Choose the duplicate you give back.
             </h2>
-            <p className="mt-2 text-sm font-semibold text-white/65">No requests, no waiting. Only spare duplicates move, and swaps must stay within the same grade.</p>
+            <p className="mt-2 text-sm font-semibold text-white/65">No requests, no waiting. Only spare duplicates move, swaps must stay within the same grade, and the other user must need what you give.</p>
             <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
               <HeroStat label="Useful cards" value={recommendedMarket.length} />
               <HeroStat label="My duplicates" value={myDuplicates.length} />
@@ -548,9 +550,12 @@ function MarketCard({
   const key = `${entry.userId}:${entry.playerId}`;
   const selectedPlayerId = offerSelections[key];
   const alreadyOwned = ownedIds.has(entry.playerId);
-  const matchingDuplicates = myDuplicates.filter((d) => d.id !== entry.playerId && d.rarity === player?.rarity);
+  const mutuallyUsefulDuplicates = myDuplicates.filter((d) => entry.acceptableOfferPlayerIds.includes(d.id));
+  const sameGradeDuplicates = myDuplicates.filter((d) => d.id !== entry.playerId && d.rarity === player?.rarity);
+  const blockedSameGradeCount = sameGradeDuplicates.length - mutuallyUsefulDuplicates.length;
   const rarity = player?.rarity ?? "common";
   const flag = flagUrl(player?.nation ?? "");
+  const canMutualSwap = mutuallyUsefulDuplicates.length > 0;
 
   return (
     <div className={`overflow-hidden rounded-2xl border ${RARITY_ACCENT[rarity] ?? RARITY_ACCENT.common}`}>
@@ -576,13 +581,24 @@ function MarketCard({
           {progress?.missing.length === 1 ? (
             <span className="rounded-full bg-amber-400/20 px-2 py-0.5 text-[9px] font-black text-amber-300">Completes {player?.nation}</span>
           ) : null}
+          {!alreadyOwned ? (
+            canMutualSwap ? (
+              <span className="rounded-full bg-emerald-400/20 px-2 py-0.5 text-[9px] font-black text-emerald-300">They need your spare</span>
+            ) : (
+              <span className="rounded-full bg-red-500/15 px-2 py-0.5 text-[9px] font-black text-red-300">No mutual swap</span>
+            )
+          ) : null}
         </div>
       </div>
 
       {!alreadyOwned ? (
         <div className="flex items-center gap-2 border-t border-white/8 bg-white/4 px-4 py-3">
-          {matchingDuplicates.length === 0 ? (
-            <p className="flex-1 text-xs font-semibold text-white/30">No spare {rarity} to offer</p>
+          {!canMutualSwap ? (
+            <p className="flex-1 text-xs font-semibold text-white/35">
+              {sameGradeDuplicates.length === 0
+                ? `No spare ${rarity} to offer.`
+                : `${entry.username} already owns your spare ${rarity} card${sameGradeDuplicates.length === 1 ? "" : "s"}.`}
+            </p>
           ) : (
             <>
               <select
@@ -591,7 +607,7 @@ function MarketCard({
                 onChange={(e) => setOfferSelections((prev) => ({ ...prev, [key]: Number(e.target.value) }))}
               >
                 <option value="" className="bg-green-950">Your spare {rarity}…</option>
-                {matchingDuplicates.map((d) => (
+                {mutuallyUsefulDuplicates.map((d) => (
                   <option key={d.id} value={d.id} className="bg-green-950">
                     {d.name} ×{duplicateCounts[d.id] ?? 0} · {d.nation}
                   </option>
@@ -599,7 +615,7 @@ function MarketCard({
               </select>
               <button
                 className="shrink-0 rounded-lg bg-amber-400 px-4 py-2 text-xs font-black text-amber-950 transition hover:bg-amber-300 disabled:opacity-40"
-                disabled={tradeBusy || !selectedPlayerId}
+                disabled={tradeBusy || !selectedPlayerId || !entry.acceptableOfferPlayerIds.includes(selectedPlayerId)}
                 onClick={() =>
                   selectedPlayerId &&
                   tradeAction(
@@ -610,6 +626,9 @@ function MarketCard({
               >
                 Swap now
               </button>
+              {blockedSameGradeCount > 0 ? (
+                <p className="hidden text-[10px] font-semibold text-white/35 sm:block">{blockedSameGradeCount} same-grade spare{blockedSameGradeCount === 1 ? "" : "s"} blocked: already owned by {entry.username}.</p>
+              ) : null}
             </>
           )}
         </div>
@@ -815,7 +834,7 @@ function NationTargetCard({
 
       <div className="mt-3 divide-y divide-white/6">
         {(() => {
-          const available = progress.missing.filter((p) => market.some((e) => e.playerId === p.id)).slice(0, 5);
+          const available = progress.missing.filter((p) => market.some((e) => e.playerId === p.id && e.acceptableOfferPlayerIds.length > 0)).slice(0, 5);
           const unavailableCount = progress.missing.length - available.length;
           if (available.length === 0) {
             return (
@@ -827,7 +846,7 @@ function NationTargetCard({
           return (
             <>
               {available.map((missingPlayer) => {
-          const matchingEntries = market.filter((e) => e.playerId === missingPlayer.id);
+          const matchingEntries = market.filter((e) => e.playerId === missingPlayer.id && e.acceptableOfferPlayerIds.length > 0);
           // Key for "which duplicate am I offering" selection
           const offerKey = `offer:${missingPlayer.id}`;
           // Key for "which provider am I targeting" — only needed when >1 has it
@@ -835,7 +854,9 @@ function NationTargetCard({
           const selectedPlayerId = offerSelections[offerKey];
           const selectedTargetUserId = offerSelections[targetKey] ?? matchingEntries[0]?.userId;
           const targetEntry = matchingEntries.find((e) => e.userId === selectedTargetUserId) ?? matchingEntries[0];
-          const matchingDuplicates = myDuplicates.filter((d) => d.id !== missingPlayer.id && d.rarity === missingPlayer.rarity);
+          const matchingDuplicates = myDuplicates.filter((d) => targetEntry?.acceptableOfferPlayerIds.includes(d.id));
+          const sameGradeDuplicates = myDuplicates.filter((d) => d.id !== missingPlayer.id && d.rarity === missingPlayer.rarity);
+          const blockedSameGradeCount = sameGradeDuplicates.length - matchingDuplicates.length;
           const rarity = missingPlayer.rarity;
           const pFlag = flagUrl(missingPlayer.nation);
           const multipleProviders = matchingEntries.length > 1;
@@ -898,7 +919,7 @@ function NationTargetCard({
                     </select>
                     <button
                       className="shrink-0 rounded-lg bg-amber-400 px-4 py-2 text-xs font-black text-amber-950 transition hover:bg-amber-300 disabled:opacity-40"
-                      disabled={tradeBusy || !selectedPlayerId || !targetEntry}
+                      disabled={tradeBusy || !selectedPlayerId || !targetEntry || !targetEntry.acceptableOfferPlayerIds.includes(selectedPlayerId)}
                       onClick={() =>
                         selectedPlayerId &&
                         targetEntry &&

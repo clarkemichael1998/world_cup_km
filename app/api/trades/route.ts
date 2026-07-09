@@ -22,7 +22,8 @@ export async function GET() {
       userId: row.user_id,
       username: row.username,
       playerId: row.player_id,
-      duplicateCount: row.duplicate_count
+      duplicateCount: row.duplicate_count,
+      acceptableOfferPlayerIds: row.acceptable_offer_player_ids
     })),
     proposals: [],
     recent: getRecentCompletedTrades().map((trade) => ({

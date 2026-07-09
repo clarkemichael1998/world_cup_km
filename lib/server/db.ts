@@ -2220,7 +2220,8 @@ export function expireStaleTradeProposals() {
 
 export function getAutoTradeMarket(currentUserId: number) {
   expireStaleTradeProposals();
-  return getDb()
+  const db = getDb();
+  const rows = db
     .prepare(
       `SELECT up.user_id, users.username, up.player_id, up.duplicate_count
        FROM user_players up
@@ -2229,6 +2230,36 @@ export function getAutoTradeMarket(currentUserId: number) {
        ORDER BY users.username, up.duplicate_count DESC`
     )
     .all(currentUserId) as Array<{ user_id: number; username: string; player_id: number; duplicate_count: number }>;
+
+  const myDuplicateRows = db
+    .prepare("SELECT player_id FROM user_players WHERE user_id = ? AND duplicate_count > 0")
+    .all(currentUserId) as Array<{ player_id: number }>;
+  const playerMap = new Map(getAllPlayers().map((player) => [player.id, player]));
+  const targetOwned = new Map<number, Set<number>>();
+
+  const getTargetOwned = (userId: number) => {
+    let owned = targetOwned.get(userId);
+    if (!owned) {
+      owned = new Set(
+        (db.prepare("SELECT player_id FROM user_players WHERE user_id = ?").all(userId) as Array<{ player_id: number }>).map((row) => row.player_id)
+      );
+      targetOwned.set(userId, owned);
+    }
+    return owned;
+  };
+
+  return rows.map((row) => {
+    const wanted = playerMap.get(row.player_id);
+    const ownedByTarget = getTargetOwned(row.user_id);
+    const acceptableOfferPlayerIds = wanted
+      ? myDuplicateRows
+          .map((duplicate) => duplicate.player_id)
+          .filter((playerId) => playerId !== row.player_id)
+          .filter((playerId) => playerMap.get(playerId)?.rarity === wanted.rarity)
+          .filter((playerId) => !ownedByTarget.has(playerId))
+      : [];
+    return { ...row, acceptable_offer_player_ids: acceptableOfferPlayerIds };
+  });
 }
 
 export function getActiveDirectTradeProposals(userId: number) {
@@ -2349,6 +2380,12 @@ export function executeInstantDuplicateTrade(userId: number, targetUserId: numbe
     if (!userDupe || userDupe.duplicate_count < 1) {
       db.exec("ROLLBACK");
       return "You can only give a card you hold as a duplicate.";
+    }
+
+    const targetAlreadyOwnsOffered = db.prepare("SELECT 1 FROM user_players WHERE user_id = ? AND player_id = ?").get(targetUserId, offeredPlayerId);
+    if (targetAlreadyOwnsOffered) {
+      db.exec("ROLLBACK");
+      return "That user already owns the card you offered. Pick a spare they still need.";
     }
 
     transferTradedPlayer(db, targetUserId, userId, wantedPlayerId);

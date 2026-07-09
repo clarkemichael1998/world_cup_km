@@ -281,7 +281,7 @@ function TradingHero({ cupStatuses }: { cupStatuses: CupStatus[] }) {
             Trade your spare stickers. Finish nations. Cash in huge bonuses.
           </h1>
           <p className="mt-3 max-w-2xl text-sm font-semibold text-white/75">
-            Every duplicate is automatically on the market. Instantly swap one of your spare cards for another user's spare card of the same grade, then use those swaps to finish nation pages. Complete every sticker for a nation and you earn 25 pack credits, plus every player you own from that nation gets +3 added to their rating for Best XI, profiles, squads, and the leaderboard.
+            Every duplicate is automatically on the market. Instantly swap one of your spare cards for another user's spare of the same grade, but only when they need the card you give them too. Use those mutual swaps to finish nation pages and earn 25 pack credits plus the +3 collection boost.
           </p>
           <div className="mt-4 flex flex-wrap items-center gap-2">
             <Link href="/trade" className="flex items-center gap-2 rounded-md bg-white px-4 py-2 text-sm font-black text-green-950 shadow-sm transition hover:bg-amber-50">

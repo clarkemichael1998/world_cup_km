@@ -213,7 +213,7 @@ function DetailedRules() {
             <li><strong>Activity streaks:</strong> log activity 7 days in a row and the daily grant becomes <strong>3 credits</strong> for as long as the streak holds. Miss a day and the streak resets.</li>
             <li><strong>Album milestones:</strong> collect every sticker on a nation&apos;s page and earn <strong>25 bonus credits</strong>, once per nation.</li>
             <li><strong>Collection boost:</strong> completing a nation also gives every owned player from that nation a <strong>+3 rating boost</strong> for Best XI, squad, profile, and leaderboard ratings.</li>
-            <li><strong>Sticker trading:</strong> every duplicate is automatically available on the Trading page. Swap instantly one-for-one for another user&apos;s duplicate of the same card status, such as Icon for Icon or Epic for Epic. Only spare copies can move, so your placed stickers are safe.</li>
+            <li><strong>Sticker trading:</strong> every duplicate is automatically available on the Trading page. Swap instantly one-for-one for another user&apos;s duplicate of the same card status, such as Icon for Icon or Epic for Epic, but only if both users need the card they receive. Only spare copies can move, so your placed stickers are safe.</li>
             <li><strong>Match credits</strong> are earned when players in your locked squad represent a winning nation.</li>
             <li>A match win gives <strong>1 credit per eligible locked player</strong>.</li>
             <li>Credits can be spent on the home page. <strong>1 credit = 1 sticker pull</strong>, up to 20 at a time.</li>
