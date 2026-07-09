@@ -2324,6 +2324,58 @@ export function createDirectTradeProposal(proposerId: number, targetUserId: numb
   }
 }
 
+export function executeInstantDuplicateTrade(userId: number, targetUserId: number, wantedPlayerId: number, offeredPlayerId: number): string | null {
+  const db = getDb();
+  if (targetUserId === userId) return "You can't trade with yourself.";
+  if (wantedPlayerId === offeredPlayerId) return "Choose two different cards for the swap.";
+
+  const playerMap = new Map(getAllPlayers().map((player) => [player.id, player]));
+  const wantedPlayer = playerMap.get(wantedPlayerId);
+  const offeredPlayer = playerMap.get(offeredPlayerId);
+  if (!wantedPlayer || !offeredPlayer) return "One of those players could not be found.";
+  if (wantedPlayer.rarity !== offeredPlayer.rarity) {
+    return `Instant swaps must match card status: give another ${wantedPlayer.rarity} card for ${wantedPlayer.name}.`;
+  }
+
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    const targetDupe = db.prepare("SELECT duplicate_count FROM user_players WHERE user_id = ? AND player_id = ?").get(targetUserId, wantedPlayerId) as { duplicate_count: number } | undefined;
+    if (!targetDupe || targetDupe.duplicate_count < 1) {
+      db.exec("ROLLBACK");
+      return "That player is no longer available as a duplicate.";
+    }
+
+    const userDupe = db.prepare("SELECT duplicate_count FROM user_players WHERE user_id = ? AND player_id = ?").get(userId, offeredPlayerId) as { duplicate_count: number } | undefined;
+    if (!userDupe || userDupe.duplicate_count < 1) {
+      db.exec("ROLLBACK");
+      return "You can only give a card you hold as a duplicate.";
+    }
+
+    transferTradedPlayer(db, targetUserId, userId, wantedPlayerId);
+    transferTradedPlayer(db, userId, targetUserId, offeredPlayerId);
+
+    const offer = db.prepare("INSERT INTO trade_offers (user_id, player_id, status, accepted_by, accepted_player_id, completed_at) VALUES (?, ?, 'completed', ?, ?, CURRENT_TIMESTAMP)")
+      .run(targetUserId, wantedPlayerId, userId, offeredPlayerId);
+    db.prepare("INSERT INTO trade_proposals (offer_id, user_id, player_id, status, created_at) VALUES (?, ?, ?, 'accepted', CURRENT_TIMESTAMP)")
+      .run(Number(offer.lastInsertRowid), userId, offeredPlayerId);
+
+    db.exec("COMMIT");
+
+    const premiumRarities = new Set(["icon", "legend", "epic"]);
+    if (premiumRarities.has(wantedPlayer.rarity) || premiumRarities.has(offeredPlayer.rarity)) {
+      const targetName = (db.prepare("SELECT username FROM users WHERE id = ?").get(targetUserId) as { username: string } | undefined)?.username ?? "Someone";
+      const userName = (db.prepare("SELECT username FROM users WHERE id = ?").get(userId) as { username: string } | undefined)?.username ?? "Someone";
+      const emoji = wantedPlayer.rarity === "icon" || offeredPlayer.rarity === "icon" ? "🌟" : wantedPlayer.rarity === "legend" || offeredPlayer.rarity === "legend" ? "🏆" : "💎";
+      createAdminChatMessage(`${emoji} Instant swap: ${userName} got ${wantedPlayer.name} from ${targetName}, giving ${offeredPlayer.name} back.`);
+    }
+
+    return null;
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
+}
+
 export function createTradeOffer(userId: number, playerId: number): string | null {
   const db = getDb();
   const owned = db.prepare("SELECT duplicate_count FROM user_players WHERE user_id = ? AND player_id = ?").get(userId, playerId) as { duplicate_count: number } | undefined;

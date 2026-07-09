@@ -3,8 +3,8 @@ import {
   confirmTradeProposal,
   createDirectTradeProposal,
   declineTradeProposal,
+  executeInstantDuplicateTrade,
   expireStaleTradeProposals,
-  getActiveDirectTradeProposals,
   getAutoTradeMarket,
   getCurrentUser,
   getRecentCompletedTrades,
@@ -24,19 +24,7 @@ export async function GET() {
       playerId: row.player_id,
       duplicateCount: row.duplicate_count
     })),
-    proposals: getActiveDirectTradeProposals(user.id).map((proposal) => ({
-      id: proposal.id,
-      proposerId: proposal.proposer_id,
-      proposerUsername: proposal.proposer_username,
-      targetUserId: proposal.target_user_id,
-      targetUsername: proposal.target_username,
-      wantedPlayerId: proposal.wanted_player_id,
-      offeredPlayerId: proposal.offered_player_id,
-      createdAt: proposal.created_at,
-      expiresAt: proposal.expires_at,
-      isMine: proposal.proposer_id === user.id,
-      isIncoming: proposal.target_user_id === user.id
-    })),
+    proposals: [],
     recent: getRecentCompletedTrades().map((trade) => ({
       offererUsername: trade.offerer_username,
       acceptorUsername: trade.acceptor_username,
@@ -69,6 +57,12 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "targetUserId, wantedPlayerId and offeredPlayerId required." }, { status: 400 });
       }
       error = createDirectTradeProposal(user.id, body.targetUserId, body.wantedPlayerId, body.offeredPlayerId);
+      break;
+    case "swap":
+      if (typeof body.targetUserId !== "number" || typeof body.wantedPlayerId !== "number" || typeof body.offeredPlayerId !== "number") {
+        return NextResponse.json({ error: "targetUserId, wantedPlayerId and offeredPlayerId required." }, { status: 400 });
+      }
+      error = executeInstantDuplicateTrade(user.id, body.targetUserId, body.wantedPlayerId, body.offeredPlayerId);
       break;
     case "withdraw":
       if (typeof body.proposalId !== "number") return NextResponse.json({ error: "proposalId required." }, { status: 400 });

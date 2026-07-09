@@ -42,7 +42,7 @@ type DirectProposal = {
   isIncoming: boolean;
 };
 type RecentTrade = { offererUsername: string; acceptorUsername: string; playerId: number; acceptedPlayerId: number; completedAt: string };
-type TradeView = "home" | "recommended" | "proposals" | "teams" | "market" | "danger";
+type TradeView = "home" | "recommended" | "teams" | "market" | "danger";
 type BestSwapMode = "collections" | "ranking";
 type NationProgress = { nation: string; total: number; owned: number; missing: Player[]; percent: number };
 
@@ -79,7 +79,6 @@ export default function TradePage() {
   const [state, setState] = useState<UserState | null>(null);
   const [playerPool, setPlayerPool] = useState<Player[]>(basePlayerPool);
   const [market, setMarket] = useState<MarketEntry[]>([]);
-  const [proposals, setProposals] = useState<DirectProposal[]>([]);
   const [recentTrades, setRecentTrades] = useState<RecentTrade[]>([]);
   const [offerSelections, setOfferSelections] = useState<Record<string, number>>({});
   const [tradeBusy, setTradeBusy] = useState(false);
@@ -87,7 +86,6 @@ export default function TradePage() {
   const [activeView, setActiveView] = useState<TradeView>("home");
   const [bestSwapMode, setBestSwapMode] = useState<BestSwapMode>("collections");
   const [search, setSearch] = useState("");
-  const [proposalTab, setProposalTab] = useState<"incoming" | "sent">("incoming");
   const [randomChallenges, setRandomChallenges] = useState<RandomChallenge[]>([]);
   const [randomLog, setRandomLog] = useState<RandomLogEntry[]>([]);
   const [otherUsers, setOtherUsers] = useState<{ id: number; username: string }[]>([]);
@@ -106,7 +104,6 @@ export default function TradePage() {
       if (!response.ok) return;
       const payload = await response.json();
       setMarket(payload.market ?? []);
-      setProposals(payload.proposals ?? []);
       setRecentTrades(payload.recent ?? []);
     } catch {}
   }
@@ -232,8 +229,6 @@ export default function TradePage() {
     });
   }, [market, playerById, search]);
 
-  const incoming = proposals.filter((p) => p.isIncoming);
-  const outgoing = proposals.filter((p) => p.isMine);
   const incomingChallenges = randomChallenges.filter((c) => c.isIncoming);
 
   const sharedProps = {
@@ -250,7 +245,7 @@ export default function TradePage() {
 
   return (
     <div>
-      <PageTitle title="Trading Hub" subtitle="Every duplicate is automatically available. Send a one-for-one proposal that expires after 24 hours." />
+      <PageTitle title="Trading Hub" subtitle="Every duplicate is automatically available. Swap instantly for another user's duplicate of the same grade." />
 
       {tradeNotice ? (
         <p className="mb-4 rounded-xl bg-amber-400/15 px-4 py-3 text-sm font-black text-amber-200 ring-1 ring-amber-400/25">{tradeNotice}</p>
@@ -265,12 +260,6 @@ export default function TradePage() {
           Best Swaps
           {recommendedMarket.length > 0 ? (
             <span className="ml-1.5 rounded-full bg-white/15 px-1.5 py-0.5 text-[9px] font-black tabular-nums">{recommendedMarket.length}</span>
-          ) : null}
-        </TabButton>
-        <TabButton active={activeView === "proposals"} onClick={() => setActiveView("proposals")}>
-          Proposals
-          {incoming.length > 0 ? (
-            <span className="ml-1.5 rounded-full bg-amber-400/30 px-1.5 py-0.5 text-[9px] font-black text-amber-200 tabular-nums">{incoming.length}</span>
           ) : null}
         </TabButton>
         <TabButton active={activeView === "teams"} onClick={() => setActiveView("teams")}>
@@ -295,11 +284,11 @@ export default function TradePage() {
             <h2 className="mt-1 text-2xl font-black sm:text-3xl">
               Pick a card you want.<br />Choose the duplicate you give back.
             </h2>
-            <p className="mt-2 text-sm font-semibold text-white/65">No listing needed. Proposed swaps auto-expire after 24 hours.</p>
+            <p className="mt-2 text-sm font-semibold text-white/65">No requests, no waiting. Only spare duplicates move, and swaps must stay within the same grade.</p>
             <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
               <HeroStat label="Useful cards" value={recommendedMarket.length} />
               <HeroStat label="My duplicates" value={myDuplicates.length} />
-              <HeroStat label="Incoming" value={incoming.length} accent={incoming.length > 0} />
+              <HeroStat label="Market spares" value={market.length} />
               <HeroStat label="Teams done" value={completedNations} />
             </div>
           </section>
@@ -312,14 +301,6 @@ export default function TradePage() {
               badge={`${recommendedMarket.length} useful`}
               accent="green"
               onClick={() => setActiveView("recommended")}
-            />
-            <QuickCard
-              icon="🔔"
-              title="Proposals"
-              desc="Accept, reject, or withdraw one-for-one swap proposals."
-              badge={incoming.length > 0 ? `${incoming.length} incoming` : "None pending"}
-              accent={incoming.length > 0 ? "amber" : "neutral"}
-              onClick={() => setActiveView("proposals")}
             />
             <QuickCard
               icon="🏳"
@@ -383,49 +364,6 @@ export default function TradePage() {
           </div>
           <Showcase entries={activeBestSwaps.slice(0, 3)} playerById={playerById} progressByNation={progressByNation} mode={bestSwapMode} />
           <MarketList entries={activeBestSwaps} emptyText="No available duplicate currently improves your collection." {...sharedProps} />
-        </section>
-      ) : null}
-
-      {/* ── PROPOSALS ───────────────────────────────────────── */}
-      {activeView === "proposals" ? (
-        <section>
-          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-xs font-black uppercase tracking-widest text-white/45">Proposed Trades</p>
-              <p className="mt-1 text-sm font-semibold text-white/55">Accept or reject incoming swaps. Withdraw your own sent proposals.</p>
-            </div>
-            <div className="inline-flex gap-1 rounded-xl bg-white/6 p-1 ring-1 ring-white/10">
-              <ModeButton active={proposalTab === "incoming"} onClick={() => setProposalTab("incoming")}>
-                Incoming
-                {incoming.length > 0 ? <span className="ml-1.5 rounded-full bg-amber-400/30 px-1.5 py-0.5 text-[9px] font-black text-amber-200">{incoming.length}</span> : null}
-              </ModeButton>
-              <ModeButton active={proposalTab === "sent"} onClick={() => setProposalTab("sent")}>
-                Sent
-                {outgoing.length > 0 ? <span className="ml-1.5 rounded-full bg-white/20 px-1.5 py-0.5 text-[9px] font-black">{outgoing.length}</span> : null}
-              </ModeButton>
-            </div>
-          </div>
-          {proposalTab === "incoming" ? (
-            incoming.length === 0 ? (
-              <div className="rounded-xl border border-white/8 bg-white/4 p-8 text-center text-sm font-semibold text-white/30">No incoming proposals right now.</div>
-            ) : (
-              <div className="space-y-3">
-                {incoming.map((p) => (
-                  <ProposalCard key={p.id} proposal={p} playerById={playerById} ownedIds={ownedIds} tradeBusy={tradeBusy} tradeAction={tradeAction} />
-                ))}
-              </div>
-            )
-          ) : (
-            outgoing.length === 0 ? (
-              <div className="rounded-xl border border-white/8 bg-white/4 p-8 text-center text-sm font-semibold text-white/30">You haven't sent any active proposals.</div>
-            ) : (
-              <div className="space-y-3">
-                {outgoing.map((p) => (
-                  <ProposalCard key={p.id} proposal={p} playerById={playerById} ownedIds={ownedIds} tradeBusy={tradeBusy} tradeAction={tradeAction} />
-                ))}
-              </div>
-            )
-          )}
         </section>
       ) : null}
 
@@ -665,12 +603,12 @@ function MarketCard({
                 onClick={() =>
                   selectedPlayerId &&
                   tradeAction(
-                    { action: "propose", targetUserId: entry.userId, wantedPlayerId: entry.playerId, offeredPlayerId: selectedPlayerId },
-                    "Trade proposed — it expires in 24 hours."
+                    { action: "swap", targetUserId: entry.userId, wantedPlayerId: entry.playerId, offeredPlayerId: selectedPlayerId },
+                    "Swap complete — both duplicate piles updated."
                   )
                 }
               >
-                Propose
+                Swap now
               </button>
             </>
           )}
@@ -965,12 +903,12 @@ function NationTargetCard({
                         selectedPlayerId &&
                         targetEntry &&
                         tradeAction(
-                          { action: "propose", targetUserId: targetEntry.userId, wantedPlayerId: missingPlayer.id, offeredPlayerId: selectedPlayerId },
-                          "Trade proposed — it expires in 24 hours."
+                          { action: "swap", targetUserId: targetEntry.userId, wantedPlayerId: missingPlayer.id, offeredPlayerId: selectedPlayerId },
+                          "Swap complete — both duplicate piles updated."
                         )
                       }
                     >
-                      Propose
+                      Swap now
                     </button>
                   </div>
                 )}
