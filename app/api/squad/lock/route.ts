@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAllPlayers, getCurrentUser, getLockedSquadForDate, getFixturesInWindow, lockSquadForDate, unlockSquadForDate } from "@/lib/server/db";
+import { getAllPlayers, getCurrentUser, getLockedSquadForDate, getFixturesInWindow, isAppLockedDown, lockSquadForDate, unlockSquadForDate } from "@/lib/server/db";
 import { syncFixtureResults } from "@/lib/server/fixtures";
 import { settleUserLive } from "@/lib/server/live";
 import type { Player } from "@/lib/types";
@@ -71,6 +71,7 @@ export async function GET() {
 export async function POST() {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Login required" }, { status: 401 });
+  if (isAppLockedDown()) return NextResponse.json({ error: "The app has locked down." }, { status: 403 });
 
   const window = nextLockWindow();
   lockSquadForDate(user.id, window.lockDate, window.lockAt.toISOString(), window.unlockAt.toISOString());
@@ -84,6 +85,7 @@ export async function POST() {
 export async function DELETE() {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Login required" }, { status: 401 });
+  if (isAppLockedDown()) return NextResponse.json({ error: "The app has locked down." }, { status: 403 });
 
   const window = nextLockWindow();
   unlockSquadForDate(user.id, window.lockDate);

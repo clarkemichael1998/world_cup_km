@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser, getMatchdayHeadToHead, getNewsReel, updateNewsReel } from "@/lib/server/db";
+import { getCurrentUser, getMatchdayHeadToHead, getNewsReel, isAppLockedDown, updateNewsReel } from "@/lib/server/db";
 import { getPreviousMatchday } from "@/lib/server/live";
 import { isAdminUsername } from "@/lib/server/admin";
 
@@ -23,6 +23,7 @@ export async function GET() {
 export async function POST(request: Request) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Login required" }, { status: 401 });
+  if (isAppLockedDown()) return NextResponse.json({ error: "The app has locked down." }, { status: 403 });
 
   const rights = newsRights(user.username);
   if (!rights.canSet) {
