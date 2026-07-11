@@ -1076,8 +1076,7 @@ export function awardNationCompletionRewards(userId: number): string[] {
     if (creditsToAward <= 0) continue;
     db.prepare("UPDATE users SET reward_credits = reward_credits + ? WHERE id = ?").run(creditsToAward, userId);
     awarded.push(nation);
-    const username = (db.prepare("SELECT username FROM users WHERE id = ?").get(userId) as { username: string } | undefined)?.username ?? "Someone";
-    createAdminChatMessage(`📖 ${username} just completed the ${nation} page — full house! They've earned ${creditsToAward} pack credits.`);
+    createChatMessage(userId, `🏆 Just completed the ${nation} squad! Every player in the album. Earned ${creditsToAward} pack credits + every ${nation} player in my XI gets a permanent +${COLLECTION_COMPLETION_BOOST} rating boost.`);
   }
   return awarded;
 }
