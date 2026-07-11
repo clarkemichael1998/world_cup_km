@@ -40,7 +40,7 @@ function addDays(date: string, days: number) {
   return value.toISOString().slice(0, 10);
 }
 
-function zonedLondonDate(date: string, hour: number) {
+export function zonedLondonDate(date: string, hour: number) {
   const utcGuess = new Date(`${date}T${String(hour).padStart(2, "0")}:00:00.000Z`);
   const londonHour = Number(
     new Intl.DateTimeFormat("en-GB", {

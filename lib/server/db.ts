@@ -9,7 +9,7 @@ import { cupLegendPlayers } from "@/lib/cupLegends";
 import type { ActivityType, Player, Position, Rarity, SquadSlot } from "@/lib/types";
 import { DEFAULT_ACTIVITY_MULTIPLIER, rarityOdds } from "@/lib/rewardEngine";
 import { compareDailyScores, getDailyScore, NATION_WIN_POINTS } from "@/lib/server/dailyScoring";
-import { getLondonMatchday, londonLockWindowForDate } from "./matchday";
+import { getLondonMatchday, londonLockWindowForDate, zonedLondonDate } from "./matchday";
 
 const dbDir = path.join(process.cwd(), "data");
 const dbPath = process.env.SQLITE_DB_PATH ?? path.join(dbDir, "km-footy.sqlite");
@@ -3614,11 +3614,9 @@ export function getLastMilePlayers(): Player[] {
 // or null if outside the sprint window.
 export function getActivLastMileDay(): { date: string; playerIds: [number, number, number] } | null {
   const now = new Date();
-  // Determine which sprint date is active based on 3pm London cutoff
   for (const entry of [...LAST_MILE_SCHEDULE].reverse()) {
-    const windowStart = new Date(`${entry.date}T15:00:00`);
-    const londonStart = new Date(windowStart.toLocaleString("en-GB", { timeZone: "Europe/London" }));
-    if (now >= londonStart) return entry;
+    const windowStart = zonedLondonDate(entry.date, 15); // 3pm London
+    if (now >= windowStart) return entry;
   }
   return null;
 }
@@ -3644,8 +3642,8 @@ export function getLastMileStatus(userId: number): LastMileStatus {
 
   let qualifies = false;
   if (activeDay && !claimed[activeDay.date]) {
-    // Check if user has logged ≥5 km-equivalent since the window opened (3pm today)
-    const windowStart = `${activeDay.date}T15:00:00`;
+    // Check if user has logged ≥5 km-equivalent since the window opened (3pm London on active day)
+    const windowStart = zonedLondonDate(activeDay.date, 15).toISOString();
     const row = db
       .prepare(
         `SELECT COALESCE(SUM(
@@ -3667,9 +3665,13 @@ export function getLastMileStatus(userId: number): LastMileStatus {
     qualifies = row.equiv >= 5;
   }
 
+  const todayPlayers = activeDay
+    ? LAST_MILE_PLAYERS.filter((p) => activeDay.playerIds.includes(p.id as never))
+    : [];
+
   return {
     activeDay,
-    players: LAST_MILE_PLAYERS,
+    players: todayPlayers,
     claimed,
     qualifies,
     lockedDown,
