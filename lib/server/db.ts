@@ -3642,8 +3642,10 @@ export function getLastMileStatus(userId: number): LastMileStatus {
 
   let qualifies = false;
   if (activeDay && !claimed[activeDay.date]) {
-    // Check if user has logged ≥5 km-equivalent since the window opened (3pm London on active day)
-    const windowStart = zonedLondonDate(activeDay.date, 15).toISOString();
+    // Check if user has logged ≥5 km-equivalent since the window opened (3pm London on active day).
+    // CURRENT_TIMESTAMP in SQLite is stored as "YYYY-MM-DD HH:MM:SS" UTC, so compare using that format.
+    const windowStartUtc = zonedLondonDate(activeDay.date, 15);
+    const windowStart = windowStartUtc.toISOString().replace("T", " ").replace(/\.\d{3}Z$/, "");
     const row = db
       .prepare(
         `SELECT COALESCE(SUM(

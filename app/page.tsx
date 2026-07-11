@@ -436,8 +436,12 @@ function SprintSection() {
     }
   }
 
+  const sectionBorder = status.qualifies && !todayClaimed
+    ? "border-emerald-400/50"
+    : "border-emerald-500/20";
+
   return (
-    <section className="rounded-2xl border border-emerald-500/20 bg-gradient-to-br from-emerald-950/70 via-teal-950/50 to-slate-900/70 p-5 shadow-lg">
+    <section className={`rounded-2xl border ${sectionBorder} bg-gradient-to-br from-emerald-950/70 via-teal-950/50 to-slate-900/70 p-5 shadow-lg transition-colors duration-300`}>
       <div className="mb-4 flex items-center justify-between gap-2">
         <div>
           <p className="text-[10px] font-black uppercase tracking-[0.25em] text-emerald-400/60">Daily Sprint · Day {status.activeDay.dayNumber}</p>
@@ -445,32 +449,36 @@ function SprintSection() {
             {todayClaimed
               ? "Card claimed — see you tomorrow."
               : status.qualifies
-              ? "Pick your mystery card for today."
-              : "Log 5km today to unlock your pick."}
+              ? "✓ 5km logged — pick your card for today."
+              : "Log 5km (or equivalent) today to unlock your pick."}
           </p>
+          {!todayClaimed && !status.qualifies && (
+            <p className="mt-0.5 text-xs font-semibold text-white/40">Walk, run, cycle ÷3, strength ÷10, sport ÷10, mobility ÷30 — all count.</p>
+          )}
         </div>
         <Link href="/last-mile" className="shrink-0 text-xs font-black text-emerald-400/70 underline">Guide</Link>
       </div>
       <div className="grid grid-cols-3 gap-3">
         {status.players.map((player) => {
           const isClaimed = todayClaimed === player.id;
+          const canPick = status.qualifies && !todayClaimed && !claiming;
           return (
             <button
               key={player.id}
-              disabled={!!todayClaimed || !status.qualifies || claiming}
+              disabled={!canPick}
               onClick={() => pick(player.id)}
-              className={`rounded-xl border p-3 text-left transition ${
+              className={`rounded-xl border p-3 text-left transition-all duration-200 ${
                 isClaimed
-                  ? "border-emerald-400/60 bg-emerald-900/40"
-                  : todayClaimed || !status.qualifies
-                  ? "border-white/10 bg-white/5 opacity-60 cursor-not-allowed"
-                  : "border-emerald-400/20 bg-emerald-900/20 hover:border-emerald-400/50 hover:bg-emerald-900/40 cursor-pointer"
+                  ? "border-emerald-400/70 bg-emerald-800/50 ring-1 ring-emerald-400/30"
+                  : canPick
+                  ? "border-emerald-400/50 bg-emerald-900/40 hover:border-emerald-300/70 hover:bg-emerald-800/50 cursor-pointer shadow-emerald-900/40 shadow-md"
+                  : "border-white/10 bg-white/5 opacity-50 cursor-not-allowed"
               }`}
             >
-              <p className="text-[9px] font-black uppercase tracking-[0.2em] text-emerald-400/50">{player.pos}</p>
+              <p className={`text-[9px] font-black uppercase tracking-[0.2em] ${canPick || isClaimed ? "text-emerald-400/70" : "text-white/30"}`}>{player.pos}</p>
               <p className="mt-1 text-sm font-black text-white leading-tight">{player.name}</p>
-              <p className="text-[10px] font-semibold text-white/50">{player.nation}</p>
-              <p className="mt-2 text-lg font-black text-emerald-300">
+              <p className={`text-[10px] font-semibold ${canPick || isClaimed ? "text-white/60" : "text-white/30"}`}>{player.nation}</p>
+              <p className={`mt-2 text-lg font-black ${canPick || isClaimed ? "text-emerald-300" : "text-white/30"}`}>
                 {player.rating !== null ? player.rating : "?"}
               </p>
             </button>
