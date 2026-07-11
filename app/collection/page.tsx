@@ -26,16 +26,17 @@ export default function CollectionPage() {
     loadPlayerPool().then(setPlayerPool);
   }, []);
 
-  const nations = useMemo(() => Array.from(new Set(playerPool.map((player) => player.nation))).sort(), [playerPool]);
+  const regularPool = useMemo(() => playerPool.filter((p) => p.rarity !== "dangerous" && p.rarity !== "consistent" && !p.cupId), [playerPool]);
+  const nations = useMemo(() => Array.from(new Set(regularPool.map((player) => player.nation))).sort(), [regularPool]);
   const countryPlayers = useMemo(
-    () => playerPool.filter((player) => player.nation === nation).sort((a, b) => positionRank(a.pos) - positionRank(b.pos) || b.rating - a.rating || a.name.localeCompare(b.name)),
-    [nation, playerPool]
+    () => regularPool.filter((player) => player.nation === nation).sort((a, b) => positionRank(a.pos) - positionRank(b.pos) || b.rating - a.rating || a.name.localeCompare(b.name)),
+    [nation, regularPool]
   );
-  const owned = state ? getOwnedPlayers(state, playerPool) : [];
+  const owned = state ? getOwnedPlayers(state, regularPool) : [];
   const ownedIds = new Set(owned.map((player) => player.id));
   const nationProgress = nations.map((item) => {
-    const total = playerPool.filter((player) => player.nation === item).length;
-    const complete = playerPool.filter((player) => player.nation === item && ownedIds.has(player.id)).length;
+    const total = regularPool.filter((player) => player.nation === item).length;
+    const complete = regularPool.filter((player) => player.nation === item && ownedIds.has(player.id)).length;
     return { nation: item, total, complete, percent: total ? Math.round((complete / total) * 100) : 0 };
   });
   const sortedNationProgress = [...nationProgress].sort((a, b) => {
@@ -54,11 +55,13 @@ export default function CollectionPage() {
   const selectedFlag = flagUrl(nation);
   const totalDuplicates = state ? Object.values(state.duplicateCounts).reduce((sum, count) => sum + (count ?? 0), 0) : 0;
 
-  const albumPercent = playerPool.length > 0 ? Math.round((owned.length / playerPool.length) * 100) : 0;
+  const albumPercent = regularPool.length > 0 ? Math.round((owned.length / regularPool.length) * 100) : 0;
+  const allOwned = state ? getOwnedPlayers(state, playerPool) : [];
+  const specialOwned = allOwned.filter((p) => p.rarity === "dangerous" || p.rarity === "consistent" || p.cupId);
 
   return (
     <div>
-      <PageTitle title="Sticker Album" subtitle={`${owned.length} official KMXI sticker${owned.length === 1 ? "" : "s"} placed in your World Cup 2026 album.`} />
+      <PageTitle title="Sticker Album" subtitle={`${owned.length} of ${regularPool.length} official KMXI stickers placed. ${specialOwned.length > 0 ? `${specialOwned.length} special card${specialOwned.length === 1 ? "" : "s"} earned.` : ""}`} />
 
       <section className="premium-card mb-5 rounded-2xl p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -165,6 +168,30 @@ export default function CollectionPage() {
           ))}
         </div>
       </section>
+      {specialOwned.length > 0 ? (
+        <section className="mt-5 rounded-2xl border border-white/10 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4 shadow-lg">
+          <p className="text-[10px] font-black uppercase tracking-[0.25em] text-white/40">Special Cards</p>
+          <p className="mt-1 text-sm font-black text-white">Exclusive cards — not found in packs.</p>
+          <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
+            {specialOwned.map((player) => (
+              <button
+                key={player.id}
+                type="button"
+                onClick={() => setSelectedPlayer(player)}
+                className="sticker-slot group rounded-md border border-white/10 bg-white/5 p-1.5 text-left shadow-inner transition hover:-translate-y-0.5 hover:border-white/25 hover:bg-white/10"
+              >
+                <CompactSticker player={player} ratingBoost={state?.ratingBoosts?.[player.id] ?? 0} duplicateCount={state?.duplicateCounts[player.id] ?? 0} />
+              </button>
+            ))}
+          </div>
+          <p className="mt-3 text-[10px] font-semibold text-white/30">
+            {specialOwned.filter((p) => p.rarity === "consistent").length > 0 && "Consistency cards earned by completing the daily sprint. "}
+            {specialOwned.filter((p) => p.rarity === "dangerous").length > 0 && "Dangerous cards awarded for danger swaps. "}
+            {specialOwned.filter((p) => p.cupId).length > 0 && "Cup Legends awarded for cup progression."}
+          </p>
+        </section>
+      ) : null}
+
       {owned.length === 0 ? (
         <div className="mt-4 rounded-lg border border-green-900/10 bg-[#fbf7ea] p-6 text-center shadow-sm">
           <p className="text-lg font-black text-green-950">Your album is waiting.</p>

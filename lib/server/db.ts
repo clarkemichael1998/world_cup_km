@@ -1022,7 +1022,7 @@ export function getCompletedCollectionNationsForPlayerIds(playerIds: number[]): 
   const owned = new Set(playerIds);
   const byNation = new Map<string, number[]>();
   for (const player of getAllPlayers()) {
-    if (player.cupId || player.rarity === "dangerous") continue;
+    if (player.cupId || player.rarity === "dangerous" || player.rarity === "consistent") continue;
     const list = byNation.get(player.nation) ?? [];
     list.push(player.id);
     byNation.set(player.nation, list);
@@ -1039,7 +1039,7 @@ export function getCollectionBoostMapForPlayerIds(playerIds: number[]): Map<numb
   if (completedNations.size === 0) return new Map();
   const boosts = new Map<number, number>();
   for (const player of getAllPlayers()) {
-    if (player.cupId || player.rarity === "dangerous" || !owned.has(player.id) || !completedNations.has(player.nation)) continue;
+    if (player.cupId || player.rarity === "dangerous" || player.rarity === "consistent" || !owned.has(player.id) || !completedNations.has(player.nation)) continue;
     boosts.set(player.id, COLLECTION_COMPLETION_BOOST);
   }
   return boosts;
@@ -3711,6 +3711,8 @@ export function claimLastMilePick(userId: number, playerId: number): { ok: boole
     const player = LAST_MILE_PLAYERS.find((p) => p.id === playerId)!;
     db.prepare("INSERT INTO card_awards (user_id, player_id, rarity, source, source_id, position) VALUES (?, ?, ?, ?, ?, ?)").run(userId, playerId, player.rarity, "last_mile", null, 0);
     db.exec("COMMIT");
+    const username = (db.prepare("SELECT username FROM users WHERE id = ?").get(userId) as { username: string } | undefined)?.username ?? "Someone";
+    createChatMessage(userId, `⭐ ${username} just picked up a Consistency card — ${player.name} (${player.nation}, ${player.pos}). Daily sprint done.`);
   } catch (e) {
     db.exec("ROLLBACK");
     throw e;
