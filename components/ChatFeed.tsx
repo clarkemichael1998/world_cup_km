@@ -27,6 +27,7 @@ export function ChatFeed() {
   const [highlightedMessageId, setHighlightedMessageId] = useState<number | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     loadMessages();
@@ -42,6 +43,20 @@ export function ChatFeed() {
     const sorted = sortNewestFirst(payload.messages ?? []);
     setMessages(sorted);
     markChatSeen(sorted);
+    setIsAdmin(payload.isAdmin ?? false);
+  }
+
+  async function deleteMessage(messageId: number) {
+    const response = await fetch("/api/chat", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ messageId })
+    });
+    if (response.ok) {
+      const payload = await response.json();
+      setMessages(sortNewestFirst(payload.messages ?? []));
+    }
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -146,7 +161,19 @@ export function ChatFeed() {
                       )}
                       {tone.badge ? <Badge tone={tone.badgeTone}>{tone.badge}</Badge> : null}
                     </div>
-                    <time className="text-xs font-bold text-green-900/50">{formatDate(item.created_at)}</time>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <time className="text-xs font-bold text-green-900/50">{formatDate(item.created_at)}</time>
+                      {isAdmin && (
+                        <button
+                          type="button"
+                          onClick={() => deleteMessage(item.id)}
+                          className="rounded px-1.5 py-0.5 text-[10px] font-black text-red-400/60 hover:bg-red-50 hover:text-red-600"
+                          title="Delete message"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
                   </div>
                   <p className={`mt-1 whitespace-pre-wrap break-words text-[13px] font-semibold leading-snug ${tone.text}`}>{item.message}</p>
                   {item.reply_to_message ? (

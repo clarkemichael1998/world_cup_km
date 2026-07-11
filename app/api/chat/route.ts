@@ -1,9 +1,21 @@
 import { NextResponse } from "next/server";
-import { getChatMessages, getChatReactionsForMessages, getCurrentUser, saveChatMessage } from "@/lib/server/db";
+import { deleteChatMessage, getChatMessages, getChatReactionsForMessages, getCurrentUser, saveChatMessage } from "@/lib/server/db";
+import { isAdminUsername } from "@/lib/server/admin";
 
 export async function GET() {
   const user = await getCurrentUser();
-  return NextResponse.json({ messages: getMessagesWithReactions(user?.id ?? null) });
+  const isAdmin = user ? isAdminUsername(user.username) : false;
+  return NextResponse.json({ messages: getMessagesWithReactions(user?.id ?? null), isAdmin });
+}
+
+export async function DELETE(request: Request) {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Login required" }, { status: 401 });
+  if (!isAdminUsername(user.username)) return NextResponse.json({ error: "Admins only." }, { status: 403 });
+  const body = (await request.json().catch(() => null)) as { messageId?: number } | null;
+  if (!body?.messageId) return NextResponse.json({ error: "messageId required" }, { status: 400 });
+  deleteChatMessage(body.messageId);
+  return NextResponse.json({ ok: true, messages: getMessagesWithReactions(user.id) });
 }
 
 export async function POST(request: Request) {

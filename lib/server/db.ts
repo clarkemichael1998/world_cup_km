@@ -1662,6 +1662,11 @@ export function getChatMessages() {
     }>;
 }
 
+export function deleteChatMessage(messageId: number): boolean {
+  const result = getDb().prepare("DELETE FROM chat_messages WHERE id = ?").run(messageId);
+  return result.changes > 0;
+}
+
 export function toggleChatReaction(messageId: number, userId: number, reaction: string): 'added' | 'removed' {
   const database = getDb();
   const existing = database.prepare("SELECT id FROM chat_reactions WHERE message_id = ? AND user_id = ? AND reaction = ?").get(messageId, userId, reaction);
