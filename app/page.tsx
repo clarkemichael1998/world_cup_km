@@ -410,10 +410,16 @@ function SprintSection() {
   const router = useRouter();
 
   useEffect(() => {
-    fetch("/api/last-mile", { credentials: "include" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((p) => setStatus(p))
-      .catch(() => {});
+    function fetchStatus() {
+      fetch("/api/last-mile", { credentials: "include" })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((p) => setStatus(p))
+        .catch(() => {});
+    }
+    fetchStatus();
+    // Poll every 30s so the cards light up automatically once 5km is logged
+    const id = setInterval(fetchStatus, 30000);
+    return () => clearInterval(id);
   }, []);
 
   if (!status?.activeDay) return null;
