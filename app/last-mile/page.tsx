@@ -14,6 +14,7 @@ export default function LastMilePage() {
       <Section title="Daily Sprint">
         <p>Log 5km (or equivalent) each day from today until 18 July to unlock a mystery card pick. Each day presents three players — one defender, one midfielder, one attacker. Ratings are hidden. Pick one, keep it.</p>
         <p className="mt-2 font-bold text-white/80">No catch-ups — miss a day, miss the card.</p>
+        <p className="mt-2 text-white/60">The cards available this week are players famed for their consistency throughout the World Cup — performers who showed up every single game. Consistency is the key to building habits that last beyond the final whistle.</p>
       </Section>
 
       <Section title="Activity Boost">
@@ -33,7 +34,7 @@ export default function LastMilePage() {
       </Section>
 
       <Section title="Consistency">
-        <p>The cards available this week are a different class — earned only by showing up every day. The app ends on 19 July. Whether the daily walk continues after that is up to you.</p>
+        <p>These cards are earned only by showing up every day. The app ends on 19 July. Whether the daily habit continues after that is up to you.</p>
       </Section>
 
       <Section title="Danger Swaps">
