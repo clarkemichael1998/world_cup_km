@@ -2773,6 +2773,14 @@ function getEffectiveRatingForSort(player: Player, boosts: Map<number, number>, 
   return player.rating + (boosts.get(player.id) ?? 0) + (collectionBoosts.get(player.id) ?? 0);
 }
 
+// Returns the set of consistent player IDs whose rating must be hidden —
+// any player available on the currently active sprint day, until that window closes.
+function getHiddenConsistentRatingIds(): Set<number> {
+  const activeDay = getActivLastMileDay();
+  if (!activeDay) return new Set();
+  return new Set(activeDay.playerIds);
+}
+
 export function getCommunitySquads() {
   const db = getDb();
   const adminUsernames = getAdminUsernames();
@@ -2813,6 +2821,7 @@ export function getCommunitySquads() {
     .all() as Array<{ user_id: number; lock_date: string; slot: SquadSlot; player_id: number }>;
 
   const playerById = new Map(getAllPlayers().map((player) => [player.id, player]));
+  const hiddenRatings = getHiddenConsistentRatingIds();
   const ownedByUser = new Map<number, number[]>();
   const boostsByUser = new Map<number, Map<number, number>>();
   const bonusByUser = new Map<number, Map<number, { goalBoost: number; assistBoost: number; winCredits: number }>>();
@@ -2856,13 +2865,13 @@ export function getCommunitySquads() {
       const bonuses = bonusByUser.get(user.id) ?? new Map<number, { goalBoost: number; assistBoost: number; winCredits: number }>();
       const ownedPlayerIds = ownedByUser.get(user.id) ?? [];
       const collectionBoosts = getCollectionBoostMapForPlayerIds(ownedPlayerIds);
-      const best = pickBestCommunitySquad(ownedPlayerIds, boosts, collectionBoosts, bonuses, playerById);
+      const best = pickBestCommunitySquad(ownedPlayerIds, boosts, collectionBoosts, bonuses, playerById, hiddenRatings);
       const locked = lockedByUser.get(user.id);
       const lockedPlayers = locked
         ? communitySquadSlots
             .map((slot) => locked.players.find((player) => player.slot === slot))
             .filter((player): player is { slot: SquadSlot; playerId: number } => Boolean(player))
-            .map((player) => toCommunitySquadPlayer(player.slot, player.playerId, boosts, collectionBoosts, bonuses, playerById))
+            .map((player) => toCommunitySquadPlayer(player.slot, player.playerId, boosts, collectionBoosts, bonuses, playerById, hiddenRatings))
             .filter((player): player is NonNullable<ReturnType<typeof toCommunitySquadPlayer>> => Boolean(player))
         : [];
 
@@ -2881,7 +2890,7 @@ export function getCommunitySquads() {
     .sort((a, b) => b.best.rating - a.best.rating || a.username.localeCompare(b.username));
 }
 
-function pickBestCommunitySquad(playerIds: number[], boosts: Map<number, number>, collectionBoosts: Map<number, number>, bonuses: Map<number, { goalBoost: number; assistBoost: number; winCredits: number }>, playerById: Map<number, Player>) {
+function pickBestCommunitySquad(playerIds: number[], boosts: Map<number, number>, collectionBoosts: Map<number, number>, bonuses: Map<number, { goalBoost: number; assistBoost: number; winCredits: number }>, playerById: Map<number, Player>, hiddenRatings = new Set<number>()) {
   const owned = playerIds
     .map((id) => playerById.get(id))
     .filter((player): player is Player => Boolean(player));
@@ -2895,7 +2904,7 @@ function pickBestCommunitySquad(playerIds: number[], boosts: Map<number, number>
       .sort((a, b) => getEffectiveRatingForSort(b, boosts, collectionBoosts) - getEffectiveRatingForSort(a, boosts, collectionBoosts) || a.name.localeCompare(b.name))[0];
     if (player) {
       used.add(player.id);
-      const squadPlayer = toCommunitySquadPlayer(slot, player.id, boosts, collectionBoosts, bonuses, playerById);
+      const squadPlayer = toCommunitySquadPlayer(slot, player.id, boosts, collectionBoosts, bonuses, playerById, hiddenRatings);
       if (squadPlayer) players.push(squadPlayer);
     }
   }
@@ -2906,12 +2915,13 @@ function pickBestCommunitySquad(playerIds: number[], boosts: Map<number, number>
   };
 }
 
-function toCommunitySquadPlayer(slot: SquadSlot, playerId: number, boosts: Map<number, number>, collectionBoosts: Map<number, number>, bonuses: Map<number, { goalBoost: number; assistBoost: number; winCredits: number }>, playerById: Map<number, Player>) {
+function toCommunitySquadPlayer(slot: SquadSlot, playerId: number, boosts: Map<number, number>, collectionBoosts: Map<number, number>, bonuses: Map<number, { goalBoost: number; assistBoost: number; winCredits: number }>, playerById: Map<number, Player>, hiddenRatings = new Set<number>()) {
   const player = playerById.get(playerId);
   if (!player) return null;
   const boost = boosts.get(player.id) ?? 0;
   const collectionBoost = collectionBoosts.get(player.id) ?? 0;
   const bonus = bonuses.get(player.id) ?? { goalBoost: 0, assistBoost: 0, winCredits: 0 };
+  const ratingHidden = hiddenRatings.has(player.id);
   return {
     slot,
     id: player.id,
@@ -2920,13 +2930,13 @@ function toCommunitySquadPlayer(slot: SquadSlot, playerId: number, boosts: Map<n
     club: player.club,
     pos: player.pos,
     rarity: player.rarity,
-    rating: player.rating,
-    boost,
-    collectionBoost,
+    rating: ratingHidden ? null : player.rating,
+    boost: ratingHidden ? 0 : boost,
+    collectionBoost: ratingHidden ? 0 : collectionBoost,
     goalBoost: bonus.goalBoost,
     assistBoost: bonus.assistBoost,
     winCredits: bonus.winCredits,
-    effectiveRating: player.rating + boost + collectionBoost
+    effectiveRating: ratingHidden ? 0 : player.rating + boost + collectionBoost
   };
 }
 
