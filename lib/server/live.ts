@@ -6,6 +6,8 @@ import { londonLockWindow, londonLockWindowForDate } from "./matchday";
 
 const tournamentStart = "2026-06-11";
 const tournamentEnd = "2026-07-19";
+// Semis matchday starts 3pm London Jul 12 = 14:00 UTC — double goals/assists from here on
+const DOUBLE_POINTS_FROM = "2026-07-12T14:00:00.000Z";
 const creditValue = 1;
 
 export type LiveStatus = {
@@ -317,7 +319,10 @@ function awardGoalBoosts(userId: number) {
       const player = getPlayerById(row.player_id);
       if (!player) continue;
       const boostPerGoal = GOAL_BOOST_BY_RARITY[player.rarity] ?? 0;
-      if (boostPerGoal !== 0) awardGoalBoost(userId, row.player_id, row.match_id, boostPerGoal * row.goal_count);
+      if (boostPerGoal !== 0) {
+        const multiplier = row.kickoff_at >= DOUBLE_POINTS_FROM ? 2 : 1;
+        awardGoalBoost(userId, row.player_id, row.match_id, boostPerGoal * row.goal_count * multiplier);
+      }
     }
 
     for (const row of assistRows) {
@@ -326,7 +331,10 @@ function awardGoalBoosts(userId: number) {
       const player = getPlayerById(row.player_id);
       if (!player) continue;
       const boostPerAssist = ASSIST_BOOST_BY_RARITY[player.rarity] ?? 0;
-      if (boostPerAssist !== 0) awardGoalBoost(userId, row.player_id, `${row.match_id}:assist`, boostPerAssist * row.assist_count);
+      if (boostPerAssist !== 0) {
+        const multiplier = row.kickoff_at >= DOUBLE_POINTS_FROM ? 2 : 1;
+        awardGoalBoost(userId, row.player_id, `${row.match_id}:assist`, boostPerAssist * row.assist_count * multiplier);
+      }
     }
   }
 }
@@ -338,7 +346,7 @@ function reconcileMissingGoalBoosts() {
 
   const goalCandidates = database
     .prepare(
-      `SELECT ls.user_id, lsp.player_id, gs.match_id, gs.goal_count
+      `SELECT ls.user_id, lsp.player_id, gs.match_id, gs.goal_count, fr.kickoff_at
        FROM locked_squads ls
        JOIN locked_squad_players lsp ON lsp.locked_squad_id = ls.id
        JOIN goal_scorers gs ON gs.player_id = lsp.player_id
@@ -349,11 +357,11 @@ function reconcileMissingGoalBoosts() {
          AND fr.kickoff_at >= ls.locked_at
          AND fr.kickoff_at < ls.unlock_at`
     )
-    .all() as Array<{ user_id: number; player_id: number; match_id: string; goal_count: number }>;
+    .all() as Array<{ user_id: number; player_id: number; match_id: string; goal_count: number; kickoff_at: string }>;
 
   const assistCandidates = database
     .prepare(
-      `SELECT ls.user_id, lsp.player_id, as2.match_id, as2.assist_count
+      `SELECT ls.user_id, lsp.player_id, as2.match_id, as2.assist_count, fr.kickoff_at
        FROM locked_squads ls
        JOIN locked_squad_players lsp ON lsp.locked_squad_id = ls.id
        JOIN assist_scorers as2 ON as2.player_id = lsp.player_id
@@ -364,12 +372,13 @@ function reconcileMissingGoalBoosts() {
          AND fr.kickoff_at >= ls.locked_at
          AND fr.kickoff_at < ls.unlock_at`
     )
-    .all() as Array<{ user_id: number; player_id: number; match_id: string; assist_count: number }>;
+    .all() as Array<{ user_id: number; player_id: number; match_id: string; assist_count: number; kickoff_at: string }>;
 
   for (const row of goalCandidates) {
     const player = players.get(row.player_id);
     if (!player) continue;
-    const amount = (GOAL_BOOST_BY_RARITY[player.rarity] ?? 0) * row.goal_count;
+    const multiplier = row.kickoff_at >= DOUBLE_POINTS_FROM ? 2 : 1;
+    const amount = (GOAL_BOOST_BY_RARITY[player.rarity] ?? 0) * row.goal_count * multiplier;
     if (amount === 0) continue;
     if (awardGoalBoost(row.user_id, row.player_id, row.match_id, amount)) applied++;
   }
@@ -377,7 +386,8 @@ function reconcileMissingGoalBoosts() {
   for (const row of assistCandidates) {
     const player = players.get(row.player_id);
     if (!player) continue;
-    const amount = (ASSIST_BOOST_BY_RARITY[player.rarity] ?? 0) * row.assist_count;
+    const multiplier = row.kickoff_at >= DOUBLE_POINTS_FROM ? 2 : 1;
+    const amount = (ASSIST_BOOST_BY_RARITY[player.rarity] ?? 0) * row.assist_count * multiplier;
     if (amount === 0) continue;
     if (awardGoalBoost(row.user_id, row.player_id, `${row.match_id}:assist`, amount)) applied++;
   }

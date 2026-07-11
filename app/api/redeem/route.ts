@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAllPlayers, getCurrentUser, spendCreditsForPlayers } from "@/lib/server/db";
+import { getAllPlayers, getCurrentUser, isAppLockedDown, spendCreditsForPlayers } from "@/lib/server/db";
 import { getRandomPlayerFromPool } from "@/lib/rewardEngine";
 
 const MAX_REDEEM_PER_REQUEST = 20;
@@ -7,6 +7,7 @@ const MAX_REDEEM_PER_REQUEST = 20;
 export async function POST(request: Request) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Login required" }, { status: 401 });
+  if (isAppLockedDown()) return NextResponse.json({ error: "The app has locked down." }, { status: 403 });
 
   const body = (await request.json().catch(() => null)) as { amount?: number } | null;
   const amount = Math.min(Math.max(1, Math.floor(body?.amount ?? 1)), MAX_REDEEM_PER_REQUEST);

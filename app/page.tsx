@@ -67,6 +67,7 @@ export default function Home() {
   const [claimingDanger, setClaimingDanger] = useState(false);
   const [bonusPending, setBonusPending] = useState(0);
   const [claimingBonus, setClaimingBonus] = useState(false);
+  const [locked, setLocked] = useState(false);
   const router = useRouter();
   const countdown = useCountdown();
 
@@ -98,6 +99,10 @@ export default function Home() {
     fetch("/api/bonus-reveal", { credentials: "include" })
       .then((r) => (r.ok ? r.json() : null))
       .then((p) => setBonusPending(p?.pending ?? 0))
+      .catch(() => {});
+    fetch("/api/lockdown", { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((p) => setLocked(p?.locked ?? false))
       .catch(() => {});
   }, []);
 
@@ -176,7 +181,7 @@ export default function Home() {
         )}
       </div>
 
-      <TradingHero cupStatuses={cupStatuses ?? []} />
+      <LastMileHero cupStatuses={cupStatuses ?? []} locked={locked} />
 
       {matchdayScore ? <MatchdayScoreCard data={matchdayScore} /> : null}
 
@@ -259,12 +264,14 @@ export default function Home() {
         </section>
       ) : null}
 
+      {!locked && <SprintSection />}
+
       <ChatFeed />
     </div>
   );
 }
 
-function TradingHero({ cupStatuses }: { cupStatuses: CupStatus[] }) {
+function LastMileHero({ cupStatuses, locked }: { cupStatuses: CupStatus[]; locked: boolean }) {
   const fixtureCup = cupStatuses.find((status) => status.state === "live" && status.opponent)
     ?? cupStatuses.find((status) => status.state === "upcoming" && status.opponent)
     ?? cupStatuses.find((status) => status.state === "live")
@@ -273,24 +280,27 @@ function TradingHero({ cupStatuses }: { cupStatuses: CupStatus[] }) {
     ?? cupStatuses[0];
   const hasScore = fixtureCup?.myScore !== null && fixtureCup?.opponentScore !== null;
   return (
-    <section className="overflow-hidden rounded-2xl border border-green-900/10 bg-gradient-to-br from-green-950 via-green-900 to-amber-700 p-5 text-white shadow-sm">
+    <section className="overflow-hidden rounded-2xl border border-emerald-500/20 bg-gradient-to-br from-emerald-950 via-teal-950 to-slate-900 p-5 text-white shadow-sm">
       <div className="grid gap-4 lg:grid-cols-[1.45fr_0.55fr] lg:items-end">
         <div>
-          <p className="text-xs font-black uppercase tracking-[0.25em] text-white/55">New feature: trading market</p>
-          <h1 className="mt-2 max-w-3xl text-3xl font-black leading-tight sm:text-4xl">
-            Trade your spare stickers. Finish nations. Cash in huge bonuses.
+          <p className="text-xs font-black uppercase tracking-[0.25em] text-emerald-400/60">KMXI · Final Week</p>
+          <h1 className="mt-2 max-w-3xl text-3xl font-black leading-tight tracking-tight sm:text-4xl">
+            THE LAST MILE
           </h1>
-          <p className="mt-3 max-w-2xl text-sm font-semibold text-white/75">
-            Every duplicate is automatically on the market. Instantly swap one of your spare cards for another user's spare of the same grade, but only when they need the card you give them too. Use those mutual swaps to finish nation pages and earn 25 pack credits plus the +3 collection boost.
-          </p>
-          <div className="mt-4 flex flex-wrap items-center gap-2">
-            <Link href="/trade" className="flex items-center gap-2 rounded-md bg-white px-4 py-2 text-sm font-black text-green-950 shadow-sm transition hover:bg-amber-50">
-              Start instant swaps
-            </Link>
-            <Link href="/collection" className="rounded-md bg-white/10 px-4 py-2 text-sm font-black text-white ring-1 ring-white/20 transition hover:bg-white/15">
-              View album
-            </Link>
-          </div>
+          {locked ? (
+            <p className="mt-3 max-w-2xl text-sm font-semibold text-white/60">The app has locked down. Leaderboard frozen. No further actions.</p>
+          ) : (
+            <p className="mt-3 max-w-2xl text-sm font-semibold text-white/75">
+              The final week of KMXI is here. Log 5km a day, pick mystery cards, double your points from the semis onwards. Everything ends 11pm on 19 July.
+            </p>
+          )}
+          {!locked && (
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <Link href="/last-mile" className="flex items-center gap-2 rounded-md bg-emerald-400 px-4 py-2 text-sm font-black text-emerald-950 shadow-sm transition hover:bg-emerald-300">
+                Click here for your guide to the final week of KMXI
+              </Link>
+            </div>
+          )}
         </div>
         <div className="rounded-xl bg-white/10 p-3 ring-1 ring-white/15">
           <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/50">Cup pulse</p>
@@ -311,7 +321,7 @@ function TradingHero({ cupStatuses }: { cupStatuses: CupStatus[] }) {
           ) : (
             <p className="mt-2 text-xs font-semibold text-white/65">Check brackets, fixtures, and rewards.</p>
           )}
-          <Link href="/cups" className="mt-3 block text-xs font-black uppercase tracking-wide text-amber-100 underline">
+          <Link href="/cups" className="mt-3 block text-xs font-black uppercase tracking-wide text-emerald-300 underline">
             View cups
           </Link>
         </div>
@@ -383,4 +393,90 @@ function formatCupDate(value: string) {
   const date = new Date(`${value}T12:00:00Z`);
   if (Number.isNaN(date.getTime())) return value;
   return new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short" }).format(date);
+}
+
+type SprintPlayer = { id: number; name: string; pos: string; rating: number | null; nation: string; rarity: string };
+type SprintStatus = {
+  activeDay: { date: string; dayNumber: number } | null;
+  players: SprintPlayer[];
+  claimed: Record<string, number>;
+  qualifies: boolean;
+  lockedDown: boolean;
+};
+
+function SprintSection() {
+  const [status, setStatus] = useState<SprintStatus | null>(null);
+  const [claiming, setClaiming] = useState(false);
+  const router = useRouter();
+
+  useEffect(() => {
+    fetch("/api/last-mile", { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((p) => setStatus(p))
+      .catch(() => {});
+  }, []);
+
+  if (!status?.activeDay) return null;
+
+  const todayClaimed = status.claimed[status.activeDay.date];
+
+  async function pick(playerId: number) {
+    if (claiming || todayClaimed) return;
+    setClaiming(true);
+    try {
+      const res = await fetch("/api/last-mile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ playerId })
+      });
+      if (res.ok) router.push("/reveal");
+    } finally {
+      setClaiming(false);
+    }
+  }
+
+  return (
+    <section className="rounded-2xl border border-emerald-500/20 bg-gradient-to-br from-emerald-950/70 via-teal-950/50 to-slate-900/70 p-5 shadow-lg">
+      <div className="mb-4 flex items-center justify-between gap-2">
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-[0.25em] text-emerald-400/60">Daily Sprint · Day {status.activeDay.dayNumber}</p>
+          <p className="mt-1 text-base font-black text-white">
+            {todayClaimed
+              ? "Card claimed — see you tomorrow."
+              : status.qualifies
+              ? "Pick your mystery card for today."
+              : "Log 5km today to unlock your pick."}
+          </p>
+        </div>
+        <Link href="/last-mile" className="shrink-0 text-xs font-black text-emerald-400/70 underline">Guide</Link>
+      </div>
+      <div className="grid grid-cols-3 gap-3">
+        {status.players.map((player) => {
+          const isClaimed = todayClaimed === player.id;
+          return (
+            <button
+              key={player.id}
+              disabled={!!todayClaimed || !status.qualifies || claiming}
+              onClick={() => pick(player.id)}
+              className={`rounded-xl border p-3 text-left transition ${
+                isClaimed
+                  ? "border-emerald-400/60 bg-emerald-900/40"
+                  : todayClaimed || !status.qualifies
+                  ? "border-white/10 bg-white/5 opacity-60 cursor-not-allowed"
+                  : "border-emerald-400/20 bg-emerald-900/20 hover:border-emerald-400/50 hover:bg-emerald-900/40 cursor-pointer"
+              }`}
+            >
+              <p className="text-[9px] font-black uppercase tracking-[0.2em] text-emerald-400/50">{player.pos}</p>
+              <p className="mt-1 text-sm font-black text-white leading-tight">{player.name}</p>
+              <p className="text-[10px] font-semibold text-white/50">{player.nation}</p>
+              <p className="mt-2 text-lg font-black text-emerald-300">
+                {player.rating !== null ? player.rating : "?"}
+              </p>
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
 }
