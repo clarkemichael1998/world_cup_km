@@ -11,7 +11,8 @@ const rarityStyles: Record<Player["rarity"], string> = {
   epic: "border-fuchsia-300 bg-fuchsia-50 text-fuchsia-950",
   legend: "border-amber-300 bg-amber-50 text-amber-950 shadow-amber-200/60",
   icon: "border-zinc-300 bg-zinc-950 text-zinc-50 shadow-zinc-400/40",
-  dangerous: "border-red-500 bg-red-950 text-red-50 shadow-red-900/60"
+  dangerous:  "border-red-500 bg-red-950 text-red-50 shadow-red-900/60",
+  consistent: "border-emerald-300 bg-gradient-to-br from-emerald-50 via-teal-50 to-slate-100 text-emerald-950 shadow-emerald-200/60"
 };
 
 const rarityCardClasses: Record<Player["rarity"], string> = {
@@ -21,7 +22,8 @@ const rarityCardClasses: Record<Player["rarity"], string> = {
   epic: "sticker-epic",
   legend: "sticker-legend",
   icon: "sticker-icon",
-  dangerous: "sticker-icon"
+  dangerous:  "sticker-icon",
+  consistent: "sticker-legend"
 };
 
 const rarityLabels: Record<Player["rarity"], string> = {
@@ -31,7 +33,8 @@ const rarityLabels: Record<Player["rarity"], string> = {
   epic: "Epic",
   legend: "Legend",
   icon: "Icon",
-  dangerous: "Dangerous"
+  dangerous:  "Dangerous",
+  consistent: "Consistent"
 };
 
 const rarityMarks: Record<Player["rarity"], string> = {
@@ -41,7 +44,8 @@ const rarityMarks: Record<Player["rarity"], string> = {
   epic: "◆",
   legend: "★",
   icon: "XI",
-  dangerous: "⚠"
+  dangerous:  "⚠",
+  consistent: "★"
 };
 
 function formatNumber(value: number | null) {

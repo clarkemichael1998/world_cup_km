@@ -37,7 +37,8 @@ const rarityClasses: Record<Player["rarity"], string> = {
   epic: "border-fuchsia-300 bg-fuchsia-50 text-fuchsia-950",
   legend: "border-amber-300 bg-amber-50 text-amber-950",
   icon: "border-amber-300 bg-zinc-950 text-amber-50",
-  dangerous: "border-red-500 bg-red-950 text-red-50"
+  dangerous:  "border-red-500 bg-red-950 text-red-50",
+  consistent: "border-emerald-300 bg-gradient-to-br from-emerald-50 via-teal-50 to-slate-100 text-emerald-950"
 };
 
 export default function ProfilePage() {

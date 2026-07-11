@@ -329,7 +329,8 @@ const rarityCardClasses: Record<Player["rarity"], string> = {
   epic: "sticker-epic",
   legend: "sticker-legend",
   icon: "sticker-icon",
-  dangerous: "sticker-icon"
+  dangerous:  "sticker-icon",
+  consistent: "sticker-legend"
 };
 
 const rarityLabels: Record<Player["rarity"], string> = {
@@ -339,7 +340,8 @@ const rarityLabels: Record<Player["rarity"], string> = {
   epic: "Epic",
   legend: "Legend",
   icon: "Icon",
-  dangerous: "Dangerous"
+  dangerous:  "Dangerous",
+  consistent: "Consistent"
 };
 
 const rarityMarks: Record<Player["rarity"], string> = {
@@ -349,5 +351,6 @@ const rarityMarks: Record<Player["rarity"], string> = {
   epic: "◆",
   legend: "★",
   icon: "XI",
-  dangerous: "⚠"
+  dangerous:  "⚠",
+  consistent: "★"
 };

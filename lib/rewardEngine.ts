@@ -6,9 +6,9 @@ export const allPlayers = players as Player[];
 export const rarityOdds: Array<{ rarity: Rarity; ceiling: number }> = [
   { rarity: "clowns", ceiling: 0.01 },
   { rarity: "common", ceiling: 0.70 },
-  { rarity: "rare", ceiling: 0.95 },
-  { rarity: "epic", ceiling: 0.988 },
-  { rarity: "legend", ceiling: 0.998 },
+  { rarity: "rare", ceiling: 0.956 },
+  { rarity: "epic", ceiling: 0.994 },
+  { rarity: "legend", ceiling: 0.999 },
   { rarity: "icon", ceiling: 1 }
 ];
 
@@ -41,7 +41,7 @@ export function getRandomPlayerFromPool(playerPool: Player[], rarity = rollRarit
   return fallbackPool[Math.floor(Math.random() * fallbackPool.length)];
 }
 
-export const DEFAULT_ACTIVITY_MULTIPLIER = 1.25;
+export const DEFAULT_ACTIVITY_MULTIPLIER = 6;
 
 export const activityDefinitions: Record<ActivityType, { label: string; unit: "km" | "minutes"; creditsPerUnit: number; maxPerLog: number }> = {
   walk: { label: "Walk", unit: "km", creditsPerUnit: 1, maxPerLog: 50 },

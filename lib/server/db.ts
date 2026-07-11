@@ -27,6 +27,56 @@ const DANGER_MILESTONE_PLAYERS: Player[] = [
   { id: 99005, slug: "zinedine-zidane-danger", name: "Zinedine Zidane", sortName: "Zidane, Zinedine", club: "—", nation: "France", pos: "MF", rating: 115, rarity: "dangerous", wiki: null, dob: "1972-06-23", caps: null, goals: null, clubWiki: null, clubCountry: "France", teamId: "france" },
 ];
 
+// The Last Mile — 8-day final sprint. One DEF/MID/FW choice per day, ratings hidden until picked.
+// Days run 3pm–3pm London time. Starts 11 Jul, last claimable day 18 Jul.
+const LAST_MILE_PLAYERS: Player[] = [
+  // Day 1 — Jul 11
+  { id: 99101, slug: "cafu-consistent",          name: "Cafu",             sortName: "Cafu",             club: "—", nation: "Brazil",   pos: "DF", rating: 87,  rarity: "consistent", wiki: null, dob: "1970-06-07", caps: null, goals: null, clubWiki: null, clubCountry: "Brazil",   teamId: "brazil"   },
+  { id: 99102, slug: "pirlo-consistent",          name: "Andrea Pirlo",     sortName: "Pirlo, Andrea",    club: "—", nation: "Italy",    pos: "MF", rating: 88,  rarity: "consistent", wiki: null, dob: "1979-05-19", caps: null, goals: null, clubWiki: null, clubCountry: "Italy",    teamId: "italy"    },
+  { id: 99103, slug: "suker-consistent",          name: "Davor Šuker",      sortName: "Šuker, Davor",     club: "—", nation: "Croatia",  pos: "FW", rating: 83,  rarity: "consistent", wiki: null, dob: "1968-01-01", caps: null, goals: null, clubWiki: null, clubCountry: "Croatia",  teamId: "croatia"  },
+  // Day 2 — Jul 12
+  { id: 99104, slug: "thuram-consistent",         name: "Lilian Thuram",    sortName: "Thuram, Lilian",   club: "—", nation: "France",   pos: "DF", rating: 85,  rarity: "consistent", wiki: null, dob: "1972-01-29", caps: null, goals: null, clubWiki: null, clubCountry: "France",   teamId: "france"   },
+  { id: 99105, slug: "ballack-consistent",        name: "Michael Ballack",  sortName: "Ballack, Michael", club: "—", nation: "Germany",  pos: "MF", rating: 87,  rarity: "consistent", wiki: null, dob: "1976-09-26", caps: null, goals: null, clubWiki: null, clubCountry: "Germany",  teamId: "germany"  },
+  { id: 99106, slug: "fontaine-consistent",       name: "Just Fontaine",    sortName: "Fontaine, Just",   club: "—", nation: "France",   pos: "FW", rating: 85,  rarity: "consistent", wiki: null, dob: "1933-08-18", caps: null, goals: null, clubWiki: null, clubCountry: "France",   teamId: "france"   },
+  // Day 3 — Jul 13 ⚡
+  { id: 99107, slug: "maldini-consistent",        name: "Paolo Maldini",    sortName: "Maldini, Paolo",   club: "—", nation: "Italy",    pos: "DF", rating: 96,  rarity: "consistent", wiki: null, dob: "1968-06-26", caps: null, goals: null, clubWiki: null, clubCountry: "Italy",    teamId: "italy"    },
+  { id: 99108, slug: "matthaus-consistent",       name: "Lothar Matthäus",  sortName: "Matthäus, Lothar", club: "—", nation: "Germany",  pos: "MF", rating: 94,  rarity: "consistent", wiki: null, dob: "1961-03-21", caps: null, goals: null, clubWiki: null, clubCountry: "Germany",  teamId: "germany"  },
+  { id: 99109, slug: "ronaldo-r9-consistent",     name: "Ronaldo Nazário",  sortName: "Ronaldo, R9",      club: "—", nation: "Brazil",   pos: "FW", rating: 97,  rarity: "consistent", wiki: null, dob: "1976-09-22", caps: null, goals: null, clubWiki: null, clubCountry: "Brazil",   teamId: "brazil"   },
+  // Day 4 — Jul 14
+  { id: 99110, slug: "hummels-consistent",        name: "Mats Hummels",     sortName: "Hummels, Mats",    club: "—", nation: "Germany",  pos: "DF", rating: 84,  rarity: "consistent", wiki: null, dob: "1988-12-16", caps: null, goals: null, clubWiki: null, clubCountry: "Germany",  teamId: "germany"  },
+  { id: 99111, slug: "kroos-consistent",          name: "Toni Kroos",       sortName: "Kroos, Toni",      club: "—", nation: "Germany",  pos: "MF", rating: 87,  rarity: "consistent", wiki: null, dob: "1990-01-04", caps: null, goals: null, clubWiki: null, clubCountry: "Germany",  teamId: "germany"  },
+  { id: 99112, slug: "lineker-consistent",        name: "Gary Lineker",     sortName: "Lineker, Gary",    club: "—", nation: "England",  pos: "FW", rating: 86,  rarity: "consistent", wiki: null, dob: "1960-11-30", caps: null, goals: null, clubWiki: null, clubCountry: "England",  teamId: "england"  },
+  // Day 5 — Jul 15 ⚡
+  { id: 99113, slug: "lahm-consistent",           name: "Philipp Lahm",     sortName: "Lahm, Philipp",    club: "—", nation: "Germany",  pos: "DF", rating: 91,  rarity: "consistent", wiki: null, dob: "1983-11-01", caps: null, goals: null, clubWiki: null, clubCountry: "Germany",  teamId: "germany"  },
+  { id: 99114, slug: "iniesta-consistent",        name: "Andrés Iniesta",   sortName: "Iniesta, Andrés",  club: "—", nation: "Spain",    pos: "MF", rating: 93,  rarity: "consistent", wiki: null, dob: "1984-05-11", caps: null, goals: null, clubWiki: null, clubCountry: "Spain",    teamId: "spain"    },
+  { id: 99115, slug: "gerd-muller-consistent",    name: "Gerd Müller",      sortName: "Müller, Gerd",     club: "—", nation: "Germany",  pos: "FW", rating: 95,  rarity: "consistent", wiki: null, dob: "1945-11-03", caps: null, goals: null, clubWiki: null, clubCountry: "Germany",  teamId: "germany"  },
+  // Day 6 — Jul 16
+  { id: 99116, slug: "carlos-alberto-consistent", name: "Carlos Alberto",   sortName: "Alberto, Carlos",  club: "—", nation: "Brazil",   pos: "DF", rating: 86,  rarity: "consistent", wiki: null, dob: "1944-07-17", caps: null, goals: null, clubWiki: null, clubCountry: "Brazil",   teamId: "brazil"   },
+  { id: 99117, slug: "breitner-consistent",       name: "Paul Breitner",    sortName: "Breitner, Paul",   club: "—", nation: "Germany",  pos: "MF", rating: 84,  rarity: "consistent", wiki: null, dob: "1951-09-05", caps: null, goals: null, clubWiki: null, clubCountry: "Germany",  teamId: "germany"  },
+  { id: 99118, slug: "klinsmann-consistent",      name: "Jürgen Klinsmann", sortName: "Klinsmann, Jürgen",club: "—", nation: "Germany",  pos: "FW", rating: 83,  rarity: "consistent", wiki: null, dob: "1964-07-30", caps: null, goals: null, clubWiki: null, clubCountry: "Germany",  teamId: "germany"  },
+  // Day 7 — Jul 17 ⚡
+  { id: 99119, slug: "roberto-carlos-consistent", name: "Roberto Carlos",   sortName: "Carlos, Roberto",  club: "—", nation: "Brazil",   pos: "DF", rating: 91,  rarity: "consistent", wiki: null, dob: "1973-04-10", caps: null, goals: null, clubWiki: null, clubCountry: "Brazil",   teamId: "brazil"   },
+  { id: 99120, slug: "rivaldo-consistent",        name: "Rivaldo",          sortName: "Rivaldo",          club: "—", nation: "Brazil",   pos: "MF", rating: 92,  rarity: "consistent", wiki: null, dob: "1972-04-19", caps: null, goals: null, clubWiki: null, clubCountry: "Brazil",   teamId: "brazil"   },
+  { id: 99121, slug: "klose-consistent",          name: "Miroslav Klose",   sortName: "Klose, Miroslav",  club: "—", nation: "Germany",  pos: "FW", rating: 92,  rarity: "consistent", wiki: null, dob: "1978-06-09", caps: null, goals: null, clubWiki: null, clubCountry: "Germany",  teamId: "germany"  },
+  // Day 8 — Jul 18 ⚡⚡
+  { id: 99122, slug: "beckenbauer-consistent",    name: "Franz Beckenbauer",sortName: "Beckenbauer, Franz",club: "—", nation: "Germany",  pos: "DF", rating: 100, rarity: "consistent", wiki: null, dob: "1945-09-11", caps: null, goals: null, clubWiki: null, clubCountry: "Germany",  teamId: "germany"  },
+  { id: 99123, slug: "xavi-consistent",           name: "Xavi",             sortName: "Xavi",             club: "—", nation: "Spain",    pos: "MF", rating: 92,  rarity: "consistent", wiki: null, dob: "1980-01-25", caps: null, goals: null, clubWiki: null, clubCountry: "Spain",    teamId: "spain"    },
+  { id: 99124, slug: "eusebio-consistent",        name: "Eusébio",          sortName: "Eusébio",          club: "—", nation: "Portugal", pos: "FW", rating: 91,  rarity: "consistent", wiki: null, dob: "1942-01-25", caps: null, goals: null, clubWiki: null, clubCountry: "Portugal", teamId: "portugal" },
+];
+
+// Maps each sprint date (London) to the three player IDs available that day.
+// Window: 3pm on that date → 3pm the following date (or 11pm on Jul 19 for the final short day).
+const LAST_MILE_SCHEDULE: Array<{ date: string; playerIds: [number, number, number] }> = [
+  { date: "2026-07-11", playerIds: [99101, 99102, 99103] },
+  { date: "2026-07-12", playerIds: [99104, 99105, 99106] },
+  { date: "2026-07-13", playerIds: [99107, 99108, 99109] },
+  { date: "2026-07-14", playerIds: [99110, 99111, 99112] },
+  { date: "2026-07-15", playerIds: [99113, 99114, 99115] },
+  { date: "2026-07-16", playerIds: [99116, 99117, 99118] },
+  { date: "2026-07-17", playerIds: [99119, 99120, 99121] },
+  { date: "2026-07-18", playerIds: [99122, 99123, 99124] },
+];
+
 const DANGER_MILESTONES: Array<{ count: number; playerId: number }> = [
   { count: 3, playerId: 99001 },
   { count: 7, playerId: 99002 },
@@ -41,7 +91,8 @@ const goalBoostByRarity: Record<Rarity, number> = {
   rare: 5,
   common: 10,
   clowns: -5,
-  dangerous: 0
+  dangerous:  0,
+  consistent: 0
 };
 
 type UserRow = {
@@ -401,6 +452,14 @@ export function getDb() {
       FOREIGN KEY (challenger_id) REFERENCES users(id),
       FOREIGN KEY (target_id) REFERENCES users(id)
     );
+    CREATE TABLE IF NOT EXISTS last_mile_claims (
+      user_id INTEGER NOT NULL,
+      sprint_date TEXT NOT NULL,
+      player_id INTEGER NOT NULL,
+      claimed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (user_id, sprint_date),
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
     CREATE TABLE IF NOT EXISTS bonus_reveal_queue (
       user_id INTEGER NOT NULL,
       player_id INTEGER NOT NULL,
@@ -430,6 +489,7 @@ export function getDb() {
   migrateCupBracketOverrides(db);
   migrateBonusRevealQueue(db);
   resetMaradonaCupDraw(db);
+  migrateActivityMultiplier(db);
   seedFixtureResults(db);
   removeLegacySeedFixtures(db);
   return db;
@@ -538,7 +598,7 @@ export type PlayerRatingAdjustment = {
 };
 
 export function getAllPlayers(): Player[] {
-  return applyGlobalRatingAdjustments([...basePlayers, ...getLateCallupPlayers(), ...cupLegendPlayers, ...DANGER_MILESTONE_PLAYERS]);
+  return applyGlobalRatingAdjustments([...basePlayers, ...getLateCallupPlayers(), ...cupLegendPlayers, ...DANGER_MILESTONE_PLAYERS, ...LAST_MILE_PLAYERS]);
 }
 
 export function getDangerMilestonePlayers(): Player[] {
@@ -3531,4 +3591,123 @@ export function getCupMatchOverrides(cupId: number): Array<{ match_id: string; h
   return getDb()
     .prepare("SELECT match_id, home_username, away_username, force_winner FROM cup_match_overrides WHERE cup_id = ?")
     .all(cupId) as Array<{ match_id: string; home_username: string | null; away_username: string | null; force_winner: string | null }>;
+}
+
+// ─── App lockdown ────────────────────────────────────────────────────────────
+
+// App locks down at 23:00 London time on 19 July 2026.
+export function isAppLockedDown(): boolean {
+  const now = new Date();
+  const londonTime = new Date(now.toLocaleString("en-GB", { timeZone: "Europe/London" }));
+  const lockdown = new Date("2026-07-19T23:00:00");
+  const londonLockdown = new Date(lockdown.toLocaleString("en-GB", { timeZone: "Europe/London" }));
+  return londonTime >= londonLockdown;
+}
+
+// ─── Last Mile sprint ─────────────────────────────────────────────────────────
+
+export function getLastMilePlayers(): Player[] {
+  return LAST_MILE_PLAYERS;
+}
+
+// Returns the sprint entry for the currently active day (3pm–3pm London),
+// or null if outside the sprint window.
+export function getActivLastMileDay(): { date: string; playerIds: [number, number, number] } | null {
+  const now = new Date();
+  // Determine which sprint date is active based on 3pm London cutoff
+  for (const entry of [...LAST_MILE_SCHEDULE].reverse()) {
+    const windowStart = new Date(`${entry.date}T15:00:00`);
+    const londonStart = new Date(windowStart.toLocaleString("en-GB", { timeZone: "Europe/London" }));
+    if (now >= londonStart) return entry;
+  }
+  return null;
+}
+
+export type LastMileStatus = {
+  activeDay: { date: string; playerIds: [number, number, number] } | null;
+  players: Player[];
+  claimed: Record<string, number>; // date → playerId
+  qualifies: boolean; // has the user logged 5km-equivalent today
+  lockedDown: boolean;
+};
+
+export function getLastMileStatus(userId: number): LastMileStatus {
+  const db = getDb();
+  const lockedDown = isAppLockedDown();
+  const activeDay = lockedDown ? null : getActivLastMileDay();
+
+  const claimRows = db
+    .prepare("SELECT sprint_date, player_id FROM last_mile_claims WHERE user_id = ?")
+    .all(userId) as Array<{ sprint_date: string; player_id: number }>;
+  const claimed: Record<string, number> = {};
+  for (const r of claimRows) claimed[r.sprint_date] = r.player_id;
+
+  let qualifies = false;
+  if (activeDay && !claimed[activeDay.date]) {
+    // Check if user has logged ≥5 km-equivalent since the window opened (3pm today)
+    const windowStart = `${activeDay.date}T15:00:00`;
+    const row = db
+      .prepare(
+        `SELECT COALESCE(SUM(
+          CASE activity_type
+            WHEN 'walk'     THEN distance_km
+            WHEN 'run'      THEN distance_km
+            WHEN 'cycle'    THEN distance_km / 3.0
+            WHEN 'strength' THEN distance_km / 10.0
+            WHEN 'sport'    THEN distance_km / 10.0
+            WHEN 'mobility' THEN distance_km / 30.0
+            ELSE 0
+          END
+        ), 0) AS equiv
+        FROM km_log
+        WHERE user_id = ? AND voided_at IS NULL
+          AND created_at >= ?`
+      )
+      .get(userId, windowStart) as { equiv: number };
+    qualifies = row.equiv >= 5;
+  }
+
+  return {
+    activeDay,
+    players: LAST_MILE_PLAYERS,
+    claimed,
+    qualifies,
+    lockedDown,
+  };
+}
+
+export function claimLastMilePick(userId: number, playerId: number): { ok: boolean; error?: string } {
+  const db = getDb();
+  if (isAppLockedDown()) return { ok: false, error: "App is locked down." };
+
+  const activeDay = getActivLastMileDay();
+  if (!activeDay) return { ok: false, error: "No active sprint day." };
+  if (!activeDay.playerIds.includes(playerId as never)) return { ok: false, error: "Invalid player for today." };
+
+  const existing = db.prepare("SELECT player_id FROM last_mile_claims WHERE user_id = ? AND sprint_date = ?").get(userId, activeDay.date);
+  if (existing) return { ok: false, error: "Already claimed today." };
+
+  const status = getLastMileStatus(userId);
+  if (!status.qualifies) return { ok: false, error: "5km not yet logged today." };
+
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    db.prepare("INSERT INTO last_mile_claims (user_id, sprint_date, player_id) VALUES (?, ?, ?)").run(userId, activeDay.date, playerId);
+    const maxPos = (db.prepare("SELECT COALESCE(MAX(position), -1) AS m FROM reveal_players WHERE user_id = ?").get(userId) as { m: number }).m;
+    db.prepare("INSERT OR IGNORE INTO reveal_players (user_id, position, player_id) VALUES (?, ?, ?)").run(userId, maxPos + 1, playerId);
+    const player = LAST_MILE_PLAYERS.find((p) => p.id === playerId)!;
+    db.prepare("INSERT INTO card_awards (user_id, player_id, rarity, source, source_id, position) VALUES (?, ?, ?, ?, ?, ?)").run(userId, playerId, player.rarity, "last_mile", null, 0);
+    db.exec("COMMIT");
+  } catch (e) {
+    db.exec("ROLLBACK");
+    throw e;
+  }
+  return { ok: true };
+}
+
+function migrateActivityMultiplier(database: DatabaseSync) {
+  // Boost activity multiplier to ×6 for the final week
+  database.prepare("UPDATE tournament_settings SET activity_multiplier = 6 WHERE id = 1").run();
+  // Insert default row if it doesn't exist yet
+  database.prepare("INSERT OR IGNORE INTO tournament_settings (id, activity_multiplier) VALUES (1, 6)").run();
 }

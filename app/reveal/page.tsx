@@ -16,7 +16,8 @@ const rarityGlow: Record<Player["rarity"], string> = {
   epic:      "rgba(192,132,252,0.6)",
   legend:    "rgba(251,191,36,0.65)",
   icon:      "rgba(255,255,255,0.7)",
-  dangerous: "rgba(239,68,68,0.9)"
+  dangerous:  "rgba(239,68,68,0.9)",
+  consistent: "rgba(134,239,172,0.75)"
 };
 
 const rarityGrad: Record<Player["rarity"], string> = {
@@ -26,7 +27,8 @@ const rarityGrad: Record<Player["rarity"], string> = {
   epic:      "from-fuchsia-700 via-purple-900 to-slate-900",
   legend:    "from-amber-500 via-amber-800 to-slate-900",
   icon:      "from-zinc-400 via-zinc-700 to-zinc-950",
-  dangerous: "from-red-600 via-red-950 to-black"
+  dangerous:  "from-red-600 via-red-950 to-black",
+  consistent: "from-emerald-300 via-teal-600 to-slate-900"
 };
 
 const rarityLabel: Record<Player["rarity"], string> = {
@@ -36,7 +38,8 @@ const rarityLabel: Record<Player["rarity"], string> = {
   epic:      "Epic",
   legend:    "Legend",
   icon:      "Icon",
-  dangerous: "Dangerous"
+  dangerous:  "Dangerous",
+  consistent: "Consistent"
 };
 
 export default function RevealPage() {
