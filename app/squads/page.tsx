@@ -13,7 +13,7 @@ type SquadPlayer = {
   club: string;
   pos: string;
   rarity: string;
-  rating: number;
+  rating: number | null;
   boost: number;
   collectionBoost: number;
   goalBoost: number;
@@ -144,8 +144,8 @@ function MiniCard({ slot, player }: { slot: string; player?: SquadPlayer }) {
     <div className="min-h-20 rounded-md bg-white p-2 shadow-sm">
       <div className="flex items-start justify-between gap-1">
         <p className="text-[9px] font-black uppercase text-green-900/45">{slot}</p>
-        <p className="rounded bg-gold px-1.5 py-0.5 text-[10px] font-black text-green-950">
-          {player.effectiveRating}
+        <p className={`rounded px-1.5 py-0.5 text-[10px] font-black ${player.rating === null ? "bg-slate-200 text-slate-500" : "bg-gold text-green-950"}`}>
+          {player.rating === null ? "??" : player.effectiveRating}
         </p>
       </div>
       <p className="mt-1 break-words text-[11px] font-black leading-tight text-green-950">{player.name}</p>

@@ -3029,9 +3029,10 @@ export function getAdminMatchMonitor(limit = 80) {
   };
 }
 
-function averageCommunityRating(players: Array<{ effectiveRating: number }>) {
-  if (players.length === 0) return 0;
-  return Math.round((players.reduce((sum, player) => sum + player.effectiveRating, 0) / players.length) * 10) / 10;
+function averageCommunityRating(players: Array<{ effectiveRating: number; rating: number | null }>) {
+  const visible = players.filter((p) => p.rating !== null);
+  if (visible.length === 0) return 0;
+  return Math.round((visible.reduce((sum, p) => sum + p.effectiveRating, 0) / visible.length) * 10) / 10;
 }
 
 // Fixtures kicking off inside the lock window [startIso, endIso). This matches
