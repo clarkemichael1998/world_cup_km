@@ -490,6 +490,7 @@ export function getDb() {
   migrateBonusRevealQueue(db);
   resetMaradonaCupDraw(db);
   migrateActivityMultiplier(db);
+  backfillLastMileDay1(db);
   seedFixtureResults(db);
   removeLegacySeedFixtures(db);
   return db;
@@ -3732,6 +3733,75 @@ export function claimLastMilePick(userId: number, playerId: number): { ok: boole
     throw e;
   }
   return { ok: true };
+}
+
+// One-time backfill: award a Day 1 sprint card to users who logged ≥5km in the Day 1
+// window (3pm BST Jul 11 = 14:00 UTC → 3pm BST Jul 12 = 14:00 UTC) but never claimed.
+// Uses a guard row in a settings key so it only runs once.
+function backfillLastMileDay1(database: DatabaseSync) {
+  const GUARD_KEY = "last_mile_day1_backfill_done";
+  const done = database.prepare("SELECT value FROM kv_store WHERE key = ?").get(GUARD_KEY) as { value: string } | undefined;
+  if (done) return;
+
+  // Ensure kv_store table exists
+  database.exec("CREATE TABLE IF NOT EXISTS kv_store (key TEXT PRIMARY KEY, value TEXT NOT NULL)");
+
+  const DAY1_DATE = "2026-07-11";
+  const WINDOW_START = "2026-07-11 14:00:00"; // 3pm BST = 14:00 UTC
+  const WINDOW_END   = "2026-07-12 14:00:00";
+  const DAY1_PLAYER_IDS = [99101, 99102, 99103]; // Cafu (DF), Pirlo (MF), Suker (FW)
+
+  // Find users who qualified (≥5km equiv) but have no claim for Day 1
+  const qualifying = database.prepare(
+    `SELECT user_id, COALESCE(SUM(
+       CASE activity_type
+         WHEN 'walk'     THEN distance_km
+         WHEN 'run'      THEN distance_km
+         WHEN 'cycle'    THEN distance_km / 3.0
+         WHEN 'strength' THEN distance_km / 10.0
+         WHEN 'sport'    THEN distance_km / 10.0
+         WHEN 'mobility' THEN distance_km / 30.0
+         ELSE 0
+       END
+     ), 0) AS equiv
+     FROM km_log
+     WHERE voided_at IS NULL
+       AND created_at >= ? AND created_at < ?
+     GROUP BY user_id
+     HAVING equiv >= 5`
+  ).all(WINDOW_START, WINDOW_END) as Array<{ user_id: number; equiv: number }>;
+
+  const adminUsernames = getAdminUsernames();
+  for (const row of qualifying) {
+    const userRow = database.prepare("SELECT username FROM users WHERE id = ?").get(row.user_id) as { username: string } | undefined;
+    if (!userRow || adminUsernames.has(userRow.username.toLowerCase())) continue;
+
+    const alreadyClaimed = database.prepare("SELECT 1 FROM last_mile_claims WHERE user_id = ? AND sprint_date = ?").get(row.user_id, DAY1_DATE);
+    if (alreadyClaimed) continue;
+
+    // Assign deterministically by userId mod 3 so each position type gets spread
+    const playerId = DAY1_PLAYER_IDS[row.user_id % 3];
+    const player = LAST_MILE_PLAYERS.find((p) => p.id === playerId)!;
+
+    database.exec("BEGIN IMMEDIATE");
+    try {
+      database.prepare("INSERT INTO last_mile_claims (user_id, sprint_date, player_id) VALUES (?, ?, ?)").run(row.user_id, DAY1_DATE, playerId);
+      const existing = database.prepare("SELECT duplicate_count FROM user_players WHERE user_id = ? AND player_id = ?").get(row.user_id, playerId) as { duplicate_count: number } | undefined;
+      if (existing) {
+        database.prepare("UPDATE user_players SET duplicate_count = duplicate_count + 1 WHERE user_id = ? AND player_id = ?").run(row.user_id, playerId);
+      } else {
+        database.prepare("INSERT INTO user_players (user_id, player_id, duplicate_count) VALUES (?, ?, 0)").run(row.user_id, playerId);
+      }
+      database.prepare("INSERT OR IGNORE INTO reveal_players (user_id, position, player_id) VALUES (?, 0, ?)").run(row.user_id, playerId);
+      database.prepare("INSERT INTO card_awards (user_id, player_id, rarity, source, source_id, position) VALUES (?, ?, 'consistent', 'last_mile_backfill', NULL, 0)").run(row.user_id, playerId);
+      database.exec("COMMIT");
+      createChatMessage(row.user_id, `⭐ ${userRow.username} earned a Consistency card for completing Day 1 — ${player.name} (${player.nation}, ${player.pos}). Check your reveal.`);
+    } catch {
+      database.exec("ROLLBACK");
+    }
+  }
+
+  database.prepare("INSERT OR REPLACE INTO kv_store (key, value) VALUES (?, 'done')").run(GUARD_KEY);
 }
 
 function migrateActivityMultiplier(database: DatabaseSync) {
