@@ -3504,10 +3504,10 @@ export function claimDangerReveals(userId: number): number[] {
   const rows = db.prepare("SELECT player_id FROM danger_reveal_queue WHERE user_id = ? ORDER BY awarded_at").all(userId) as { player_id: number }[];
   if (rows.length === 0) return [];
   const playerIds = rows.map((r) => r.player_id);
-  const { maxPos } = db.prepare("SELECT MAX(position) AS maxPos FROM reveal_players WHERE user_id = ?").get(userId) as { maxPos: number | null };
-  const startPos = (maxPos ?? -1) + 1;
-  const insert = db.prepare("INSERT OR REPLACE INTO reveal_players (user_id, position, player_id) VALUES (?, ?, ?)");
-  playerIds.forEach((id, i) => insert.run(userId, startPos + i, id));
+  // Replace reveal queue — stale pack reveals are already in user_players, animation-only
+  db.prepare("DELETE FROM reveal_players WHERE user_id = ?").run(userId);
+  const insert = db.prepare("INSERT INTO reveal_players (user_id, position, player_id) VALUES (?, ?, ?)");
+  playerIds.forEach((id, i) => insert.run(userId, i, id));
   db.prepare("DELETE FROM danger_reveal_queue WHERE user_id = ?").run(userId);
   return playerIds;
 }
@@ -3574,9 +3574,10 @@ export function claimBonusReveals(userId: number): number[] {
   const rows = db.prepare("SELECT player_id FROM bonus_reveal_queue WHERE user_id = ?").all(userId) as Array<{ player_id: number }>;
   if (rows.length === 0) return [];
   const playerIds = rows.map((r) => r.player_id);
-  const maxPos = (db.prepare("SELECT COALESCE(MAX(position), -1) AS m FROM reveal_players WHERE user_id = ?").get(userId) as { m: number }).m;
-  const insertReveal = db.prepare("INSERT OR IGNORE INTO reveal_players (user_id, position, player_id) VALUES (?, ?, ?)");
-  playerIds.forEach((pid, i) => insertReveal.run(userId, maxPos + 1 + i, pid));
+  // Replace reveal queue — stale pack reveals are already in user_players, animation-only
+  db.prepare("DELETE FROM reveal_players WHERE user_id = ?").run(userId);
+  const insertReveal = db.prepare("INSERT INTO reveal_players (user_id, position, player_id) VALUES (?, ?, ?)");
+  playerIds.forEach((pid, i) => insertReveal.run(userId, i, pid));
   db.prepare("DELETE FROM bonus_reveal_queue WHERE user_id = ?").run(userId);
   return playerIds;
 }
@@ -3711,8 +3712,16 @@ export function claimLastMilePick(userId: number, playerId: number): { ok: boole
   db.exec("BEGIN IMMEDIATE");
   try {
     db.prepare("INSERT INTO last_mile_claims (user_id, sprint_date, player_id) VALUES (?, ?, ?)").run(userId, activeDay.date, playerId);
-    const maxPos = (db.prepare("SELECT COALESCE(MAX(position), -1) AS m FROM reveal_players WHERE user_id = ?").get(userId) as { m: number }).m;
-    db.prepare("INSERT OR IGNORE INTO reveal_players (user_id, position, player_id) VALUES (?, ?, ?)").run(userId, maxPos + 1, playerId);
+    // Add to user's collection
+    const existing = db.prepare("SELECT duplicate_count FROM user_players WHERE user_id = ? AND player_id = ?").get(userId, playerId) as { duplicate_count: number } | undefined;
+    if (existing) {
+      db.prepare("UPDATE user_players SET duplicate_count = duplicate_count + 1 WHERE user_id = ? AND player_id = ?").run(userId, playerId);
+    } else {
+      db.prepare("INSERT INTO user_players (user_id, player_id, duplicate_count) VALUES (?, ?, 0)").run(userId, playerId);
+    }
+    // Replace reveal queue with only this card so no stale pack reveals bleed in
+    db.prepare("DELETE FROM reveal_players WHERE user_id = ?").run(userId);
+    db.prepare("INSERT INTO reveal_players (user_id, position, player_id) VALUES (?, 0, ?)").run(userId, playerId);
     const player = LAST_MILE_PLAYERS.find((p) => p.id === playerId)!;
     db.prepare("INSERT INTO card_awards (user_id, player_id, rarity, source, source_id, position) VALUES (?, ?, ?, ?, ?, ?)").run(userId, playerId, player.rarity, "last_mile", null, 0);
     db.exec("COMMIT");
