@@ -3838,6 +3838,67 @@ function backfillLastMileMissingUserPlayers(database: DatabaseSync) {
   database.prepare("INSERT OR REPLACE INTO kv_store (key, value) VALUES (?, 'done')").run(GUARD_KEY);
 }
 
+// On-demand version of the missing user_players repair (bypasses guard key).
+// Returns the number of claims that were repaired.
+export function repairLastMileMissingUserPlayers(): number {
+  const database = getDb();
+  const orphans = database.prepare(
+    `SELECT lmc.user_id, lmc.player_id
+     FROM last_mile_claims lmc
+     WHERE NOT EXISTS (
+       SELECT 1 FROM user_players up
+       WHERE up.user_id = lmc.user_id AND up.player_id = lmc.player_id
+     )`
+  ).all() as Array<{ user_id: number; player_id: number }>;
+
+  let repaired = 0;
+  for (const row of orphans) {
+    const player = LAST_MILE_PLAYERS.find((p) => p.id === row.player_id);
+    if (!player) continue;
+    database.exec("BEGIN IMMEDIATE");
+    try {
+      database.prepare("INSERT INTO user_players (user_id, player_id, duplicate_count) VALUES (?, ?, 0)").run(row.user_id, row.player_id);
+      database.prepare("INSERT OR IGNORE INTO reveal_players (user_id, position, player_id) VALUES (?, 0, ?)").run(row.user_id, row.player_id);
+      database.prepare("INSERT INTO card_awards (user_id, player_id, rarity, source, source_id, position) VALUES (?, ?, 'consistent', 'last_mile_repair', NULL, 0)").run(row.user_id, row.player_id);
+      database.exec("COMMIT");
+      repaired++;
+    } catch {
+      database.exec("ROLLBACK");
+    }
+  }
+  return repaired;
+}
+
+export function adminAwardLastMileCard(username: string, playerId: number, sprintDate: string): { ok: boolean; error?: string } {
+  const database = getDb();
+  const userRow = database.prepare("SELECT id FROM users WHERE username = ?").get(username) as { id: number } | undefined;
+  if (!userRow) return { ok: false, error: `User "${username}" not found.` };
+
+  const player = LAST_MILE_PLAYERS.find((p) => p.id === playerId);
+  if (!player) return { ok: false, error: `Player ${playerId} is not a Last Mile player.` };
+
+  const alreadyClaimed = database.prepare("SELECT 1 FROM last_mile_claims WHERE user_id = ? AND sprint_date = ?").get(userRow.id, sprintDate);
+  if (alreadyClaimed) return { ok: false, error: `${username} already has a claim for ${sprintDate}.` };
+
+  database.exec("BEGIN IMMEDIATE");
+  try {
+    database.prepare("INSERT INTO last_mile_claims (user_id, sprint_date, player_id) VALUES (?, ?, ?)").run(userRow.id, sprintDate, playerId);
+    const existing = database.prepare("SELECT duplicate_count FROM user_players WHERE user_id = ? AND player_id = ?").get(userRow.id, playerId) as { duplicate_count: number } | undefined;
+    if (existing) {
+      database.prepare("UPDATE user_players SET duplicate_count = duplicate_count + 1 WHERE user_id = ? AND player_id = ?").run(userRow.id, playerId);
+    } else {
+      database.prepare("INSERT INTO user_players (user_id, player_id, duplicate_count) VALUES (?, ?, 0)").run(userRow.id, playerId);
+    }
+    database.prepare("INSERT OR IGNORE INTO reveal_players (user_id, position, player_id) VALUES (?, 0, ?)").run(userRow.id, playerId);
+    database.prepare("INSERT INTO card_awards (user_id, player_id, rarity, source, source_id, position) VALUES (?, ?, ?, 'admin_award', NULL, 0)").run(userRow.id, playerId, player.rarity);
+    database.exec("COMMIT");
+    return { ok: true };
+  } catch (e) {
+    database.exec("ROLLBACK");
+    return { ok: false, error: String(e) };
+  }
+}
+
 export type LastMileAwardRow = {
   username: string;
   user_id: number;

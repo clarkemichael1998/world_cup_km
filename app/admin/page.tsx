@@ -1678,26 +1678,108 @@ type LastMileAward = {
   source: string;
 };
 
+const LAST_MILE_PLAYER_OPTIONS = [
+  { id: 99101, name: "Cafu (DF, Day 1)" },
+  { id: 99102, name: "Andrea Pirlo (MF, Day 1)" },
+  { id: 99103, name: "Davor Šuker (FW, Day 1)" },
+  { id: 99104, name: "Lilian Thuram (DF, Day 2)" },
+  { id: 99105, name: "Michael Ballack (MF, Day 2)" },
+  { id: 99106, name: "Just Fontaine (FW, Day 2)" },
+  { id: 99107, name: "Paolo Maldini (DF, Day 3)" },
+  { id: 99108, name: "Lothar Matthäus (MF, Day 3)" },
+  { id: 99109, name: "Ronaldo Nazário (FW, Day 3)" },
+  { id: 99110, name: "Mats Hummels (DF, Day 4)" },
+  { id: 99111, name: "Toni Kroos (MF, Day 4)" },
+  { id: 99112, name: "Gary Lineker (FW, Day 4)" },
+  { id: 99113, name: "Philipp Lahm (DF, Day 5)" },
+  { id: 99114, name: "Andrés Iniesta (MF, Day 5)" },
+  { id: 99115, name: "Gerd Müller (FW, Day 5)" },
+  { id: 99116, name: "Carlos Alberto (DF, Day 6)" },
+  { id: 99117, name: "Paul Breitner (MF, Day 6)" },
+  { id: 99118, name: "Jürgen Klinsmann (FW, Day 6)" },
+  { id: 99119, name: "Roberto Carlos (DF, Day 7)" },
+  { id: 99120, name: "Rivaldo (MF, Day 7)" },
+  { id: 99121, name: "Miroslav Klose (FW, Day 7)" },
+  { id: 99122, name: "Franz Beckenbauer (DF, Day 8)" },
+  { id: 99123, name: "Xavi (MF, Day 8)" },
+  { id: 99124, name: "Eusébio (FW, Day 8)" },
+];
+
 function LastMileAwardsTab({ onForbidden }: { onForbidden: () => void }) {
   const [awards, setAwards] = useState<LastMileAward[]>([]);
   const [loading, setLoading] = useState(true);
+  const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
+  const [repairing, setRepairing] = useState(false);
+  const [awardUsername, setAwardUsername] = useState("");
+  const [awardPlayerId, setAwardPlayerId] = useState(99101);
+  const [awardDate, setAwardDate] = useState("2026-07-11");
+  const [awarding, setAwarding] = useState(false);
 
-  useEffect(() => {
-    fetch("/api/admin/last-mile-awards", { credentials: "include" })
+  function loadAwards() {
+    return fetch("/api/admin/last-mile-awards", { credentials: "include" })
       .then(async (response) => {
         if (response.status === 403) { onForbidden(); return null; }
         const payload = await response.json() as { awards?: LastMileAward[]; error?: string };
         if (!response.ok) throw new Error(payload.error ?? "Could not load awards.");
         return payload.awards ?? [];
-      })
+      });
+  }
+
+  useEffect(() => {
+    loadAwards()
       .then((data) => { if (data) setAwards(data); })
       .catch((err: Error) => setError(err.message))
       .finally(() => setLoading(false));
   }, [onForbidden]);
 
+  async function repair() {
+    setRepairing(true);
+    setNotice("");
+    setError("");
+    try {
+      const response = await fetch("/api/admin/last-mile-awards", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ action: "repair" })
+      });
+      const payload = await response.json() as { ok?: boolean; repaired?: number; awards?: LastMileAward[]; error?: string };
+      if (!response.ok) throw new Error(payload.error ?? "Repair failed.");
+      setNotice(`Repaired ${payload.repaired ?? 0} missing card${payload.repaired !== 1 ? "s" : ""}.`);
+      if (payload.awards) setAwards(payload.awards);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setRepairing(false);
+    }
+  }
+
+  async function award(e: React.FormEvent) {
+    e.preventDefault();
+    setAwarding(true);
+    setNotice("");
+    setError("");
+    try {
+      const response = await fetch("/api/admin/last-mile-awards", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ action: "award", username: awardUsername, playerId: awardPlayerId, sprintDate: awardDate })
+      });
+      const payload = await response.json() as { ok?: boolean; awards?: LastMileAward[]; error?: string };
+      if (!response.ok) throw new Error(payload.error ?? "Award failed.");
+      setNotice(`Awarded to ${awardUsername}.`);
+      setAwardUsername("");
+      if (payload.awards) setAwards(payload.awards);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setAwarding(false);
+    }
+  }
+
   if (loading) return <p className="text-sm font-bold text-green-900/60">Loading awards…</p>;
-  if (error) return <p className="rounded-lg bg-red-50 p-4 text-sm font-bold text-red-900">{error}</p>;
 
   const byDate = awards.reduce<Record<string, LastMileAward[]>>((acc, award) => {
     (acc[award.sprint_date] ??= []).push(award);
@@ -1706,7 +1788,64 @@ function LastMileAwardsTab({ onForbidden }: { onForbidden: () => void }) {
 
   return (
     <div className="space-y-6">
-      <p className="text-sm font-bold text-green-900/60">{awards.length} total Last Mile award{awards.length !== 1 ? "s" : ""} across {Object.keys(byDate).length} day{Object.keys(byDate).length !== 1 ? "s" : ""}.</p>
+      {notice && <div className="rounded-lg bg-emerald-50 p-3 text-sm font-bold text-emerald-900">{notice}</div>}
+      {error && <div className="rounded-lg bg-red-50 p-3 text-sm font-bold text-red-900">{error}</div>}
+
+      <div className="flex flex-wrap items-start gap-4">
+        <button
+          onClick={repair}
+          disabled={repairing}
+          className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-black text-white hover:bg-amber-600 disabled:opacity-50"
+        >
+          {repairing ? "Repairing…" : "Repair Missing Cards"}
+        </button>
+        <p className="text-xs font-semibold text-green-900/50 self-center">Finds any claim with no user_players entry and fixes it.</p>
+      </div>
+
+      <form onSubmit={award} className="flex flex-wrap items-end gap-3 rounded-lg border border-green-900/10 bg-white p-4">
+        <p className="w-full text-xs font-black uppercase tracking-wide text-green-900/50">Manually Award Card</p>
+        <div>
+          <label className="mb-1 block text-[11px] font-black uppercase text-green-900/50">Username</label>
+          <input
+            className="rounded border border-green-900/20 px-3 py-1.5 text-sm font-semibold"
+            value={awardUsername}
+            onChange={(e) => setAwardUsername(e.target.value)}
+            placeholder="e.g. ryanmcm"
+            required
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-[11px] font-black uppercase text-green-900/50">Player</label>
+          <select
+            className="rounded border border-green-900/20 px-3 py-1.5 text-sm font-semibold"
+            value={awardPlayerId}
+            onChange={(e) => setAwardPlayerId(Number(e.target.value))}
+          >
+            {LAST_MILE_PLAYER_OPTIONS.map((p) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="mb-1 block text-[11px] font-black uppercase text-green-900/50">Sprint Date</label>
+          <input
+            type="date"
+            className="rounded border border-green-900/20 px-3 py-1.5 text-sm font-semibold"
+            value={awardDate}
+            onChange={(e) => setAwardDate(e.target.value)}
+            required
+          />
+        </div>
+        <button
+          type="submit"
+          disabled={awarding}
+          className="rounded-lg bg-green-950 px-4 py-2 text-sm font-black text-white hover:bg-green-800 disabled:opacity-50"
+        >
+          {awarding ? "Awarding…" : "Award"}
+        </button>
+      </form>
+
+      <p className="text-sm font-bold text-green-900/60">{awards.length} total award{awards.length !== 1 ? "s" : ""} across {Object.keys(byDate).length} day{Object.keys(byDate).length !== 1 ? "s" : ""}.</p>
       {Object.entries(byDate).sort(([a], [b]) => a.localeCompare(b)).map(([date, dayAwards]) => (
         <section key={date}>
           <h3 className="mb-2 text-sm font-black text-green-950">{date} — {dayAwards.length} award{dayAwards.length !== 1 ? "s" : ""}</h3>
@@ -1717,7 +1856,6 @@ function LastMileAwardsTab({ onForbidden }: { onForbidden: () => void }) {
                   <th className="px-3 py-2 text-left">User</th>
                   <th className="px-3 py-2 text-left">Player</th>
                   <th className="px-3 py-2 text-left">Pos</th>
-                  <th className="px-3 py-2 text-left">ID</th>
                   <th className="px-3 py-2 text-left">Source</th>
                 </tr>
               </thead>
@@ -1727,9 +1865,8 @@ function LastMileAwardsTab({ onForbidden }: { onForbidden: () => void }) {
                     <td className="px-3 py-2 font-bold text-green-950">{award.username}</td>
                     <td className="px-3 py-2 font-semibold text-green-900">{award.player_name}</td>
                     <td className="px-3 py-2 font-semibold text-green-900/60">{award.player_pos}</td>
-                    <td className="px-3 py-2 font-mono text-xs text-green-900/50">{award.player_id}</td>
                     <td className="px-3 py-2">
-                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-black ${award.source === "claimed" ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>
+                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-black ${award.source === "claimed" ? "bg-emerald-100 text-emerald-800" : award.source === "admin_award" ? "bg-sky-100 text-sky-800" : "bg-amber-100 text-amber-800"}`}>
                         {award.source}
                       </span>
                     </td>
