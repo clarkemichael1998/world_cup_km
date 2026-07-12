@@ -491,6 +491,7 @@ export function getDb() {
   resetMaradonaCupDraw(db);
   migrateActivityMultiplier(db);
   backfillLastMileDay1(db);
+  backfillLastMileMissingUserPlayers(db);
   seedFixtureResults(db);
   removeLegacySeedFixtures(db);
   return db;
@@ -3802,6 +3803,74 @@ function backfillLastMileDay1(database: DatabaseSync) {
   }
 
   database.prepare("INSERT OR REPLACE INTO kv_store (key, value) VALUES (?, 'done')").run(GUARD_KEY);
+}
+
+// Second backfill: fix users who claimed during the bug window (before the user_players INSERT fix).
+// They have a last_mile_claims row but no user_players entry for that player.
+function backfillLastMileMissingUserPlayers(database: DatabaseSync) {
+  const GUARD_KEY = "last_mile_user_players_backfill_done";
+  const done = database.prepare("SELECT value FROM kv_store WHERE key = ?").get(GUARD_KEY) as { value: string } | undefined;
+  if (done) return;
+
+  const orphans = database.prepare(
+    `SELECT lmc.user_id, lmc.player_id
+     FROM last_mile_claims lmc
+     WHERE NOT EXISTS (
+       SELECT 1 FROM user_players up
+       WHERE up.user_id = lmc.user_id AND up.player_id = lmc.player_id
+     )`
+  ).all() as Array<{ user_id: number; player_id: number }>;
+
+  for (const row of orphans) {
+    const player = LAST_MILE_PLAYERS.find((p) => p.id === row.player_id);
+    if (!player) continue;
+    database.exec("BEGIN IMMEDIATE");
+    try {
+      database.prepare("INSERT INTO user_players (user_id, player_id, duplicate_count) VALUES (?, ?, 0)").run(row.user_id, row.player_id);
+      database.prepare("INSERT OR IGNORE INTO reveal_players (user_id, position, player_id) VALUES (?, 0, ?)").run(row.user_id, row.player_id);
+      database.prepare("INSERT INTO card_awards (user_id, player_id, rarity, source, source_id, position) VALUES (?, ?, 'consistent', 'last_mile_claim_fix', NULL, 0)").run(row.user_id, row.player_id);
+      database.exec("COMMIT");
+    } catch {
+      database.exec("ROLLBACK");
+    }
+  }
+
+  database.prepare("INSERT OR REPLACE INTO kv_store (key, value) VALUES (?, 'done')").run(GUARD_KEY);
+}
+
+export type LastMileAwardRow = {
+  username: string;
+  user_id: number;
+  sprint_date: string;
+  player_id: number;
+  player_name: string;
+  player_pos: string;
+  source: string;
+};
+
+export function getLastMileAwards(): LastMileAwardRow[] {
+  const db = getDb();
+  const claims = db
+    .prepare(
+      `SELECT u.username, lmc.user_id, lmc.sprint_date, lmc.player_id
+       FROM last_mile_claims lmc
+       JOIN users u ON u.id = lmc.user_id
+       ORDER BY lmc.sprint_date, u.username`
+    )
+    .all() as Array<{ username: string; user_id: number; sprint_date: string; player_id: number }>;
+  const playerMap = new Map(getAllPlayers().map((p) => [p.id, p]));
+  return claims.map((row) => {
+    const player = playerMap.get(row.player_id);
+    return {
+      username: row.username,
+      user_id: row.user_id,
+      sprint_date: row.sprint_date,
+      player_id: row.player_id,
+      player_name: player?.name ?? `Player #${row.player_id}`,
+      player_pos: player?.pos ?? "?",
+      source: "claimed"
+    };
+  });
 }
 
 function migrateActivityMultiplier(database: DatabaseSync) {

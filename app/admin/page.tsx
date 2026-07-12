@@ -130,7 +130,7 @@ const CUP_OPTIONS = [
 ];
 
 export default function AdminPage() {
-  const [tab, setTab] = useState<"results" | "goalscorers" | "activity" | "boost" | "news" | "players" | "ratings" | "settle" | "monitor">("results");
+  const [tab, setTab] = useState<"results" | "goalscorers" | "activity" | "boost" | "news" | "players" | "ratings" | "settle" | "monitor" | "awards">("results");
   const [forbidden, setForbidden] = useState(false);
 
   if (forbidden) {
@@ -149,13 +149,13 @@ export default function AdminPage() {
       <PageTitle title="Admin" subtitle="Tournament management" />
 
       <div className="mb-6 flex flex-wrap gap-2">
-        {(["results", "monitor", "goalscorers", "activity", "boost", "news", "players", "ratings", "settle"] as const).map((t) => (
+        {(["results", "monitor", "goalscorers", "activity", "boost", "news", "players", "ratings", "settle", "awards"] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
             className={`rounded-md px-4 py-2 text-sm font-black transition-colors ${tab === t ? "bg-green-950 text-white" : "bg-green-950/8 text-green-950 hover:bg-green-950/15"}`}
           >
-            {t === "results" ? "Match Results" : t === "monitor" ? "Match Monitor" : t === "goalscorers" ? "Goal Scorers" : t === "activity" ? "Activity Review" : t === "boost" ? "Activity Boost" : t === "news" ? "News Reel" : t === "players" ? "Late Call-Ups" : t === "ratings" ? "Viral Ratings" : "Live Settle"}
+            {t === "results" ? "Match Results" : t === "monitor" ? "Match Monitor" : t === "goalscorers" ? "Goal Scorers" : t === "activity" ? "Activity Review" : t === "boost" ? "Activity Boost" : t === "news" ? "News Reel" : t === "players" ? "Late Call-Ups" : t === "ratings" ? "Viral Ratings" : t === "awards" ? "Last Mile Awards" : "Live Settle"}
           </button>
         ))}
       </div>
@@ -169,6 +169,7 @@ export default function AdminPage() {
       {tab === "players" && <LateCallupsTab onForbidden={() => setForbidden(true)} />}
       {tab === "ratings" && <ViralRatingsTab onForbidden={() => setForbidden(true)} />}
       {tab === "settle" && <LiveSettleTab onForbidden={() => setForbidden(true)} />}
+      {tab === "awards" && <LastMileAwardsTab onForbidden={() => setForbidden(true)} />}
     </div>
   );
 }
@@ -1664,6 +1665,83 @@ function TeamSelect({ value, onChange, exclude }: { value: string; onChange: (v:
         <option key={t} value={t}>{t}</option>
       ))}
     </select>
+  );
+}
+
+type LastMileAward = {
+  username: string;
+  user_id: number;
+  sprint_date: string;
+  player_id: number;
+  player_name: string;
+  player_pos: string;
+  source: string;
+};
+
+function LastMileAwardsTab({ onForbidden }: { onForbidden: () => void }) {
+  const [awards, setAwards] = useState<LastMileAward[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    fetch("/api/admin/last-mile-awards", { credentials: "include" })
+      .then(async (response) => {
+        if (response.status === 403) { onForbidden(); return null; }
+        const payload = await response.json() as { awards?: LastMileAward[]; error?: string };
+        if (!response.ok) throw new Error(payload.error ?? "Could not load awards.");
+        return payload.awards ?? [];
+      })
+      .then((data) => { if (data) setAwards(data); })
+      .catch((err: Error) => setError(err.message))
+      .finally(() => setLoading(false));
+  }, [onForbidden]);
+
+  if (loading) return <p className="text-sm font-bold text-green-900/60">Loading awards…</p>;
+  if (error) return <p className="rounded-lg bg-red-50 p-4 text-sm font-bold text-red-900">{error}</p>;
+
+  const byDate = awards.reduce<Record<string, LastMileAward[]>>((acc, award) => {
+    (acc[award.sprint_date] ??= []).push(award);
+    return acc;
+  }, {});
+
+  return (
+    <div className="space-y-6">
+      <p className="text-sm font-bold text-green-900/60">{awards.length} total Last Mile award{awards.length !== 1 ? "s" : ""} across {Object.keys(byDate).length} day{Object.keys(byDate).length !== 1 ? "s" : ""}.</p>
+      {Object.entries(byDate).sort(([a], [b]) => a.localeCompare(b)).map(([date, dayAwards]) => (
+        <section key={date}>
+          <h3 className="mb-2 text-sm font-black text-green-950">{date} — {dayAwards.length} award{dayAwards.length !== 1 ? "s" : ""}</h3>
+          <div className="overflow-x-auto rounded-lg border border-green-900/10">
+            <table className="w-full text-sm">
+              <thead className="bg-green-950/6 text-[11px] font-black uppercase tracking-wide text-green-900/50">
+                <tr>
+                  <th className="px-3 py-2 text-left">User</th>
+                  <th className="px-3 py-2 text-left">Player</th>
+                  <th className="px-3 py-2 text-left">Pos</th>
+                  <th className="px-3 py-2 text-left">ID</th>
+                  <th className="px-3 py-2 text-left">Source</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-green-900/8">
+                {dayAwards.map((award, i) => (
+                  <tr key={i} className="bg-white hover:bg-green-950/3">
+                    <td className="px-3 py-2 font-bold text-green-950">{award.username}</td>
+                    <td className="px-3 py-2 font-semibold text-green-900">{award.player_name}</td>
+                    <td className="px-3 py-2 font-semibold text-green-900/60">{award.player_pos}</td>
+                    <td className="px-3 py-2 font-mono text-xs text-green-900/50">{award.player_id}</td>
+                    <td className="px-3 py-2">
+                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-black ${award.source === "claimed" ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>
+                        {award.source}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ))}
+      {awards.length === 0 && <p className="rounded-lg bg-white p-6 text-sm font-bold text-green-900/60">No Last Mile awards yet.</p>}
+    </div>
   );
 }
 
