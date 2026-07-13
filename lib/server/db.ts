@@ -3664,22 +3664,14 @@ export function getLastMileStatus(userId: number): LastMileStatus {
     // CURRENT_TIMESTAMP in SQLite is stored as "YYYY-MM-DD HH:MM:SS" UTC, so compare using that format.
     const windowStartUtc = zonedLondonDate(activeDay.date, 15);
     const windowStart = windowStartUtc.toISOString().replace("T", " ").replace(/\.\d{3}Z$/, "");
+    // distance_km stores activity credits (already normalised km-equivalent).
+    // Walk/run: 1 credit = 1 km. Strength: credits = minutes/10. Cycle: credits = km/3. Etc.
     const row = db
       .prepare(
-        `SELECT COALESCE(SUM(
-          CASE activity_type
-            WHEN 'walk'     THEN distance_km
-            WHEN 'run'      THEN distance_km
-            WHEN 'cycle'    THEN distance_km / 3.0
-            WHEN 'strength' THEN distance_km / 10.0
-            WHEN 'sport'    THEN distance_km / 10.0
-            WHEN 'mobility' THEN distance_km / 30.0
-            ELSE 0
-          END
-        ), 0) AS equiv
-        FROM km_log
-        WHERE user_id = ? AND voided_at IS NULL
-          AND created_at >= ?`
+        `SELECT COALESCE(SUM(distance_km), 0) AS equiv
+         FROM km_log
+         WHERE user_id = ? AND voided_at IS NULL
+           AND created_at >= ?`
       )
       .get(userId, windowStart) as { equiv: number };
     qualifies = row.equiv >= 5;
@@ -3755,17 +3747,7 @@ function backfillLastMileDay1(database: DatabaseSync) {
 
   // Find users who qualified (≥5km equiv) but have no claim for Day 1
   const qualifying = database.prepare(
-    `SELECT user_id, COALESCE(SUM(
-       CASE activity_type
-         WHEN 'walk'     THEN distance_km
-         WHEN 'run'      THEN distance_km
-         WHEN 'cycle'    THEN distance_km / 3.0
-         WHEN 'strength' THEN distance_km / 10.0
-         WHEN 'sport'    THEN distance_km / 10.0
-         WHEN 'mobility' THEN distance_km / 30.0
-         ELSE 0
-       END
-     ), 0) AS equiv
+    `SELECT user_id, COALESCE(SUM(distance_km), 0) AS equiv
      FROM km_log
      WHERE voided_at IS NULL
        AND created_at >= ? AND created_at < ?
