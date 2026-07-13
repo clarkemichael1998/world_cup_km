@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser, getLastMileAwards, adminAwardLastMileCard, repairLastMileMissingUserPlayers } from "@/lib/server/db";
+import { getCurrentUser, getLastMileAwards, adminAwardLastMileCard, adminAwardRandomIcon, repairLastMileMissingUserPlayers } from "@/lib/server/db";
 import { isAdminUsername } from "@/lib/server/admin";
 
 export async function GET() {
@@ -29,6 +29,14 @@ export async function POST(request: Request) {
     const result = adminAwardLastMileCard(body.username, body.playerId, body.sprintDate);
     if (!result.ok) return NextResponse.json({ error: result.error }, { status: 400 });
     return NextResponse.json({ ok: true, awards: getLastMileAwards() });
+  }
+
+  if (body?.action === "award-icon") {
+    if (!body.username) return NextResponse.json({ error: "username required." }, { status: 400 });
+    const reason = typeof (body as Record<string, unknown>).reason === "string" ? (body as Record<string, unknown>).reason as string : "Maradona Cup runner-up icon award.";
+    const result = adminAwardRandomIcon(body.username, reason);
+    if (!result.ok) return NextResponse.json({ error: result.error }, { status: 400 });
+    return NextResponse.json({ ok: true, playerName: result.playerName });
   }
 
   return NextResponse.json({ error: "Unknown action." }, { status: 400 });

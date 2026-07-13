@@ -1715,6 +1715,9 @@ function LastMileAwardsTab({ onForbidden }: { onForbidden: () => void }) {
   const [awardPlayerId, setAwardPlayerId] = useState(99101);
   const [awardDate, setAwardDate] = useState("2026-07-11");
   const [awarding, setAwarding] = useState(false);
+  const [iconUsername, setIconUsername] = useState("");
+  const [iconReason, setIconReason] = useState("Maradona Cup runner-up icon award.");
+  const [awardingIcon, setAwardingIcon] = useState(false);
 
   function loadAwards() {
     return fetch("/api/admin/last-mile-awards", { credentials: "include" })
@@ -1776,6 +1779,29 @@ function LastMileAwardsTab({ onForbidden }: { onForbidden: () => void }) {
       setError((e as Error).message);
     } finally {
       setAwarding(false);
+    }
+  }
+
+  async function awardIcon(e: React.FormEvent) {
+    e.preventDefault();
+    setAwardingIcon(true);
+    setNotice("");
+    setError("");
+    try {
+      const response = await fetch("/api/admin/last-mile-awards", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ action: "award-icon", username: iconUsername, reason: iconReason })
+      });
+      const payload = await response.json() as { ok?: boolean; playerName?: string; error?: string };
+      if (!response.ok) throw new Error(payload.error ?? "Icon award failed.");
+      setNotice(`Icon awarded to ${iconUsername}: ${payload.playerName ?? "unknown"}.`);
+      setIconUsername("");
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setAwardingIcon(false);
     }
   }
 
@@ -1842,6 +1868,36 @@ function LastMileAwardsTab({ onForbidden }: { onForbidden: () => void }) {
           className="rounded-lg bg-green-950 px-4 py-2 text-sm font-black text-white hover:bg-green-800 disabled:opacity-50"
         >
           {awarding ? "Awarding…" : "Award"}
+        </button>
+      </form>
+
+      <form onSubmit={awardIcon} className="flex flex-wrap items-end gap-3 rounded-lg border border-amber-300/40 bg-amber-50 p-4">
+        <p className="w-full text-xs font-black uppercase tracking-wide text-amber-900/60">Award Guaranteed Icon (Cup Runner-Up)</p>
+        <div>
+          <label className="mb-1 block text-[11px] font-black uppercase text-amber-900/60">Username</label>
+          <input
+            className="rounded border border-amber-300 px-3 py-1.5 text-sm font-semibold"
+            value={iconUsername}
+            onChange={(e) => setIconUsername(e.target.value)}
+            placeholder="e.g. liamw"
+            required
+          />
+        </div>
+        <div className="flex-1 min-w-48">
+          <label className="mb-1 block text-[11px] font-black uppercase text-amber-900/60">Reason (shown in chat)</label>
+          <input
+            className="w-full rounded border border-amber-300 px-3 py-1.5 text-sm font-semibold"
+            value={iconReason}
+            onChange={(e) => setIconReason(e.target.value)}
+            required
+          />
+        </div>
+        <button
+          type="submit"
+          disabled={awardingIcon}
+          className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-black text-white hover:bg-amber-600 disabled:opacity-50"
+        >
+          {awardingIcon ? "Awarding…" : "Award Icon"}
         </button>
       </form>
 

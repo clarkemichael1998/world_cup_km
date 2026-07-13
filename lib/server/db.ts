@@ -3852,6 +3852,34 @@ export function repairLastMileMissingUserPlayers(): number {
   return repaired;
 }
 
+export function adminAwardRandomIcon(username: string, reason: string): { ok: boolean; error?: string; playerName?: string } {
+  const database = getDb();
+  const userRow = database.prepare("SELECT id FROM users WHERE username = ?").get(username) as { id: number } | undefined;
+  if (!userRow) return { ok: false, error: `User "${username}" not found.` };
+
+  const icons = getAllPlayers().filter((p) => p.rarity === "icon" && !p.cupId);
+  if (icons.length === 0) return { ok: false, error: "No icon players found." };
+  const icon = icons[Math.floor(Math.random() * icons.length)];
+
+  database.exec("BEGIN IMMEDIATE");
+  try {
+    const existing = database.prepare("SELECT duplicate_count FROM user_players WHERE user_id = ? AND player_id = ?").get(userRow.id, icon.id) as { duplicate_count: number } | undefined;
+    if (existing) {
+      database.prepare("UPDATE user_players SET duplicate_count = duplicate_count + 1 WHERE user_id = ? AND player_id = ?").run(userRow.id, icon.id);
+    } else {
+      database.prepare("INSERT INTO user_players (user_id, player_id, duplicate_count) VALUES (?, ?, 0)").run(userRow.id, icon.id);
+    }
+    database.prepare("INSERT OR IGNORE INTO reveal_players (user_id, position, player_id) VALUES (?, 0, ?)").run(userRow.id, icon.id);
+    database.prepare("INSERT INTO card_awards (user_id, player_id, rarity, source, source_id, position) VALUES (?, ?, 'icon', 'admin_icon_award', NULL, 0)").run(userRow.id, icon.id);
+    database.exec("COMMIT");
+    createChatMessage(userRow.id, `🏆 Guaranteed Icon card awarded — ${icon.name} (${icon.nation}). ${reason}`);
+    return { ok: true, playerName: icon.name };
+  } catch (e) {
+    database.exec("ROLLBACK");
+    return { ok: false, error: String(e) };
+  }
+}
+
 export function adminAwardLastMileCard(username: string, playerId: number, sprintDate: string): { ok: boolean; error?: string } {
   const database = getDb();
   const userRow = database.prepare("SELECT id FROM users WHERE username = ?").get(username) as { id: number } | undefined;
