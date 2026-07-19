@@ -46,13 +46,18 @@ function addDays(date: string, days: number) {
 
 export function zonedLondonDate(date: string, hour: number) {
   const utcGuess = new Date(`${date}T${String(hour).padStart(2, "0")}:00:00.000Z`);
-  const londonHour = Number(
-    new Intl.DateTimeFormat("en-GB", {
-      timeZone: "Europe/London",
-      hour: "2-digit",
-      hour12: false
-    }).format(utcGuess)
-  );
-  const offsetHours = londonHour - hour;
-  return new Date(utcGuess.getTime() - offsetHours * 60 * 60 * 1000);
+  const noonUtc = new Date(`${date}T12:00:00.000Z`);
+  const londonNoonParts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/London",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false
+  }).formatToParts(noonUtc);
+  const parts = Object.fromEntries(londonNoonParts.map((part) => [part.type, part.value]));
+  const londonNoonAsUtc = Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day), Number(parts.hour), Number(parts.minute));
+  const offsetMs = londonNoonAsUtc - noonUtc.getTime();
+  return new Date(utcGuess.getTime() - offsetMs);
 }
