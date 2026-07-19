@@ -14,10 +14,14 @@ export function londonLockWindow(now: Date) {
 
 export function londonLockWindowForDate(lockDate: string) {
   const nextDate = addDays(lockDate, 1);
+  // Final matchday closes at 11pm BST on its own day (app lockdown), not 3pm the next day
+  const unlockAt = lockDate === "2026-07-19"
+    ? zonedLondonDate(lockDate, 23)
+    : zonedLondonDate(nextDate, LOCK_HOUR);
   return {
     lockDate,
     lockAt: zonedLondonDate(lockDate, LOCK_HOUR),
-    unlockAt: zonedLondonDate(nextDate, LOCK_HOUR)
+    unlockAt
   };
 }
 
