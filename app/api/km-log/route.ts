@@ -3,7 +3,7 @@ import { createChatMessage, getActivityMultiplier, getAllPlayers, getCurrentUser
 import { activityDefinitions, calculateActivityCredits, calculateRewards, getRandomPlayerFromPool, isActivityType } from "@/lib/rewardEngine";
 
 const MAX_LOGS_PER_DAY = 3;
-const WC_FINAL_LOCKOUT = new Date("2026-07-19T18:00:00Z");
+const WC_FINAL_LOCKOUT = new Date("2026-07-19T19:00:00Z");
 
 export async function GET() {
   return NextResponse.json({ feed: getKmFeed() });
