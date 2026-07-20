@@ -3,7 +3,6 @@ import { createChatMessage, getActivityMultiplier, getAllPlayers, getCurrentUser
 import { activityDefinitions, calculateActivityCredits, calculateRewards, getRandomPlayerFromPool, isActivityType } from "@/lib/rewardEngine";
 
 const MAX_LOGS_PER_DAY = 3;
-const WC_FINAL_LOCKOUT = new Date("2026-07-19T19:00:00Z");
 
 export async function GET() {
   return NextResponse.json({ feed: getKmFeed() });
@@ -12,10 +11,6 @@ export async function GET() {
 export async function POST(request: Request) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Login required" }, { status: 401 });
-
-  if (new Date() >= WC_FINAL_LOCKOUT) {
-    return NextResponse.json({ error: "Activity logging is locked — the World Cup Final has kicked off!" }, { status: 403 });
-  }
 
   const body = (await request.json().catch(() => null)) as {
     activityType?: unknown;

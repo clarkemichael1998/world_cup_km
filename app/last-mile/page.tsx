@@ -41,8 +41,8 @@ export default function LastMilePage() {
         <p>There may be a reason to keep swapping. No further comment.</p>
       </Section>
 
-      <Section title="Final Whistle — 11pm, 19 July" highlight>
-        <p>The app locks down for good. No logging, no trading, no packs. The leaderboard freezes. Whoever has the highest squad average at that moment wins the tournament.</p>
+      <Section title="Post-Tournament Mode" highlight>
+        <p>The World Cup game has finished, but KMXI is open again. Logging, trading, free packs, squad tinkering, and the leaderboard are live for the final bragging-rights chase.</p>
       </Section>
 
       <div className="pt-2">

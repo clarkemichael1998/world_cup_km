@@ -3613,13 +3613,11 @@ export function getCupMatchOverrides(cupId: number): Array<{ match_id: string; h
 
 // ─── App lockdown ────────────────────────────────────────────────────────────
 
-// App locks down at 23:00 London time on 19 July 2026.
+// Post-tournament mode: keep the game features open after the World Cup has
+// finished so users can keep logging, trading, opening packs, and checking
+// leaderboards.
 export function isAppLockedDown(): boolean {
-  const now = new Date();
-  const londonTime = new Date(now.toLocaleString("en-GB", { timeZone: "Europe/London" }));
-  const lockdown = new Date("2026-07-19T23:00:00");
-  const londonLockdown = new Date(lockdown.toLocaleString("en-GB", { timeZone: "Europe/London" }));
-  return londonTime >= londonLockdown;
+  return false;
 }
 
 // ─── Last Mile sprint ─────────────────────────────────────────────────────────

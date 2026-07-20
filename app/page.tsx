@@ -177,7 +177,7 @@ export default function Home() {
             <CountUnit value={countdown.secs} label="sec" />
           </div>
         ) : (
-          <p className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-black text-amber-900">Final kicked off — logging locked.</p>
+          <p className="rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-2 text-sm font-black text-emerald-900">Post-tournament mode open: logging, packs, trading, and leaderboard are live.</p>
         )}
       </div>
 
@@ -283,21 +283,21 @@ function LastMileHero({ cupStatuses, locked }: { cupStatuses: CupStatus[]; locke
     <section className="overflow-hidden rounded-2xl border border-emerald-500/20 bg-gradient-to-br from-emerald-950 via-teal-950 to-slate-900 p-5 text-white shadow-sm">
       <div className="grid gap-4 lg:grid-cols-[1.45fr_0.55fr] lg:items-end">
         <div>
-          <p className="text-xs font-black uppercase tracking-[0.25em] text-emerald-400/60">KMXI · Final Week</p>
+          <p className="text-xs font-black uppercase tracking-[0.25em] text-emerald-400/60">KMXI · Post-Tournament</p>
           <h1 className="mt-2 max-w-3xl text-3xl font-black leading-tight tracking-tight sm:text-4xl">
             THE LAST MILE
           </h1>
           {locked ? (
-            <p className="mt-3 max-w-2xl text-sm font-semibold text-white/60">The app has locked down. Leaderboard frozen. No further actions.</p>
+            <p className="mt-3 max-w-2xl text-sm font-semibold text-white/60">Post-tournament mode is open. Logging, packs, trading, and leaderboard are live.</p>
           ) : (
             <p className="mt-3 max-w-2xl text-sm font-semibold text-white/75">
-              The final week of KMXI is here. Log 5km a day, pick mystery cards, double your points from the semis onwards. Everything ends 11pm on 19 July.
+              The tournament is finished, but KMXI is open again. Keep logging activity, open free packs, trade duplicates, and chase the final leaderboard bragging rights.
             </p>
           )}
           {!locked && (
             <div className="mt-4 flex flex-wrap items-center gap-2">
               <Link href="/last-mile" className="flex items-center gap-2 rounded-md bg-emerald-400 px-4 py-2 text-sm font-black text-emerald-950 shadow-sm transition hover:bg-emerald-300">
-                Click here for your guide to the final week of KMXI
+                View the post-tournament extras
               </Link>
             </div>
           )}

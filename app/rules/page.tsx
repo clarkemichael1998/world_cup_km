@@ -121,7 +121,7 @@ function SimpleRules() {
           <li>Your main score is your <strong>Best Squad Rating</strong>.</li>
           <li>Activity credits, games won, goal boosts, assist boosts, and collection boosts also show on the leaderboard.</li>
           <li>Each matchday has a <strong>head-to-head</strong>: the player earning the most match credits that day takes the daily crown — and gets to <strong>set the news reel</strong> for the next day.</li>
-          <li>Everything locks at <strong>World Cup Final kick-off on 19 July 2026</strong>.</li>
+          <li>Post-tournament mode is open: logging, free packs, trading, squads, and leaderboard updates are live again.</li>
         </ul>
       </Section>
 
@@ -187,7 +187,7 @@ function DetailedRules() {
           </div>
           <ul className="mt-3 list-disc space-y-1 pl-5 text-green-900/70">
             <li>Maximum <strong>3 activity logs per day</strong>.</li>
-            <li>All logging closes permanently at the <strong>World Cup Final kick-off on 19 July 2026</strong>.</li>
+            <li>Post-tournament mode is open, so activity logging remains available after the final.</li>
           </ul>
         </Section>
 
@@ -278,9 +278,9 @@ function DetailedRules() {
           </p>
         </Section>
 
-        <Section title="8. Leaderboard and Final Submission">
+        <Section title="8. Leaderboard and Post-Tournament Play">
           <p>
-            At the <strong>World Cup Final kick-off on 19 July 2026</strong>, all squad selections and activity logging are permanently locked. Your final squad is your entry.
+            After the World Cup Final, the game stays open in post-tournament mode. Logging activity, claiming free pack credits, trading duplicates, updating squads, and climbing the leaderboard remain available.
           </p>
           <ul className="mt-3 list-disc space-y-1 pl-5 text-green-900/70">
             <li><strong>Best Squad Rating:</strong> average rating of your strongest possible 4-3-3 XI, including goal, assist, and collection boosts.</li>
